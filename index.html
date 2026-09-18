@@ -1,15 +1,93 @@
 <!doctype html>
 <html lang="pt-BR">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>A Quinta Sombra</title><link rel="stylesheet" href="style.css"><script src="script.js" defer></script></head>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>A Quinta Sombra</title>
+
+  <link rel="stylesheet" href="style.css">
+  <script src="script.js" defer></script>
+</head>
+
 <body>
-<main id="game" aria-label="A Quinta Sombra — jogo para teclado">
-<canvas id="canvas" width="480" height="270" aria-label="Cenário do jogo"></canvas><div class="vignette"></div>
-<section id="menu" class="menu"><span class="eyebrow">UM LUGAR PARA VOLTAR.</span><h1>A Quinta<br><em>Sombra</em></h1><p class="tagline">Nem tudo que ficou em casa<br>pertence à sua família.</p><nav><button id="play">Jogar <span>↗</span></button><button id="continue" hidden>Continuar</button><button id="help">Como jogar</button><button id="credits">Créditos</button></nav><small>UMA HISTÓRIA AINDA EM CONSTRUÇÃO</small></section>
-<div id="hud" hidden><div class="objective"><span id="location"></span><strong id="objective"></strong></div><div class="clock"><span id="day"></span><strong id="time"></strong><small id="timeNote"></small></div><div class="bottom"><span id="inventory"></span><span>WASD / SETAS · MOVER &nbsp; E · INTERAGIR &nbsp; ESC · PAUSAR</span></div></div>
-<div id="prompt" hidden></div>
-<section id="dialog" hidden aria-live="polite"><span id="speaker"></span><p id="speech"></p><button id="next">Continuar <kbd>E</kbd></button></section>
-<section id="overlay" hidden><div class="card"><span class="eyebrow" id="modalLabel">A QUINTA SOMBRA</span><h2 id="modalTitle"></h2><div id="modalText"></div><div id="modalActions"></div></div></section>
-<div id="transition" aria-live="polite"><strong id="transitionTitle"></strong><span id="transitionHint"></span></div>
-<span id="version">PROTÓTIPO · 0.1.0</span>
-</main>
-</body></html>
+  <main id="game" aria-label="A Quinta Sombra — jogo para teclado">
+    <canvas
+      id="canvas"
+      width="480"
+      height="270"
+      aria-label="Cenário do jogo"
+    ></canvas>
+
+    <div class="vignette"></div>
+
+    <section id="menu" class="menu">
+      <span class="eyebrow">UM LUGAR PARA VOLTAR.</span>
+
+      <h1>A Quinta<br><em>Sombra</em></h1>
+
+      <p class="tagline">
+        Nem tudo que ficou em casa<br>
+        pertence à sua família.
+      </p>
+
+      <nav>
+        <button id="play">Jogar <span>↗</span></button>
+        <button id="continue" hidden>Continuar</button>
+        <button id="help">Como jogar</button>
+        <button id="credits">Créditos</button>
+      </nav>
+
+      <small>UMA HISTÓRIA AINDA EM CONSTRUÇÃO</small>
+    </section>
+
+    <div id="hud" hidden>
+      <div class="objective">
+        <span id="location"></span>
+        <strong id="objective"></strong>
+      </div>
+
+      <div class="clock">
+        <span id="day"></span>
+        <strong id="time"></strong>
+        <small id="timeNote"></small>
+      </div>
+
+      <div class="bottom">
+        <span id="inventory"></span>
+
+        <span>
+          WASD / SETAS · MOVER
+          &nbsp; E · INTERAGIR
+          &nbsp; ESC · PAUSAR
+        </span>
+      </div>
+    </div>
+
+    <div id="prompt" hidden></div>
+
+    <section id="dialog" hidden aria-live="polite">
+      <span id="speaker"></span>
+      <p id="speech"></p>
+      <button id="next">Continuar <kbd>E</kbd></button>
+    </section>
+
+    <section id="overlay" hidden>
+      <div class="card">
+        <span class="eyebrow" id="modalLabel">A QUINTA SOMBRA</span>
+
+        <h2 id="modalTitle"></h2>
+        <div id="modalText"></div>
+        <div id="modalActions"></div>
+      </div>
+    </section>
+
+    <div id="transition" aria-live="polite">
+      <strong id="transitionTitle"></strong>
+      <span id="transitionHint"></span>
+    </div>
+
+    <span id="version">PROTÓTIPO · 0.1.0</span>
+  </main>
+</body>
+</html>
