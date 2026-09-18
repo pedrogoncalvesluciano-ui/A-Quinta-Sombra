@@ -120,7 +120,7 @@
       obj(280, 70, 88, 130, "bed", "Cama", "bed"),
       obj(397, 90, 40, 40, "lamp"),
       obj(270, 280, 140, 55, "rug"),
-      obj(65, 78, 90, 40, "shelf")
+           obj(65, 180, 90, 40, "shelf")
     ],
     [
       door(90, 46, "hall", 490, 325, "Sair do quarto")
@@ -604,13 +604,7 @@
       }
 
       if (state.stage === "prologue") {
-        person(
-          state.x + 22,
-          state.y + 10,
-          "mother",
-          state.walk,
-          "down"
-        );
+               drawMother();
       } else {
         person(325, 405, "mother", 0);
         txt("MORADORA", 303, 363, "#bac2a4", 7);
@@ -803,6 +797,159 @@
   // DIÁLOGOS, SALVAMENTO E TRANSIÇÕES
   // =========================================================
 
+  // Mãe acompanhante: segue o percurso do pai com distância.
+
+  function prepareMother() {
+    if (state.mother) return;
+
+    const start = {
+      x: state.x,
+      y: state.y
+    };
+
+    const positions = [
+      [0, 52],
+      [52, 0],
+      [-52, 0],
+      [0, -52]
+    ];
+
+    for (const [dx, dy] of positions) {
+      let clear = true;
+
+      for (let n = 0; n <= 26; n++) {
+        const x = state.x + dx * n / 26;
+        const y = state.y + dy * n / 26;
+
+        if (solid(x, y)) {
+          clear = false;
+          break;
+        }
+      }
+
+      if (clear) {
+        start.x += dx;
+        start.y += dy;
+        break;
+      }
+    }
+
+    state.mother = {
+      x: start.x,
+      y: start.y,
+      walk: 0,
+      facing: "up",
+      trail: [
+        { x: state.x, y: state.y }
+      ],
+      lastX: state.x,
+      lastY: state.y
+    };
+  }
+
+  function drawMother() {
+    prepareMother();
+
+    const mother = state.mother;
+
+    person(
+      mother.x,
+      mother.y,
+      "mother",
+      mother.walk,
+      mother.facing
+    );
+  }
+
+  function updateMother(dt) {
+    if (
+      state.stage !== "prologue" ||
+      state.room !== "village"
+    ) {
+      return;
+    }
+
+    prepareMother();
+
+    const mother = state.mother;
+
+    // Registra o caminho real do pai, incluindo as curvas.
+    if (state.x !== mother.lastX) {
+      mother.trail.push({
+        x: state.x,
+        y: mother.lastY
+      });
+    }
+
+    if (state.y !== mother.lastY) {
+      mother.trail.push({
+        x: state.x,
+        y: state.y
+      });
+    }
+
+    mother.lastX = state.x;
+    mother.lastY = state.y;
+
+    let length = 0;
+    let previous = mother;
+
+    for (const point of mother.trail) {
+      length += Math.hypot(
+        point.x - previous.x,
+        point.y - previous.y
+      );
+
+      previous = point;
+    }
+
+    // Mantém 52 pixels de distância ao longo do percurso.
+    let distance = Math.min(
+      140 * dt,
+      Math.max(0, length - 52)
+    );
+
+    let moved = false;
+
+    while (distance > 0.001 && mother.trail.length) {
+      const target = mother.trail[0];
+
+      const dx = target.x - mother.x;
+      const dy = target.y - mother.y;
+      const remaining = Math.hypot(dx, dy);
+
+      if (remaining < 0.001) {
+        mother.trail.shift();
+        continue;
+      }
+
+      const step = Math.min(remaining, distance, 2);
+      const x = mother.x + dx / remaining * step;
+      const y = mother.y + dy / remaining * step;
+
+      if (solid(x, y)) break;
+
+      mother.x = x;
+      mother.y = y;
+
+      mother.facing = Math.abs(dx) > Math.abs(dy)
+        ? (dx > 0 ? "right" : "left")
+        : (dy > 0 ? "down" : "up");
+
+      distance -= step;
+      moved = true;
+
+      if (remaining <= step + 0.001) {
+        mother.trail.shift();
+      }
+    }
+
+    mother.walk = moved
+      ? mother.walk + dt * 13
+      : 0;
+  }
+
+  
   function say(lines, after) {
     keys.clear();
 
@@ -1395,6 +1542,8 @@
       state.walk = 0;
     }
 
+    updateMother(dt);
+    
     near = getNear();
     $("prompt").hidden = !near;
 
