@@ -308,13 +308,13 @@ function drawFatherSprite(
   // Mantém o desenho provisório nas fotos da família.
   if (scale !== 1) return false;
 
-  const moving = walk !== 0;
-  const animation = moving ? "walk" : "idle";
-  const image = fatherSpriteSheets[animation];
+ const moving = Math.abs(walk) > 0.01;
+const animation = moving ? "walk" : "idle";
+const image = fatherSpriteSheets[animation];
 
-  if (!image || !image.complete || !image.naturalWidth) {
-    return false;
-  }
+if (!image || !image.complete || image.naturalWidth <= 0) {
+  return false;
+}
 
   const columns = Math.max(
     1,
@@ -331,10 +331,10 @@ function drawFatherSprite(
     rows - 1
   );
 
-  const frame = moving
-    ? Math.floor(Math.abs(walk)) % columns
-    : Math.floor(elapsed * 3) % columns;
-
+ const frame = moving
+  ? Math.floor(elapsed * 8) % columns
+  : 0;
+  
   const spriteScale = 0.55;
 
   c.save();
