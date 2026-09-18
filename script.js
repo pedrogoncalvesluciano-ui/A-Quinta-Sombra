@@ -2648,7 +2648,7 @@ const enterGameBeforeTransitions = enterGame;
 const goBeforeTransitions = go;
 
 const START_TRANSITION_MS = 5000;
-const DOOR_TRANSITION_MS = 1100;
+const DOOR_TRANSITION_MS = 5000;
 
 function runScreenTransition(title, hint, duration, changeRoom) {
   transitionBusy = true;
