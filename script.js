@@ -2642,6 +2642,86 @@
       ["Voltar", closeModal]
     ]
   );
+
+  // TRANSIÇÕES DE ABERTURA E DE PORTAS
+const enterGameBeforeTransitions = enterGame;
+const goBeforeTransitions = go;
+
+const START_TRANSITION_MS = 5000;
+const DOOR_TRANSITION_MS = 1100;
+
+function runScreenTransition(title, hint, duration, changeRoom) {
+  transitionBusy = true;
+  keys.clear();
+
+  $('transitionTitle').textContent = title;
+  $('transitionHint').textContent = hint;
+  $('transition').classList.add('active');
+
+  const fadeTime = 650;
+  const holdTime = Math.max(0, duration - fadeTime * 2);
+
+  setTimeout(() => {
+    if (typeof changeRoom === 'function') changeRoom();
+
+    setTimeout(() => {
+      $('transition').classList.remove('active');
+
+      setTimeout(() => {
+        transitionBusy = false;
+        save();
+      }, fadeTime);
+    }, holdTime);
+  }, fadeTime);
+}
+
+enterGame = function () {
+  const opening =
+    state &&
+    state.stage === 'prologue' &&
+    !state.startupShown;
+
+  if (opening) state.startupShown = true;
+
+  enterGameBeforeTransitions();
+
+  if (opening) {
+    runScreenTransition(
+      'A QUINTA SOMBRA',
+      '14:00 · A família ainda está reunida.',
+      START_TRANSITION_MS
+    );
+  }
+};
+
+go = function (nextRoom, x, y) {
+  if (!state || transitionBusy || state.room === nextRoom) {
+    goBeforeTransitions(nextRoom, x, y);
+    return;
+  }
+
+  const labels = {
+    foyer: 'Entrada',
+    hall: 'Corredor',
+    room1: 'Quarto dos pais',
+    room2: 'Quarto do irmão',
+    kitchen: 'Cozinha',
+    attic: 'Sótão',
+    basement: 'Porão',
+    village: 'Vila'
+  };
+
+  const destination = labels[nextRoom] || 'Outro cômodo';
+
+  runScreenTransition(
+    '...',
+    `Indo para ${destination}.`,
+    DOOR_TRANSITION_MS,
+    () => {
+      goBeforeTransitions(nextRoom, x, y);
+    }
+  );
+};
   
   requestAnimationFrame(frame);
 })();
