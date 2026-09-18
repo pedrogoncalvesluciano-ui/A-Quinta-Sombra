@@ -278,6 +278,86 @@
   // PERSONAGENS PROVISÓRIOS
   // =========================================================
 
+// Sprites do pai em formato LPC, com frames de 64x64.
+const fatherSpriteSheets = {};
+const FATHER_FRAME_SIZE = 64;
+
+const FATHER_ROWS = {
+  up: 0,
+  left: 1,
+  down: 2,
+  right: 3
+};
+
+for (const animation of ["idle", "walk", "run"]) {
+  const image = new Image();
+
+  image.src =
+    `assets/sprites/characters/father/${animation}.png`;
+
+  fatherSpriteSheets[animation] = image;
+}
+
+function drawFatherSprite(
+  x,
+  y,
+  walk = 0,
+  face = "down",
+  scale = 1
+) {
+  // Mantém o desenho provisório nas fotos da família.
+  if (scale !== 1) return false;
+
+  const moving = walk !== 0;
+  const animation = moving ? "walk" : "idle";
+  const image = fatherSpriteSheets[animation];
+
+  if (!image || !image.complete || !image.naturalWidth) {
+    return false;
+  }
+
+  const columns = Math.max(
+    1,
+    Math.floor(image.naturalWidth / FATHER_FRAME_SIZE)
+  );
+
+  const rows = Math.max(
+    1,
+    Math.floor(image.naturalHeight / FATHER_FRAME_SIZE)
+  );
+
+  const row = Math.min(
+    FATHER_ROWS[face] ?? FATHER_ROWS.down,
+    rows - 1
+  );
+
+  const frame = moving
+    ? Math.floor(Math.abs(walk)) % columns
+    : Math.floor(elapsed * 3) % columns;
+
+  const spriteScale = 0.55;
+
+  c.save();
+
+  c.imageSmoothingEnabled = false;
+
+  c.drawImage(
+    image,
+    frame * FATHER_FRAME_SIZE,
+    row * FATHER_FRAME_SIZE,
+    FATHER_FRAME_SIZE,
+    FATHER_FRAME_SIZE,
+    Math.round(x - FATHER_FRAME_SIZE * spriteScale / 2),
+    Math.round(y - FATHER_FRAME_SIZE * spriteScale),
+    Math.round(FATHER_FRAME_SIZE * spriteScale),
+    Math.round(FATHER_FRAME_SIZE * spriteScale)
+  );
+
+  c.restore();
+
+  return true;
+}
+  
   function person(
     x,
     y,
@@ -286,6 +366,13 @@
     face = "down",
     scale = 1
   ) {
+if (
+  kind === "father" &&
+  drawFatherSprite(x, y, walk, face, scale)
+) {
+  return;
+}
+
     c.save();
     c.translate(Math.round(x), Math.round(y));
     c.scale(scale, scale);
