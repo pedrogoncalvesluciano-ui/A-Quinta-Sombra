@@ -309,7 +309,7 @@ function drawFatherSprite(
   if (scale !== 1) return false;
 
  const moving = Math.abs(walk) > 0.01;
-const animation = moving ? "walk" : "idle";
+const animation = "idle";
 const image = fatherSpriteSheets[animation];
 
 if (!image || !image.complete || image.naturalWidth <= 0) {
@@ -331,11 +331,9 @@ if (!image || !image.complete || image.naturalWidth <= 0) {
     rows - 1
   );
 
- const frame = moving
-  ? Math.floor(elapsed * 8) % columns
-  : 0;
+const frame = 0;
   
-  const spriteScale = 0.55;
+  const spriteScale = 0.85;
 
   c.save();
 
