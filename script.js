@@ -1719,7 +1719,7 @@
       return;
     }
 
-    if (!dialog) {
+   if (!dialog && !transitionBusy) {
       keys.add(key);
     }
   });
