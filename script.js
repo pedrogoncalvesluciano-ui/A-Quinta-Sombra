@@ -1834,5 +1834,814 @@
     [["Voltar", closeModal]]
   );
 
+  // =========================================================
+  // CONTINUAÇÃO 0.2
+  // Estoque limitado, perigo, invasão e defesa do irmão.
+  // =========================================================
+
+  const previous = {
+    enterGame,
+    update,
+    drawWorld,
+    updateHud,
+    interact,
+    getNear
+  };
+
+  // ---------------------------------------------------------
+  // NOVOS DADOS E COMPATIBILIDADE COM PROGRESSOS ANTIGOS
+  // ---------------------------------------------------------
+
+  function prepareSystems() {
+    if (!state) return;
+
+    if (!Number.isFinite(state.stockDay)) {
+      state.stockDay = state.day;
+
+      // Considera comida já carregada e a primeira entrega
+      // ao converter um progresso da versão anterior.
+      state.stock = Math.max(
+        0,
+        3 - state.food - (state.finished ? 1 : 0)
+      );
+    }
+
+    if (state.stockDay !== state.day) {
+      state.stockDay = state.day;
+      state.stock = 3;
+    }
+
+    if (!state.danger) {
+      state.danger = {
+        phase: "safe",
+        time: 0,
+        countdown: 60,
+        cooldown: 12,
+        victories: 0,
+        enemy: null,
+        punch: 0
+      };
+    }
+  }
+
+  function dangerActive() {
+    return (
+      state.danger.phase !== "safe" &&
+      state.danger.phase !== "lost"
+    );
+  }
+
+  // ---------------------------------------------------------
+  // PONTO DE RETORNO E DERROTA
+  // ---------------------------------------------------------
+
+  function rememberSafePoint() {
+    const snapshot = { ...state };
+
+    delete snapshot.rescueCheckpoint;
+
+    state.rescueCheckpoint = JSON.parse(
+      JSON.stringify(snapshot)
+    );
+  }
+
+  function showDefeat() {
+    modal(
+      "Você não chegou a tempo",
+      "O invasor encontrou seu irmão.\n\nVolte ao ponto anterior à invasão para tentar outra estratégia.",
+      [
+        [
+          "Tentar novamente",
+          () => {
+            if (!state.rescueCheckpoint) return;
+
+            state = JSON.parse(
+              JSON.stringify(state.rescueCheckpoint)
+            );
+
+            state.gameOver = false;
+            state.danger.phase = "safe";
+            state.danger.time = 0;
+            state.danger.enemy = null;
+            state.danger.cooldown = 12;
+
+            closeModal();
+            enterGame();
+            save();
+          }
+        ],
+        [
+          "Menu principal",
+          () => {
+            save();
+            closeModal();
+
+            mode = "menu";
+
+            $("menu").hidden = false;
+            $("hud").hidden = true;
+            $("prompt").hidden = true;
+          }
+        ]
+      ]
+    );
+  }
+
+  // ---------------------------------------------------------
+  // INVASOR E PERCURSO
+  // ---------------------------------------------------------
+
+  function startInvasion() {
+    rememberSafePoint();
+
+    const d = state.danger;
+
+    d.phase = "yellow";
+    d.time = 0;
+    d.countdown = 60;
+
+    d.enemy = {
+      room: "village",
+      x: 690,
+      y: 740,
+      hp: 3,
+      flash: 0,
+      walk: 0,
+      facing: "left",
+      path: [
+        [500, 740],
+        [500, 664]
+      ]
+    };
+
+    save();
+  }
+
+  function advanceInvader(dt) {
+    const e = state.danger.enemy;
+
+    if (!e) return;
+
+    e.flash = Math.max(0, e.flash - dt);
+
+    let distance = dt * 34;
+    let moved = false;
+
+    while (distance > 0 && e.path.length) {
+      const target = e.path[0];
+
+      const dx = target[0] - e.x;
+      const dy = target[1] - e.y;
+      const length = Math.hypot(dx, dy);
+
+      if (length < 0.01) {
+        e.path.shift();
+        continue;
+      }
+
+      const step = Math.min(distance, length, 2);
+
+      const x = e.x + dx / length * step;
+      const y = e.y + dy / length * step;
+
+      const blocked = maps[e.room].objects.some(o =>
+        o.type !== "rug" &&
+        x + 7 > o.x &&
+        x - 7 < o.x + o.w &&
+        y > o.y &&
+        y - 6 < o.y + o.h
+      );
+
+      if (blocked) break;
+
+      e.x = x;
+      e.y = y;
+
+      e.facing = Math.abs(dx) > Math.abs(dy)
+        ? (dx > 0 ? "right" : "left")
+        : (dy > 0 ? "down" : "up");
+
+      distance -= step;
+      moved = true;
+    }
+
+    e.walk = moved ? e.walk + dt * 10 : 0;
+  }
+
+  // ---------------------------------------------------------
+  // ETAPAS DA AMEAÇA
+  // ---------------------------------------------------------
+
+  function updateDanger(dt) {
+    const d = state.danger;
+
+    d.punch = Math.max(0, d.punch - dt);
+
+    if (!state.finished || state.gameOver) return;
+
+    if (d.phase === "safe") {
+      // Uma nova ameaça começa apenas fora de casa, à noite.
+      const isNight = (
+        state.minutes < 360 ||
+        state.minutes >= 1080
+      );
+
+      if (state.room === "village" && isNight) {
+        d.cooldown -= dt;
+
+        if (d.cooldown <= 0) {
+          startInvasion();
+        }
+      }
+
+      return;
+    }
+
+    d.time += dt;
+
+    advanceInvader(dt);
+
+    const e = d.enemy;
+
+    if (
+      d.phase === "yellow" &&
+      d.time >= 35 &&
+      !e.path.length
+    ) {
+      d.phase = "orange";
+      d.time = 0;
+
+      save();
+    } else if (
+      d.phase === "orange" &&
+      d.time >= 25
+    ) {
+      d.phase = "red";
+      d.time = 0;
+
+      e.room = "foyer";
+      e.x = 550;
+      e.y = 305;
+
+      e.path = [
+        [370, 305],
+        [370, 255]
+      ];
+
+      save();
+    } else if (
+      d.phase === "red" &&
+      d.time >= 20 &&
+      !e.path.length
+    ) {
+      d.phase = "critical";
+      d.time = 0;
+      d.countdown = 60;
+
+      e.room = "hall";
+      e.x = 450;
+      e.y = 200;
+
+      e.path = [
+        [160, 200],
+        [160, 360]
+      ];
+
+      save();
+    } else if (d.phase === "critical") {
+      d.countdown = Math.max(0, d.countdown - dt);
+
+      if (
+        e.room === "hall" &&
+        !e.path.length
+      ) {
+        e.room = "brother";
+        e.x = 490;
+        e.y = 85;
+
+        e.path = [
+          [490, 240],
+          [400, 240],
+          [400, 205]
+        ];
+
+        save();
+      }
+
+      if (d.countdown <= 0) {
+        d.phase = "lost";
+        state.gameOver = true;
+
+        keys.clear();
+        save();
+        showDefeat();
+      }
+    }
+  }
+
+  // ---------------------------------------------------------
+  // SOCO BÁSICO
+  // ---------------------------------------------------------
+
+  function punchInvader() {
+    const d = state.danger;
+
+    if (!d || d.punch > 0) return;
+
+    d.punch = 0.45;
+
+    const e = d.enemy;
+
+    if (
+      !e ||
+      e.room !== state.room ||
+      Math.hypot(e.x - state.x, e.y - state.y) > 44
+    ) {
+      return;
+    }
+
+    e.hp--;
+    e.flash = 0.22;
+
+    if (e.hp <= 0) {
+      d.phase = "safe";
+      d.time = 0;
+      d.countdown = 60;
+      d.enemy = null;
+
+      // Intervalo antes de outra ameaça.
+      d.cooldown = 180;
+      d.victories++;
+
+      delete state.rescueCheckpoint;
+
+      save();
+
+      say([
+        [
+          "Você",
+          "Ele fugiu. Preciso verificar se meu irmão está bem."
+        ],
+        [
+          "Você",
+          "Da próxima vez, posso interceptá-lo antes de entrar."
+        ]
+      ]);
+    } else {
+      save();
+    }
+  }
+
+  // ---------------------------------------------------------
+  // INTEGRAÇÃO COM O CÓDIGO EXISTENTE
+  // ---------------------------------------------------------
+
+  enterGame = function () {
+    prepareSystems();
+    previous.enterGame();
+
+    if (state.gameOver) {
+      showDefeat();
+    }
+  };
+
+  interact = function (action) {
+    prepareSystems();
+
+    if (state.gameOver) return;
+
+    // Estoque da venda independente da comida carregada.
+    if (
+      action === "supply" &&
+      state.stage !== "prologue"
+    ) {
+      if (state.stock <= 0) {
+        say([
+          "A caixa está vazia. A próxima reposição será amanhã."
+        ]);
+      } else if (state.food >= 2) {
+        say([
+          "Minha bolsa está cheia. Consigo carregar duas porções."
+        ]);
+      } else {
+        const stockDay = state.stockDay;
+
+        say(
+          [
+            `Há ${state.stock} porção(ões) na caixa. Vou pegar uma.`
+          ],
+          () => {
+            if (
+              state.stockDay !== stockDay ||
+              state.stock <= 0 ||
+              state.food >= 2
+            ) {
+              return;
+            }
+
+            state.stock--;
+            state.food++;
+
+            if (state.stage === "supplies") {
+              stage("return");
+            }
+
+            updateHud();
+            save();
+          }
+        );
+      }
+
+      return;
+    }
+
+    // A primeira entrega agora abre a continuação.
+    if (
+      action === "brother" &&
+      (
+        state.stage === "return" ||
+        state.stage === "free"
+      )
+    ) {
+      if (!state.finished && state.food > 0) {
+        say(
+          [
+            [
+              "Irmão",
+              "Alguém ficou olhando para a janela enquanto você estava fora."
+            ],
+            [
+              "Você",
+              "Trouxe comida. Vou conferir a entrada."
+            ],
+            [
+              "Tutorial",
+              "Ao sair novamente, observe a barra PERIGO NA CASA. Se alguém se aproximar, você pode voltar e interceptá-lo."
+            ],
+            [
+              "Tutorial",
+              "Use ESPAÇO perto do invasor para dar um soco. Três golpes o fazem fugir. Se alcançar o andar de cima, você terá 60 segundos para impedi-lo."
+            ]
+          ],
+          () => {
+            state.food--;
+            state.finished = true;
+
+            stage("free");
+            save();
+          }
+        );
+      } else if (dangerActive()) {
+        say([
+          [
+            "Irmão",
+            "Eu ouvi os passos. Por favor, não deixa ele chegar aqui."
+          ]
+        ]);
+      } else if (state.food > 0) {
+        say(
+          [
+            [
+              "Irmão",
+              "Obrigado. Vou guardar essa porção para depois."
+            ]
+          ],
+          () => {
+            state.food--;
+
+            updateHud();
+            save();
+          }
+        );
+      } else {
+        say([
+          [
+            "Irmão",
+            state.danger.victories
+              ? "Os passos pararam. Você conseguiu?"
+              : "Toma cuidado lá fora."
+          ]
+        ]);
+      }
+
+      return;
+    }
+
+    // Impede pular uma invasão dormindo.
+    if (action === "bed" && state.firstExit) {
+      if (dangerActive()) {
+        say([
+          "Não posso dormir enquanto alguém está rondando a casa."
+        ]);
+
+        return;
+      }
+
+      // Evita fazer o relógio voltar para as 18h.
+      if (state.minutes >= 1080) {
+        say([
+          "Já é noite. Preciso ficar atento à casa."
+        ]);
+
+        return;
+      }
+    }
+
+    previous.interact(action);
+  };
+
+  getNear = function () {
+    const target = previous.getNear();
+
+    if (state.room !== "village") return target;
+
+    // A interação fica na caixa, não no prédio inteiro.
+    const distance = Math.hypot(
+      state.x - 202.5,
+      state.y - 399
+    );
+
+    if (distance < 38) {
+      return {
+        label: "Examinar a caixa da venda",
+        action: "supply"
+      };
+    }
+
+    return target && target.action === "supply"
+      ? null
+      : target;
+  };
+
+  updateHud = function () {
+    prepareSystems();
+    previous.updateHud();
+
+    if (!state) return;
+
+    $("inventory").textContent +=
+      ` · VENDA ${state.stock}/3`;
+
+    if (state.stage === "free") {
+      const d = state.danger;
+
+      $("objective").textContent = dangerActive()
+        ? "Proteja seu irmão. ESPAÇO: soco perto do invasor."
+        : d.victories
+          ? "O irmão está seguro. Explore e acompanhe os sinais."
+          : "Confira o lado de fora da casa. ESPAÇO: soco.";
+    }
+  };
+
+  update = function (dt) {
+    prepareSystems();
+
+    if (
+      state &&
+      state.gameOver &&
+      mode === "game"
+    ) {
+      if ($("overlay").hidden) {
+        showDefeat();
+      }
+
+      return;
+    }
+
+    previous.update(dt);
+
+    if (
+      mode !== "game" ||
+      !state ||
+      dialog ||
+      transitionBusy ||
+      !$("overlay").hidden
+    ) {
+      return;
+    }
+
+    updateDanger(dt);
+    updateHud();
+  };
+
+  // ---------------------------------------------------------
+  // DESENHO DO INVASOR, SOCO E BARRA DE PERIGO
+  // ---------------------------------------------------------
+
+  drawWorld = function () {
+    previous.drawWorld();
+    prepareSystems();
+
+    const d = state.danger;
+    const e = d.enemy;
+
+    if (e && e.room === state.room) {
+      c.save();
+
+      c.translate(
+        -Math.floor(camera.x),
+        -Math.floor(camera.y)
+      );
+
+      person(
+        e.x,
+        e.y,
+        "father",
+        e.walk,
+        e.facing
+      );
+
+      // Capuz e roupa provisórios do invasor.
+      rect(
+        e.x - 7,
+        e.y - 31,
+        14,
+        10,
+        e.flash > 0 ? "#e2c9a2" : "#282737"
+      );
+
+      rect(
+        e.x - 5,
+        e.y - 20,
+        10,
+        12,
+        "#463945"
+      );
+
+      for (let i = 0; i < 3; i++) {
+        rect(
+          e.x - 10 + i * 8,
+          e.y - 43,
+          5,
+          3,
+          i < e.hp ? "#cf7160" : "#39343b"
+        );
+      }
+
+      txt(
+        "ESPAÇO · SOCO",
+        e.x - 31,
+        e.y - 49,
+        "#e5cda8",
+        7
+      );
+
+      c.restore();
+    }
+
+    if (d.punch > 0.25) {
+      const direction = {
+        up: [0, -24],
+        down: [0, 5],
+        left: [-14, -12],
+        right: [14, -12]
+      }[state.facing];
+
+      rect(
+        state.x - camera.x + direction[0] - 3,
+        state.y - camera.y + direction[1],
+        6,
+        6,
+        "#e2c3a0"
+      );
+    }
+
+    if (!state.finished) return;
+
+    const styles = {
+      safe: [
+        "#7caf8b", 0.07, "SEGURO"
+      ],
+      yellow: [
+        "#d5c264", 0.32, "ALGUÉM RONDA A CASA"
+      ],
+      orange: [
+        "#dc964e", 0.60, "TENTANDO ENTRAR"
+      ],
+      red: [
+        "#d26b62", 0.84, "INVASOR NO TÉRREO"
+      ],
+      critical: [
+        "#e55757", 1, "PROTEJA SEU IRMÃO"
+      ],
+      lost: [
+        "#bd4848", 1, "TARDE DEMAIS"
+      ]
+    };
+
+    const [color, fill, label] = styles[d.phase];
+
+    const x = W - 180;
+    const y = H - 69;
+
+    rect(x, y, 168, 48, "#0a131ded");
+
+    txt(
+      "PERIGO NA CASA",
+      x + 8,
+      y + 11,
+      "#bcbba9",
+      7
+    );
+
+    if (d.phase === "critical") {
+      txt(
+        Math.ceil(d.countdown) + "s",
+        x + 133,
+        y + 11,
+        color,
+        9
+      );
+    }
+
+    txt(
+      label,
+      x + 8,
+      y + 25,
+      color,
+      7
+    );
+
+    rect(
+      x + 8,
+      y + 33,
+      152,
+      6,
+      "#30383c"
+    );
+
+    rect(
+      x + 8,
+      y + 33,
+      Math.round(152 * fill),
+      6,
+      color
+    );
+  };
+
+  // ---------------------------------------------------------
+  // CONTROLE DO SOCO
+  // ---------------------------------------------------------
+
+  window.addEventListener(
+    "keydown",
+    event => {
+      if (mode !== "game" || !state) return;
+
+      if (state.gameOver) {
+        if (
+          ["escape", "e", " "].includes(
+            event.key.toLowerCase()
+          )
+        ) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+        }
+
+        return;
+      }
+
+      if (
+        event.code !== "Space" &&
+        event.key !== " "
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopImmediatePropagation();
+
+      if (
+        event.repeat ||
+        dialog ||
+        transitionBusy ||
+        !$("overlay").hidden
+      ) {
+        return;
+      }
+
+      prepareSystems();
+
+      if (state.firstExit) {
+        punchInvader();
+      }
+    },
+    true
+  );
+
+  // ---------------------------------------------------------
+  // VERSÃO E AJUDA ATUALIZADAS
+  // ---------------------------------------------------------
+
+  $("version").textContent = "PROTÓTIPO · 0.2.0";
+
+  $("help").onclick = () => modal(
+    "Como jogar",
+    "WASD / setas: andar. Shift: correr. E: interagir. Esc: pausar.\n\nESPAÇO: soco. Aproxime-se do invasor e acerte três golpes para expulsá-lo. Você pode interceptá-lo antes de entrar.\n\nA primeira ameaça começa após alimentar seu irmão e sair novamente. Amarelo: aproximação. Laranja: tentativa de entrada. Vermelho: invasor no térreo. Barra cheia: 60 segundos para salvar seu irmão.\n\nA venda possui três porções por dia. Sua bolsa comporta duas. O estoque é salvo e reposto à meia-noite. Pausas e diálogos interrompem o relógio e a ameaça.",
+    [
+      ["Voltar", closeModal]
+    ]
+  );
+  
   requestAnimationFrame(frame);
 })();
