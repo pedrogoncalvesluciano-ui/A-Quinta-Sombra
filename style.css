@@ -537,3 +537,20 @@ h2 {
   height:170px;
   object-fit:cover;
 }
+
+/* Abertura do logotipo, antes do menu */
+#bootSplash {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  background: #000;
+}
+#bootLogo {
+  display: block;
+  width: min(80vw, 900px);
+  max-height: 80vh;
+  object-fit: contain;
+  opacity: 0;
+}
