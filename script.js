@@ -2891,7 +2891,7 @@ if (
   // VERSÃO E AJUDA ATUALIZADAS
   // ---------------------------------------------------------
 
-  $("version").textContent = "PROTÓTIPO · 0.2.0";
+  $("version").textContent = "PROTÓTIPO · 0.6.0";
 
   $("help").onclick = () => modal(
     "Como jogar",
@@ -3798,7 +3798,1040 @@ drawWorld = function () {
   }
 };
 
-$("version").textContent = "PROTÓTIPO · 0.5.2";
+
+// =========================================================
+// CONTINUAÇÃO 0.6 — ALIMENTAÇÃO, VENDA, CHECKPOINT E SÓTÃO
+// Diário visual permanece intocado nesta etapa.
+// =========================================================
+
+const v06Base = {
+  go,
+  getNear,
+  interact,
+  update,
+  updateHud,
+  drawWorld
+};
+
+roomNames.shop = "Venda";
+
+objectives.key = "A reserva ficou onde o tempo parou.";
+objectives.supplies = "Entre na venda e peça uma porção ao vendedor.";
+objectives.return = "Leve a porção para seu irmão.";
+
+// Ajustes de cenário sem reescrever os mapas antigos.
+const v06VillageShop = maps.village.objects.find(o => o.type === "shop");
+if (v06VillageShop) {
+  v06VillageShop.label = "Entrar na venda";
+  v06VillageShop.action = "shopDoor";
+}
+
+// Relógio parado na sala: nova posição da chave reserva.
+if (!maps.living.objects.some(o => o.action === "key")) {
+  maps.living.objects.push({
+    x: housePoint(455),
+    y: housePoint(92),
+    w: housePoint(45),
+    h: housePoint(55),
+    type: "shelf",
+    label: "Examinar o relógio parado",
+    action: "key"
+  });
+}
+
+// Bilhete perto da entrada com a dica da chave.
+if (!maps.foyer.objects.some(o => o.action === "keyNote")) {
+  maps.foyer.objects.push({
+    x: housePoint(500),
+    y: housePoint(255),
+    w: housePoint(55),
+    h: housePoint(28),
+    type: "table",
+    label: "Ler a anotação",
+    action: "keyNote"
+  });
+}
+
+// O primeiro baú do sótão deixa de conter a chave.
+// O segundo móvel vira o baú da câmera.
+const v06AtticFirstChest = maps.attic.objects.find(o => o.action === "key");
+if (v06AtticFirstChest) {
+  v06AtticFirstChest.action = "atticFirstChest";
+  v06AtticFirstChest.label = "Vasculhar o primeiro baú";
+}
+
+const v06CameraChest =
+  maps.attic.objects.find(o =>
+    o !== v06AtticFirstChest &&
+    o.type === "crate"
+  );
+
+if (v06CameraChest) {
+  v06CameraChest.type = "chest";
+  v06CameraChest.cameraChest = true;
+}
+
+// Interior compacto da venda.
+if (!maps.shop) {
+  room(
+    "shop",
+    [
+      obj(110, 78, 120, 50, "shelf"),
+      obj(255, 95, 205, 62, "counter", "Falar com o vendedor", "vendor"),
+      obj(95, 220, 85, 55, "crate"),
+      obj(440, 230, 75, 50, "crate"),
+      obj(250, 230, 120, 58, "table")
+    ],
+    [
+      door(310, 374, "village", 202, 430, "Sair da venda")
+    ]
+  );
+}
+
+let v06ToastText = "";
+let v06ToastUntil = 0;
+
+function v06Toast(text, seconds = 1.5) {
+  v06ToastText = text;
+  v06ToastUntil = elapsed + seconds;
+}
+
+function v06AbsoluteMinutes() {
+  return state.day * 1440 + state.minutes;
+}
+
+function v06StockCycle() {
+  // O estoque do novo dia só nasce às 07:00.
+  return state.day + (state.minutes >= 420 ? 0 : -1);
+}
+
+function v06ShopOpen() {
+  // Aberta das 06:00 até 01:00, atravessando a meia-noite.
+  return state.minutes >= 360 || state.minutes < 60;
+}
+
+prepareSystems = function () {
+  if (!state) return;
+
+  if (!state.danger) {
+    state.danger = {
+      phase: "safe",
+      time: 0,
+      countdown: 60,
+      cooldown: 12,
+      victories: 0,
+      enemy: null,
+      punch: 0
+    };
+  }
+
+  if (!Number.isFinite(state.brotherFood)) {
+    state.brotherFood = 75;
+  }
+
+  state.brotherFood = Math.max(
+    0,
+    Math.min(100, state.brotherFood)
+  );
+
+  // Uma única porção pode ser carregada.
+  state.food = Math.max(
+    0,
+    Math.min(1, Number(state.food) || 0)
+  );
+
+  const cycle = v06StockCycle();
+
+  if (!Number.isFinite(state.stockCycle)) {
+    state.stockCycle = cycle;
+    state.stock = Number.isFinite(state.stock)
+      ? Math.max(0, Math.min(2, state.stock))
+      : 2;
+  }
+
+  if (cycle > state.stockCycle) {
+    state.stockCycle = cycle;
+    state.stock = 2;
+  } else if (cycle < state.stockCycle) {
+    state.stockCycle = cycle;
+  }
+
+  if (!Number.isFinite(state.stock)) {
+    state.stock = 2;
+  }
+
+  state.stock = Math.max(0, Math.min(2, state.stock));
+
+  if (!Number.isFinite(state.foodClock)) {
+    state.foodClock = v06AbsoluteMinutes();
+  }
+
+  if (typeof state.atticUnlocked !== "boolean") {
+    state.atticUnlocked = ![
+      "prologue",
+      "parents",
+      "meal",
+      "feed",
+      "sleep",
+      "check",
+      "empty",
+      "talk"
+    ].includes(state.stage);
+  }
+
+  if (!state._lastRoomV06) {
+    state._lastRoomV06 = state.room;
+  }
+};
+
+function v06FeedBrother() {
+  prepareSystems();
+
+  if (state.food <= 0) return false;
+
+  state.food = 0;
+  state.brotherFood = Math.min(
+    100,
+    state.brotherFood + 25
+  );
+  state.foodClock = v06AbsoluteMinutes();
+
+  updateHud();
+  save();
+
+  return true;
+}
+
+function v06RestoreCheckpoint() {
+  if (!state.rescueCheckpoint) return;
+
+  state = JSON.parse(
+    JSON.stringify(state.rescueCheckpoint)
+  );
+
+  state.gameOver = false;
+  delete state.defeatReason;
+
+  prepareSystems();
+
+  // Mantém o mesmo checkpoint disponível para novas tentativas.
+  rememberSafePoint();
+
+  closeModal();
+  enterGame();
+  updateHud();
+  save();
+}
+
+showDefeat = function () {
+  const hunger = state.defeatReason === "hunger";
+
+  const buttons = [];
+
+  if (state.rescueCheckpoint) {
+    buttons.push([
+      "Voltar ao checkpoint",
+      v06RestoreCheckpoint
+    ]);
+  }
+
+  buttons.push([
+    "Menu principal",
+    () => {
+      save();
+      closeModal();
+
+      mode = "menu";
+
+      $("menu").hidden = false;
+      $("hud").hidden = true;
+      $("prompt").hidden = true;
+    }
+  ]);
+
+  modal(
+    hunger
+      ? "Seu irmão ficou sem alimento"
+      : "Você não chegou a tempo",
+    hunger
+      ? "A alimentação do seu irmão chegou a 0%."
+      : "O invasor chegou ao seu irmão.",
+    buttons
+  );
+};
+
+function v06TriggerHungerDefeat() {
+  if (state.gameOver) return;
+
+  state.brotherFood = 0;
+  state.gameOver = true;
+  state.defeatReason = "hunger";
+
+  keys.clear();
+  save();
+  showDefeat();
+}
+
+function v06UpdateBrotherFood() {
+  prepareSystems();
+
+  const now = v06AbsoluteMinutes();
+
+  // O relógio de alimentação começa a contar de verdade
+  // após a primeira saída. Antes disso, os saltos narrativos
+  // são tratados pelo sistema de dormir.
+  if (!state.firstExit) {
+    state.foodClock = now;
+    return;
+  }
+
+  let delta = now - state.foodClock;
+
+  if (!Number.isFinite(delta) || delta < 0) {
+    state.foodClock = now;
+    return;
+  }
+
+  if (delta <= 0) return;
+
+  state.brotherFood = Math.max(
+    0,
+    state.brotherFood - delta * (3 / 60)
+  );
+
+  state.foodClock = now;
+
+  if (state.brotherFood <= 0) {
+    v06TriggerHungerDefeat();
+  }
+}
+
+function v06Sleep() {
+  prepareSystems();
+
+  if (dangerActive()) {
+    say([
+      "Não posso dormir enquanto alguém está rondando a casa."
+    ]);
+    return;
+  }
+
+  if (state.minutes < 420) {
+    say([
+      "Ainda não consigo dormir. Preciso esperar passar das 07:00."
+    ]);
+    return;
+  }
+
+  const minutesToMidnight = 1440 - state.minutes;
+  const hours = minutesToMidnight / 60;
+  const consumption = hours * 3;
+  const after = Math.max(0, state.brotherFood - consumption);
+
+  modal(
+    "Dormir até 00:00?",
+    "Alimentação atual do irmão: " +
+      Math.round(state.brotherFood) +
+      "%\nConsumo previsto durante o sono: " +
+      consumption.toFixed(1) +
+      " pontos\nAo acordar: " +
+      Math.round(after) +
+      "%",
+    [
+      [
+        "Dormir",
+        () => {
+          closeModal();
+
+          fade(
+            "Enquanto você dorme",
+            "00:00 · Um novo dia começa.",
+            () => {
+              state.brotherFood = after;
+              state.day += 1;
+              state.minutes = 0;
+              state.foodClock = v06AbsoluteMinutes();
+
+              if (state.stage === "sleep") {
+                state.stage = "check";
+              }
+
+              updateHud();
+
+              if (state.brotherFood <= 0) {
+                v06TriggerHungerDefeat();
+              } else {
+                save();
+              }
+            }
+          );
+        }
+      ],
+      ["Agora não", closeModal]
+    ]
+  );
+}
+
+// O checkpoint deixa de ser criado ao iniciar a invasão.
+const v06StartInvasionBase = startInvasion;
+startInvasion = function () {
+  // Replica o início da invasão sem substituir o checkpoint da casa.
+  const d = state.danger;
+
+  d.phase = "yellow";
+  d.time = 0;
+  d.countdown = 60;
+
+  d.enemy = {
+    room: "village",
+    x: 690,
+    y: 740,
+    hp: 3,
+    flash: 0,
+    walk: 0,
+    facing: "left",
+    path: [
+      [500, 740],
+      [500, 664]
+    ]
+  };
+
+  save();
+};
+
+go = function (nextRoom, x, y) {
+  prepareSystems();
+
+  if (
+    nextRoom === "attic" &&
+    !state.atticUnlocked
+  ) {
+    say([
+      "Não preciso subir agora."
+    ]);
+    return;
+  }
+
+  v06Base.go(nextRoom, x, y);
+};
+
+getNear = function () {
+  prepareSystems();
+
+  // Entrada real da venda: somente pela porta frontal.
+  if (state.room === "village") {
+    const shopDoorDistance = Math.hypot(
+      state.x - 202.5,
+      state.y - 399
+    );
+
+    if (shopDoorDistance < 45) {
+      return {
+        label: "Entrar na venda",
+        action: "shopDoor"
+      };
+    }
+  }
+
+  // O baú da câmera pode ser examinado antes da investigação,
+  // mas só pode ser resolvido com as três pistas.
+  if (state.room === "attic" && v06CameraChest) {
+    const px = Math.max(
+      v06CameraChest.x,
+      Math.min(
+        state.x,
+        v06CameraChest.x + v06CameraChest.w
+      )
+    );
+
+    const py = Math.max(
+      v06CameraChest.y,
+      Math.min(
+        state.y,
+        v06CameraChest.y + v06CameraChest.h
+      )
+    );
+
+    if (Math.hypot(state.x - px, state.y - py) < 44) {
+      return {
+        label: "Abrir baú da câmera",
+        action: "clue:chest"
+      };
+    }
+  }
+
+  const target = v06Base.getNear();
+
+  // Remove de vez a antiga caixa externa de alimento.
+  if (
+    state.room === "village" &&
+    target &&
+    (
+      target.action === "supply" ||
+      target.action === "shopDoor"
+    )
+  ) {
+    return null;
+  }
+
+  return target;
+};
+
+interact = function (action) {
+  prepareSystems();
+
+  const q = chapter();
+
+  if (action === "shopDoor") {
+    if (state.stage === "prologue") {
+      say([
+        ["Pai", "A venda está fechada agora. Precisamos seguir para o portão norte."]
+      ]);
+      return;
+    }
+
+    if (!v06ShopOpen()) {
+      say([
+        ["Vendedor", "Fechamos à 01:00. Voltamos a abrir às 06:00."]
+      ]);
+      return;
+    }
+
+    go("shop", 310, 330);
+    return;
+  }
+
+  if (action === "vendor") {
+    if (!v06ShopOpen()) {
+      say([
+        ["Vendedor", "Já encerramos por hoje."]
+      ]);
+      return;
+    }
+
+    if (state.food >= 1) {
+      say([
+        ["Vendedor", "Você já está carregando uma porção. Leve para quem precisa antes de pegar outra."]
+      ]);
+      return;
+    }
+
+    if (state.stock <= 0) {
+      say([
+        ["Vendedor", "As duas porções gratuitas de hoje acabaram. O estoque volta às 07:00."]
+      ]);
+      return;
+    }
+
+    const stockCycle = state.stockCycle;
+
+    say(
+      [
+        ["Vendedor", "Ainda tenho " + state.stock + " porção(ões) gratuita(s) hoje. Pode levar uma."]
+      ],
+      () => {
+        prepareSystems();
+
+        if (
+          state.stockCycle !== stockCycle ||
+          state.stock <= 0 ||
+          state.food >= 1
+        ) {
+          return;
+        }
+
+        state.stock -= 1;
+        state.food = 1;
+
+        if (state.stage === "supplies") {
+          state.stage = "return";
+        }
+
+        updateHud();
+        save();
+      }
+    );
+
+    return;
+  }
+
+  if (action === "keyNote") {
+    say([
+      "A reserva ficou onde o tempo parou."
+    ]);
+    return;
+  }
+
+  if (action === "key") {
+    if (state.key) {
+      say([
+        "O relógio continua parado. O esconderijo está vazio."
+      ]);
+      return;
+    }
+
+    if (state.stage !== "key") {
+      say([
+        "Um relógio antigo, parado há muito tempo."
+      ]);
+      return;
+    }
+
+    say(
+      [
+        "Atrás do relógio parado há uma pequena chave presa com fita."
+      ],
+      () => {
+        state.key = true;
+        state.stage = "exit";
+        updateHud();
+        save();
+      }
+    );
+
+    return;
+  }
+
+  if (action === "atticFirstChest") {
+    say([
+      "Só há tecidos, papéis antigos e objetos quebrados."
+    ]);
+    return;
+  }
+
+  if (action === "bed") {
+    v06Sleep();
+    return;
+  }
+
+  // Salva um checkpoint dentro da casa antes da primeira saída.
+  if (
+    action === "outside" &&
+    state.room === "foyer" &&
+    state.key &&
+    !state.firstExit
+  ) {
+    rememberSafePoint();
+  }
+
+  // Alimentação do irmão: +25 por porção, até 100%.
+  if (
+    action === "brother" &&
+    q &&
+    q.phase === "brother"
+  ) {
+    return v06Base.interact(action);
+  }
+
+  if (
+    action === "brother" &&
+    state.stage === "feed" &&
+    state.food > 0
+  ) {
+    say(
+      [
+        ["Irmão", "Estou com um mau pressentimento. Eles nunca demoram assim."],
+        ["Você", "Come um pouco. Eu vou continuar procurando."]
+      ],
+      () => {
+        v06FeedBrother();
+        state.stage = "sleep";
+        updateHud();
+        save();
+      }
+    );
+    return;
+  }
+
+  if (
+    action === "brother" &&
+    (
+      state.stage === "return" ||
+      state.stage === "free"
+    ) &&
+    state.food > 0
+  ) {
+    const firstDelivery = !state.finished;
+
+    say(
+      firstDelivery
+        ? [
+            ["Irmão", "Alguém ficou olhando para a janela enquanto você estava fora."],
+            ["Você", "Trouxe comida. Vou conferir a entrada."]
+          ]
+        : [
+            ["Irmão", "Obrigado. Eu estava começando a ficar com fome."]
+          ],
+      () => {
+        v06FeedBrother();
+
+        if (firstDelivery) {
+          state.finished = true;
+          state.stage = "free";
+          updateHud();
+          save();
+        }
+      }
+    );
+    return;
+  }
+
+  // Coleta das três pistas sem diálogo: salva imediatamente
+  // e exibe apenas um aviso curto.
+  if (
+    action.startsWith("clue:") &&
+    !["clue:chest", "clue:normal"].includes(action)
+  ) {
+    const id = action.slice(5);
+
+    if (!q.clues.includes(id)) {
+      q.clues.push(id);
+
+      if (
+        q.clues.length >= 3 &&
+        q.phase === "clues"
+      ) {
+        q.phase = "chest";
+      }
+
+      v06Toast("Pista coletada");
+      updateHud();
+      save();
+    } else {
+      v06Toast("Pista já coletada");
+    }
+
+    return;
+  }
+
+  if (action === "clue:chest") {
+    if (q.camera) {
+      say([
+        "O segundo baú está vazio. A câmera está comigo."
+      ]);
+      return;
+    }
+
+    if (
+      q.phase === "waiting" ||
+      q.phase === "brother"
+    ) {
+      say([
+        "Não sei o que esses símbolos significam. Melhor voltar aqui mais tarde."
+      ]);
+      return;
+    }
+
+    if (q.clues.length < 3) {
+      say([
+        "Ainda faltam pistas para entender a sequência dos símbolos."
+      ]);
+      return;
+    }
+
+    chestPuzzle();
+    return;
+  }
+
+  v06Base.interact(action);
+};
+
+updateHud = function () {
+  prepareSystems();
+  v06Base.updateHud();
+
+  if (!state) return;
+
+  $("inventory").textContent =
+    "PORÇÃO " +
+    state.food +
+    "/1 · ALIMENTAÇÃO " +
+    Math.round(state.brotherFood) +
+    "% · VENDA " +
+    state.stock +
+    "/2" +
+    (state.key ? " · CHAVE RESERVA" : "");
+
+  if (
+    state.investigation &&
+    !dangerActive()
+  ) {
+    const q = state.investigation;
+
+    if (q.phase === "clues") {
+      $("objective").textContent =
+        "Investigue o quarto dos pais: " +
+        q.clues.length +
+        "/3 pistas.";
+    } else if (q.phase === "chest") {
+      $("objective").textContent =
+        "Volte ao sótão e abra o segundo baú.";
+    } else if (q.phase === "camera") {
+      $("objective").textContent =
+        "Fotografe a figura perto do portão norte.";
+    } else if (q.phase === "done") {
+      $("objective").textContent =
+        "A fotografia aponta para o oeste.";
+    }
+  }
+};
+
+update = function (dt) {
+  prepareSystems();
+
+  const beforeRoom = state ? state.room : null;
+
+  v06Base.update(dt);
+
+  if (!state) return;
+
+  prepareSystems();
+
+  // Detecta entrada efetiva em casa após a transição e atualiza
+  // o checkpoint somente nesse momento.
+  if (state._lastRoomV06 !== state.room) {
+    const previousRoom = state._lastRoomV06;
+    state._lastRoomV06 = state.room;
+
+    if (
+      previousRoom === "village" &&
+      state.room === "foyer" &&
+      !state.gameOver
+    ) {
+      rememberSafePoint();
+      save();
+    }
+  }
+
+  if (
+    mode !== "game" ||
+    dialog ||
+    transitionBusy ||
+    !$("overlay").hidden ||
+    state.gameOver
+  ) {
+    return;
+  }
+
+  v06UpdateBrotherFood();
+  prepareSystems();
+  updateHud();
+};
+
+drawWorld = function () {
+  prepareSystems();
+
+  // Esconde a barra horizontal antiga e o retângulo de enquadramento
+  // da fotografia sem alterar o restante da renderização existente.
+  const finished = state.finished;
+  const photoPhase = photoScene ? photoScene.phase : null;
+
+  state.finished = false;
+
+  if (photoScene && photoScene.phase === "ready") {
+    photoScene.phase = "ready-no-frame";
+  }
+
+  v06Base.drawWorld();
+
+  state.finished = finished;
+
+  if (photoScene && photoPhase !== null) {
+    photoScene.phase = photoPhase;
+  }
+
+  // Vendedor no interior da venda.
+  if (state.room === "shop") {
+    c.save();
+    c.translate(
+      -Math.floor(camera.x),
+      -Math.floor(camera.y)
+    );
+
+    person(
+      housePoint(355),
+      housePoint(128),
+      "father",
+      0,
+      "down",
+      0.9
+    );
+
+    txt(
+      "VENDEDOR",
+      housePoint(326),
+      housePoint(82),
+      "#d7c49b",
+      7
+    );
+
+    c.restore();
+  }
+
+  if (state.stage !== "prologue") {
+    const d = state.danger;
+
+    const dangerStyles = {
+      safe: ["#7caf8b", 0.06],
+      yellow: ["#d5c264", 0.32],
+      orange: ["#dc964e", 0.60],
+      red: ["#d26b62", 0.84],
+      critical: ["#e55757", 1],
+      lost: ["#bd4848", 1]
+    };
+
+    const dangerData =
+      dangerStyles[d.phase] ||
+      dangerStyles.safe;
+
+    const dangerColor = dangerData[0];
+    const dangerFill = dangerData[1];
+
+    // PERIGO — vertical à esquerda.
+    const dangerX = 10;
+    const dangerY = 65;
+    const barH = 138;
+    const barW = 12;
+
+    rect(
+      dangerX - 5,
+      dangerY - 24,
+      52,
+      barH + 34,
+      "#09121adb"
+    );
+
+    txt(
+      "PERIGO",
+      dangerX - 2,
+      dangerY - 10,
+      "#c8c5b5",
+      7
+    );
+
+    rect(
+      dangerX,
+      dangerY,
+      barW,
+      barH,
+      "#30383c"
+    );
+
+    rect(
+      dangerX,
+      dangerY + barH - Math.round(barH * dangerFill),
+      barW,
+      Math.round(barH * dangerFill),
+      dangerColor
+    );
+
+    if (d.phase === "critical") {
+      txt(
+        Math.ceil(d.countdown) + "s",
+        dangerX + 18,
+        dangerY + 10,
+        dangerColor,
+        8
+      );
+    }
+
+    // ALIMENTAÇÃO — vertical à direita.
+    const foodX = W - 22;
+    const foodY = 65;
+    const foodFill = state.brotherFood / 100;
+    const foodColor =
+      state.brotherFood > 55
+        ? "#7caf8b"
+        : state.brotherFood > 25
+          ? "#d5a458"
+          : "#d25f58";
+
+    rect(
+      foodX - 32,
+      foodY - 24,
+      49,
+      barH + 34,
+      "#09121adb"
+    );
+
+    txt(
+      "COMIDA",
+      foodX - 30,
+      foodY - 10,
+      "#c8c5b5",
+      7
+    );
+
+    rect(
+      foodX,
+      foodY,
+      barW,
+      barH,
+      "#30383c"
+    );
+
+    rect(
+      foodX,
+      foodY + barH - Math.round(barH * foodFill),
+      barW,
+      Math.round(barH * foodFill),
+      foodColor
+    );
+
+    txt(
+      Math.round(state.brotherFood) + "%",
+      foodX - 30,
+      foodY + barH + 14,
+      foodColor,
+      7
+    );
+  }
+
+  if (
+    v06ToastText &&
+    elapsed < v06ToastUntil
+  ) {
+    const w = Math.max(
+      100,
+      v06ToastText.length * 7 + 18
+    );
+
+    rect(
+      W / 2 - w / 2,
+      H - 58,
+      w,
+      24,
+      "#0b131beb"
+    );
+
+    txt(
+      v06ToastText,
+      W / 2 - w / 2 + 9,
+      H - 42,
+      "#e3d3ac",
+      8
+    );
+  }
+
+  // A estática permanece pulsando durante toda a conversa
+  // inicial com os filhos, sem bloquear controles ou diálogo.
+  if (
+    state.stage === "prologue" &&
+    dialog &&
+    !state.familyFarewell &&
+    Math.floor(elapsed * 10) % 4 === 0
+  ) {
+    drawStatic(0, W, 7);
+  }
+};
+
+$("help").onclick = () => modal(
+  "Como jogar",
+  "WASD / setas: andar. Shift: correr. E: interagir. Esc: pausar. ESPAÇO: soco perto do invasor.\n\nA barra PERIGO fica à esquerda. A ALIMENTAÇÃO do irmão fica à direita: começa em 75%, perde 3 pontos por hora do jogo e cada porção recupera 25 pontos, até 100%.\n\nVocê carrega no máximo uma porção. A venda abre às 06:00, fecha à 01:00 e oferece duas porções gratuitas por ciclo, com reposição às 07:00.\n\nDepois das 07:00, a cama permite dormir até 00:00 do dia seguinte, desde que não exista uma invasão ativa. O consumo previsto de alimentação é mostrado antes de confirmar.",
+  [["Voltar", closeModal]]
+);
+
+$("version").textContent = "PROTÓTIPO · 0.6.0";
   
   requestAnimationFrame(frame);
   showBootSplash();
