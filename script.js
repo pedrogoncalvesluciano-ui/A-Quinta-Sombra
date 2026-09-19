@@ -67,7 +67,7 @@
     };
     // Os sprites já começaram a carregar quando esta função é chamada.
     const spritesReady = Promise.all(
-      Object.values(fatherSpriteSheets).map(waitForBootImage)
+      Object.values(fatherSpriteSheets).map(image => waitForBootImage(image))
     );
     try {
       // Na primeira visita o PNG ainda não está em cache. Espere o download
