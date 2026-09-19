@@ -412,7 +412,12 @@ const characterSpriteSheets = {
 };
 
 for (const kind of Object.keys(characterSpriteSheets)) {
-  for (const animation of ["idle", "walk"]) {
+  const animations =
+    kind === "player"
+      ? ["idle", "walk", "thrust"]
+      : ["idle", "walk"];
+
+  for (const animation of animations) {
     const image = new Image();
 
     image.src =
@@ -435,7 +440,61 @@ function drawCharacterSprite(
   if (!sheets) return false;
 
   const moving = Math.abs(walk) > 0.01;
-  const animation = moving ? "walk" : "idle";
+
+  const punching =
+    kind === "player" &&
+    state &&
+    state.danger &&
+    state.danger.punch > 0 &&
+    sheets.thrust;
+
+  let animation = "idle";
+  let frame = 0;
+
+  if (punching) {
+    animation = "thrust";
+
+    // O golpe dura 0,45 s no sistema atual.
+    // thrust possui 8 quadros válidos: 0..7.
+    const progress = Math.max(
+      0,
+      Math.min(
+        0.999,
+        1 - state.danger.punch / 0.45
+      )
+    );
+
+    frame = Math.floor(progress * 8);
+  } else if (moving) {
+    animation = "walk";
+
+    // LPC walk: quadro 0 é a pose parada.
+    // A caminhada real usa 1..8.
+    const walkFrames = [
+      1, 2, 3, 4,
+      5, 6, 7, 8
+    ];
+
+    frame =
+      walkFrames[
+        Math.floor(Math.abs(walk)) %
+        walkFrames.length
+      ];
+  } else {
+    animation = "idle";
+
+    // LPC idle possui apenas 2 quadros.
+    // O ciclo recomendado segura mais tempo o primeiro:
+    // 0 → 0 → 1.
+    const idleFrames = [0, 0, 1];
+
+    frame =
+      idleFrames[
+        Math.floor(elapsed / 0.75) %
+        idleFrames.length
+      ];
+  }
+
   const image = sheets[animation];
 
   if (
@@ -446,13 +505,6 @@ function drawCharacterSprite(
   ) {
     return false;
   }
-
-  const columns = Math.max(
-    1,
-    Math.floor(
-      image.naturalWidth / CHARACTER_FRAME_SIZE
-    )
-  );
 
   const rows = Math.max(
     1,
@@ -465,10 +517,6 @@ function drawCharacterSprite(
     CHARACTER_ROWS[face] ?? CHARACTER_ROWS.down,
     rows - 1
   );
-
-  const frame = moving
-    ? Math.floor(Math.abs(walk)) % columns
-    : Math.floor(elapsed * 3) % columns;
 
   const spriteScale =
     CHARACTER_BASE_SCALE[kind] * scale;
@@ -2806,22 +2854,7 @@ function drawCharacterSprite(
       c.restore();
     }
 
-    if (d.punch > 0.25) {
-      const direction = {
-        up: [0, -24],
-        down: [0, 5],
-        left: [-14, -12],
-        right: [14, -12]
-      }[state.facing];
-
-      rect(
-        state.x - camera.x + direction[0] - 3,
-        state.y - camera.y + direction[1],
-        6,
-        6,
-        "#e2c3a0"
-      );
-    }
+    // O soco agora usa a animação thrust.png do player.
 
     if (!state.finished) return;
 
@@ -5377,7 +5410,7 @@ drawWorld = function () {
   c.restore();
 };
 
-$("version").textContent = "PROTÓTIPO · 0.6.2";
+$("version").textContent = "PROTÓTIPO · 0.6.3";
   
   requestAnimationFrame(frame);
   showBootSplash();
