@@ -1,0 +1,216 @@
+/* ============================================================
+   A QUINTA SOMBRA — DIÁRIO
+
+   Carregado DEPOIS de style.css, no index.html.
+   Nada aqui altera os outros modais: todas as regras
+   dependem de .journal-layout estar dentro do cartão.
+   ============================================================ */
+
+/* ---------- Fundo: escurecido e desfocado, sem painel ---------- */
+
+#overlay:has(.journal-layout) {
+  background: #04070ae6;
+  backdrop-filter: blur(7px);
+}
+
+#overlay .card:has(.journal-layout) {
+  position: relative;
+  width: auto;
+  max-width: min(680px, 94%);
+  max-height: 96%;
+  overflow: visible;
+  padding: 0;
+  background: none;
+  border: 0;
+  box-shadow: none;
+}
+
+.card:has(.journal-layout) #modalLabel,
+.card:has(.journal-layout) #modalTitle {
+  display: none;
+}
+
+/* ---------- Fechar: apenas um X ---------- */
+
+.card:has(.journal-layout) #modalActions {
+  position: absolute;
+  top: -16px;
+  right: -16px;
+  z-index: 3;
+  margin: 0;
+}
+
+.card:has(.journal-layout) #modalActions button {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  font-size: 0;
+  border: 1px solid #8b795e;
+  border-radius: 50%;
+  background: #12191cee;
+  color: #d8c49a;
+}
+
+.card:has(.journal-layout) #modalActions button::after {
+  content: "\2715";
+  font: 15px/1 monospace;
+}
+
+.card:has(.journal-layout) #modalActions button:hover {
+  background: #5b4935;
+  border-color: #d4b67b;
+}
+
+/* ---------- O livro é a página: nada atrás dele ---------- */
+
+.journal-layout {
+  gap: 10px;
+}
+
+.journal-page {
+  min-height: 380px;
+  padding: 0;
+  background: none;
+  border: 0;
+  filter: drop-shadow(0 18px 34px #000a);
+}
+
+/* ---------- Abertura animada: seis quadros (folha 3x2) ---------- */
+
+.journal-book-sprite {
+  opacity: 1;
+  animation: journal-open 0.78s steps(1, end) both;
+}
+
+@keyframes journal-open {
+  0%, 15%   { background-position: 0% 0%; }
+  16%, 31%  { background-position: 50% 0%; }
+  32%, 47%  { background-position: 100% 0%; }
+  48%, 63%  { background-position: 0% 100%; }
+  64%, 79%  { background-position: 50% 100%; }
+  80%, 100% { background-position: 100% 100%; }
+}
+
+/* ---------- O conteúdo entra em fade, com o livro já aberto ---------- */
+
+.journal-page-title,
+.journal-entries,
+.journal-cards,
+.journal-clue-image,
+.journal-paper,
+.journal-hint {
+  animation: journal-fade 0.55s ease both 0.8s;
+}
+
+@keyframes journal-fade {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ---------- Abas laterais, soltas ao lado do livro ---------- */
+
+.journal-rail-button {
+  background: #12191cdd;
+  backdrop-filter: blur(2px);
+}
+
+/* ============================================================
+   PISTAS EM PAPEL
+
+   Usado enquanto supply-list.png e note-parents.png estiverem
+   vazios: a pista é desenhada em texto, com frente e verso.
+   ============================================================ */
+
+.journal-paper {
+  position: relative;
+  width: min(300px, 92%);
+  min-height: 300px;
+  margin: 210px auto 0;
+  padding: 18px 20px;
+  background: linear-gradient(#efe3c6, #ddcda6);
+  border: 1px solid #9c855d;
+  box-shadow: 0 10px 26px #0009;
+  color: #2f2215;
+  font: 12px/1.65 Georgia, serif;
+  transform: rotate(-0.7deg);
+  cursor: zoom-in;
+}
+
+.journal-paper.verso {
+  background: linear-gradient(#e7dabc, #cdbb96);
+  transform: rotate(0.6deg);
+}
+
+.journal-paper h3 {
+  margin: 0 0 10px;
+  font: normal 13px/1.3 monospace;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #6a4f2c;
+}
+
+.journal-paper ul {
+  margin: 0 0 12px;
+  padding-left: 18px;
+}
+
+.journal-paper .scratched {
+  text-decoration: line-through;
+  opacity: 0.55;
+}
+
+.journal-paper .mark {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 2px 8px;
+  border: 1px dashed #7d6134;
+  font: 12px/1.4 monospace;
+  letter-spacing: 0.2em;
+}
+
+.journal-paper .signature {
+  margin-top: 14px;
+  font-style: italic;
+  color: #4a381f;
+}
+
+.journal-flip {
+  display: block;
+  margin: 12px auto 0;
+  padding: 6px 14px;
+  border: 1px solid #8b795e;
+  background: #1b2525;
+  color: #cdb98f;
+  font: 11px monospace;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+}
+
+.journal-flip:hover {
+  background: #5b4935;
+  border-color: #d4b67b;
+}
+
+/* ---------- Ampliação ---------- */
+
+.card:has(.journal-clue-large) {
+  background: #0d1417;
+}
+
+.journal-clue-large {
+  animation: journal-fade 0.35s ease both;
+}
+
+/* ---------- Telas baixas ---------- */
+
+@media (max-height: 600px) {
+  .journal-page {
+    min-height: 300px;
+  }
+
+  .journal-paper {
+    margin-top: 150px;
+    min-height: 220px;
+    font-size: 11px;
+  }
+}
