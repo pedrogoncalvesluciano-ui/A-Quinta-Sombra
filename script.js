@@ -3275,17 +3275,55 @@ enterGame = function () {
     state.stage === 'prologue' &&
     !state.startupShown;
 
-  if (opening) state.startupShown = true;
+  if (!opening) {
+    enterGameBeforeTransitions();
+    return;
+  }
 
+  state.startupShown = true;
+
+  // A abertura precisa cobrir a cena ANTES de o menu sumir.
+  // Sem isso, o navegador consegue desenhar 1 frame do térreo
+  // antes do fade preto ficar visível.
+  transitionBusy = true;
+  keys.clear();
+
+  const transition = $('transition');
+
+  $('transitionTitle').textContent =
+    'A QUINTA SOMBRA';
+
+  $('transitionHint').textContent =
+    '14:00 · A família ainda está reunida.';
+
+  // Cobre instantaneamente, sem animação de entrada.
+  transition.style.transition = 'none';
+  transition.style.opacity = '1';
+  transition.classList.add('active');
+
+  // Só agora revela o jogo atrás da tela preta.
   enterGameBeforeTransitions();
 
-  if (opening) {
-    runScreenTransition(
-      'A QUINTA SOMBRA',
-      '14:00 · A família ainda está reunida.',
-      START_TRANSITION_MS
-    );
-  }
+  // Força o navegador a aplicar a cobertura antes de
+  // restaurar a animação normal.
+  void transition.offsetWidth;
+
+  requestAnimationFrame(() => {
+    transition.style.transition =
+      'opacity 0.65s';
+
+    // Mantém o cartão de abertura visível e,
+    // só depois, revela o andar térreo.
+    setTimeout(() => {
+      transition.classList.remove('active');
+      transition.style.opacity = '';
+
+      setTimeout(() => {
+        transitionBusy = false;
+        save();
+      }, 650);
+    }, START_TRANSITION_MS);
+  });
 };
 
 go = function (nextRoom, x, y) {
@@ -5652,7 +5690,7 @@ drawWorld = function () {
   c.restore();
 };
 
-$("version").textContent = "PROTÓTIPO · 0.6.5";
+$("version").textContent = "PROTÓTIPO · 0.6.6";
   
   requestAnimationFrame(frame);
   showBootSplash();
