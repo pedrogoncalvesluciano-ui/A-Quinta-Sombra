@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 20612)
-Total output lines: 3735
-
 /*CODIGO JAVA SCRIPT*/
 "use strict";
 
@@ -1700,7 +1697,124 @@ if (
       state.facing = Math.abs(dx) > Math.abs(dy)
         ? (dx > 0 ? "right" : "left")
         : (dy > 0 ? "down" : "up");
-…612 tokens truncated…        "escape"
+    } else {
+      state.walk = 0;
+    }
+
+    updateMother(dt);
+
+    if (state.stage === "prologue" && state.room === "foyer" &&
+        !state.familyFarewell &&
+        Math.hypot(state.x - children.x, state.y - children.y) < 58) {
+      familyConversation();
+      $("prompt").hidden = true;
+      return;
+    }
+
+    near = getNear();
+    $("prompt").hidden = !near;
+
+    if (near) {
+      $("prompt").textContent = "[E] " + near.label;
+    }
+
+    if (state.firstExit) {
+      const old = state.minutes;
+
+      // 3 segundos reais = 1 minuto do jogo.
+      // 3 minutos reais = 1 hora do jogo.
+      state.minutes += dt / 2;
+
+      if (state.minutes >= 1440) {
+        state.minutes -= 1440;
+        state.day++;
+        state.rain = state.day % 3 === 0;
+        save();
+      }
+
+      if (
+        old < 360 &&
+        state.minutes >= 360 &&
+        state.room === "village"
+      ) {
+        say([
+          "A luz… minha cabeça está girando. Preciso entrar em algum lugar."
+        ]);
+      }
+
+      if (
+        state.room === "village" &&
+        state.minutes >= 360 &&
+        state.minutes < 1080
+      ) {
+        state.sun = (state.sun || 0) + dt;
+
+        if (state.sun > 18) {
+          state.sun = 0;
+
+          fade(
+            "Você perdeu os sentidos",
+            "Por enquanto, o protótipo retorna você à entrada de casa.",
+            () => go("foyer", 530, 305)
+          );
+        }
+      } else {
+        state.sun = 0;
+      }
+
+      updateHud();
+
+      messageTime += dt;
+
+      if (messageTime > 10) {
+        messageTime = 0;
+        save();
+      }
+    }
+  }
+
+  function frame(time) {
+    const dt = Math.min((time - last) / 1000, 0.04);
+    last = time;
+
+    update(dt);
+    c.imageSmoothingEnabled = false;
+
+    if (mode === "menu") {
+      drawMenu();
+    } else if (state) {
+      drawWorld();
+    }
+
+    if (state && mode === "game" && state.sun) {
+      rect(
+        0,
+        0,
+        W,
+        H,
+        `rgba(189,153,117,${Math.min(0.5, state.sun / 36)})`
+      );
+    }
+
+    requestAnimationFrame(frame);
+  }
+
+  // =========================================================
+  // TECLADO E PAUSA
+  // =========================================================
+
+  window.addEventListener("keydown", event => {
+    if (photoScene) return;
+    const key = event.key.toLowerCase();
+
+    if (
+      [
+        "arrowup",
+        "arrowdown",
+        "arrowleft",
+        "arrowright",
+        " ",
+        "escape"
       ].includes(key)
     ) {
       event.preventDefault();
