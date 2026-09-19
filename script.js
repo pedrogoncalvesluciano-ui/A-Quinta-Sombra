@@ -6121,17 +6121,28 @@ drawWorld = function () {
 
 // 0.6.18 — Uma referência para proporção visual e colisão do quarto.
 const roomItems = {
-  bed: [233,61,126,165, .10,.20,.80,.76],
-  shelf: [420,4,91,120, .08,.67,.84,.30],
-  desk: [521,92,62,160, .06,.12,.89,.84],
-  nightstand: [371,61,48,52, .10,.38,.80,.58],
-  lampOff: [377,24,36,51], lampOn: [377,24,36,51],
-  rug: [109,98,100,158],
-  backpack: [201,61,30,35, .12,.55,.76,.40],
-  clothes: [508,323,66,46, .12,.30,.76,.60],
-  shoes: [475,299,28,21, .08,.25,.84,.65],
-  flipflops: [362,218,26,20, .08,.25,.84,.65],
-  trash: [490,211,28,37, .12,.48,.76,.46]
+  // Móveis principais
+  bed: [245,64,118,158, .12,.20,.76,.74],
+  nightstand: [382,66,46,50, .12,.42,.76,.54],
+  lampOff: [388,29,34,47],
+  lampOn: [388,29,34,47],
+  shelf: [440,57,88,114, .10,.66,.80,.30],
+
+  // Escrivaninha: visual ainda encostado à parede,
+  // mas colisão bem mais estreita.
+  desk: [532,108,52,150, .38,.14,.52,.82],
+
+  // Tapete continua atravessável.
+  rug: [102,126,108,162],
+
+  // Objetos soltos
+  backpack: [205,72,30,35, .16,.56,.68,.36],
+  flipflops: [365,228,28,21, .14,.30,.72,.58],
+  trash: [492,236,29,38, .16,.50,.68,.42],
+
+  // Tênis e roupas ficam totalmente dentro do quarto.
+  shoes: [496,322,31,23, .12,.28,.76,.58],
+  clothes: [536,326,58,40, .14,.34,.72,.52]
 };
 function roomItemBounds(key) {
   const [x,y,w,h] = roomItems[key].map(housePoint);
@@ -6209,7 +6220,7 @@ update=function(dt) {
   roomUpdateBeforeFix(dt);
 };
 
-$("version").textContent = "PROTÓTIPO · 0.6.18";
+$("version").textContent = "PROTÓTIPO · 0.6.19";
   
   requestAnimationFrame(frame);
   showBootSplash();
