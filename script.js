@@ -6119,15 +6119,15 @@ drawWorld = function () {
   c.restore();
 };
 
-// 0.6.14 — Uma referência para proporção visual e colisão do quarto.
+// 0.6.15 — Uma referência para proporção visual e colisão do quarto.
 const roomItems = {
-  bed: [233,69,126,165, .10,.20,.80,.76],
-  shelf: [425,69,76,100, .08,.67,.84,.30],
+  bed: [233,61,126,165, .10,.20,.80,.76],
+  shelf: [425,61,76,100, .08,.67,.84,.30],
   desk: [507,92,76,190, .06,.12,.89,.84],
-  nightstand: [371,69,48,52, .10,.38,.80,.58],
-  lampOff: [377,32,36,51], lampOn: [377,32,36,51],
-  rug: [64,98,158,100],
-  backpack: [169,69,30,35, .12,.55,.76,.40],
+  nightstand: [371,61,48,52, .10,.38,.80,.58],
+  lampOff: [377,24,36,51], lampOn: [377,24,36,51],
+  rug: [109,98,100,158],
+  backpack: [201,61,30,35, .12,.55,.76,.40],
   clothes: [508,323,66,46, .12,.30,.76,.60],
   shoes: [475,299,34,26, .08,.25,.84,.65],
   flipflops: [362,218,34,26, .08,.25,.84,.65],
@@ -6137,14 +6137,25 @@ function roomItemBounds(key) {
   const [x,y,w,h] = roomItems[key].map(housePoint);
   const image = playerRoomSprites[key];
   const crop = spriteReady(image) ? getSpriteCrop(image) : {w,h};
-  const scale = Math.min(w/crop.w,h/crop.h);
-  const width = crop.w*scale, height = crop.h*scale;
+  // O tapete gira 90°: sua largura original passa a ser a altura.
+  const sourceW = key === "rug" ? crop.h : crop.w;
+  const sourceH = key === "rug" ? crop.w : crop.h;
+  const scale = Math.min(w/sourceW,h/sourceH);
+  const width = sourceW*scale, height = sourceH*scale;
   // Móveis de parede e mochila ficam alinhados pelo topo visível.
   const wallAligned = ["bed","shelf","nightstand","lampOff","lampOn","backpack"].includes(key);
   return {x:x+(w-width)/2,y:wallAligned ? y : y+h-height,w:width,h:height};
 }
 function drawRoomItem(key) {
   const b = roomItemBounds(key);
+  if (key === "rug") {
+    c.save();
+    c.translate(b.x+b.w/2,b.y+b.h/2);
+    c.rotate(Math.PI/2);
+    drawSpriteContain(playerRoomSprites[key],-b.h/2,-b.w/2,b.h,b.w);
+    c.restore();
+    return;
+  }
   drawSpriteContain(playerRoomSprites[key],b.x,b.y,b.w,b.h);
 }
 function roomCollision(o) {
@@ -6191,7 +6202,7 @@ update=function(dt) {
   roomUpdateBeforeFix(dt);
 };
 
-$("version").textContent = "PROTÓTIPO · 0.6.14";
+$("version").textContent = "PROTÓTIPO · 0.6.15";
   
   requestAnimationFrame(frame);
   showBootSplash();
