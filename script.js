@@ -615,7 +615,7 @@ function getSpriteCrop(image) {
   };
 
   try {
-    const maxSample = 160;
+    const maxSample = 2048;
     const scale = Math.min(
       1,
       maxSample / image.naturalWidth,
@@ -740,8 +740,8 @@ function drawSpriteContain(image, x, y, w, h) {
     crop.h,
     Math.round(dx),
     Math.round(dy),
-    Math.round(dw),
-    Math.round(dh)
+    dw,
+    dh
   );
 
   c.restore();
@@ -813,56 +813,9 @@ function drawPlayerRoomBackground(m) {
 }
 
 function drawPlayerRoomClutter() {
-
-    // Tapete não possui colisão.
-  drawSprite(
-    playerRoomSprites.rug,
-    housePoint(205),
-    housePoint(240),
-    housePoint(205),
-    housePoint(105)
-  );
-  // Mochila e lixeira continuam decorativas.
-  // Roupa, tênis e chinelo possuem hitboxes pequenas no mapa.
-  drawSprite(
-    playerRoomSprites.backpack,
-    housePoint(420),
-    housePoint(292),
-    housePoint(48),
-    housePoint(48)
-  );
-
-  drawSprite(
-    playerRoomSprites.clothes,
-    housePoint(125),
-    housePoint(292),
-    housePoint(70),
-    housePoint(55)
-  );
-
-  drawSprite(
-    playerRoomSprites.shoes,
-    housePoint(205),
-    housePoint(315),
-    housePoint(48),
-    housePoint(38)
-  );
-
-  drawSprite(
-    playerRoomSprites.flipflops,
-    housePoint(265),
-    housePoint(322),
-    housePoint(42),
-    housePoint(34)
-  );
-
-  drawSprite(
-    playerRoomSprites.trash,
-    housePoint(445),
-    housePoint(250),
-    housePoint(38),
-    housePoint(42)
-  );
+  for (const key of ["rug", "backpack", "clothes", "shoes", "flipflops", "trash"]) {
+    drawRoomItem(key);
+  }
 }
 
 function drawCharacterSprite(
@@ -1081,87 +1034,10 @@ function drawCharacterSprite(
       return;
     }
 
-    // Cama real do quarto do player.
-    if (type === "playerBed") {
-      // Visual mais largo que a hitbox e sem deformar a imagem.
-      drawSpriteContain(
-        playerRoomSprites.bed,
-        x - housePoint(22),
-        y - housePoint(12),
-        w + housePoint(44),
-        h + housePoint(28)
-      );
-      return;
-    }
-
-    // Estante real do quarto do player.
-    if (type === "playerShelf") {
-      drawSpriteContain(
-        playerRoomSprites.shelf,
-        x - housePoint(8),
-        y - housePoint(12),
-        w + housePoint(16),
-        h + housePoint(24)
-      );
-      return;
-    }
-
-    if (type === "playerDesk") {
-      // A arte continua visível e encostada na parede,
-      // mas a colisão é bem mais estreita.
-      drawSpriteContain(
-        playerRoomSprites.desk,
-        x - housePoint(27),
-        y - housePoint(8),
-        w + housePoint(42),
-        h + housePoint(16)
-      );
-      return;
-    }
-
-    if (type === "playerNightstand") {
-      drawSprite(
-        playerRoomSprites.nightstand,
-        x,
-        y + housePoint(15),
-        w,
-        h - housePoint(8)
-      );
-
-      const lamp =
-        state && state.playerLampOn
-          ? playerRoomSprites.lampOn
-          : playerRoomSprites.lampOff;
-
-      drawSprite(
-        lamp,
-        x + housePoint(8),
-        y - housePoint(18),
-        w - housePoint(16),
-        housePoint(48)
-      );
-
-      if (state && state.playerLampOn) {
-        const gx = x + w / 2;
-        const gy = y + housePoint(6);
-
-        const glow = c.createRadialGradient(
-          gx, gy, 2,
-          gx, gy, housePoint(95)
-        );
-
-        glow.addColorStop(0, "#f2c87936");
-        glow.addColorStop(1, "#f2c87900");
-
-        c.fillStyle = glow;
-        c.fillRect(
-          gx - housePoint(95),
-          gy - housePoint(95),
-          housePoint(190),
-          housePoint(190)
-        );
-      }
-
+    const item = {playerBed:"bed", playerShelf:"shelf", playerDesk:"desk", playerNightstand:"nightstand"}[type];
+    if (item) {
+      drawRoomItem(item);
+      if (item === "nightstand") drawRoomItem(state?.playerLampOn ? "lampOn" : "lampOff");
       return;
     }
 
@@ -2561,8 +2437,9 @@ function drawCharacterSprite(
       dist: Math.hypot(state.x - d.x, state.y - d.y)
     }));
 
-    for (const o of m.objects) {
-      if (!o.action) {
+    for (const source of m.objects) {
+      const o = state.room === "bedroom" ? roomCollision(source) : source;
+      if (!o || !o.action) {
         continue;
       }
 
@@ -2611,13 +2488,14 @@ function drawCharacterSprite(
       return true;
     }
 
-    return m.objects.some(o =>
-      o.type !== "rug" &&
+    return m.objects.some(source => {
+      const o = state.room === "bedroom" ? roomCollision(source) : source;
+      return o && o.type !== "rug" &&
       x + 7 > o.x &&
       x - 7 < o.x + o.w &&
       y > o.y &&
-      y - 6 < o.y + o.h
-    );
+      y - 6 < o.y + o.h;
+    });
   }
 
   // =========================================================
@@ -2745,6 +2623,14 @@ function drawCharacterSprite(
     last = time;
 
     update(dt);
+    // Resolução de desenho independente das coordenadas lógicas do jogo.
+    const renderScale = 3;
+    if (canvas.width !== W * renderScale || canvas.height !== H * renderScale) {
+      canvas.width = W * renderScale;
+      canvas.height = H * renderScale;
+      canvas.style.imageRendering = "auto";
+    }
+    c.setTransform(renderScale, 0, 0, renderScale, 0, 0);
     c.imageSmoothingEnabled = false;
 
     if (mode === "menu") {
@@ -6256,9 +6142,66 @@ drawWorld = function () {
   c.restore();
 };
 
-$("version").textContent = "PROTÓTIPO · 0.6.11";
+// 0.6.12 — Uma referência para proporção visual e colisão do quarto.
+const roomItems = {
+  bed: [233,80,126,165, .10,.20,.80,.76],
+  shelf: [435,88,88,104, .08,.67,.84,.30],
+  desk: [520,92,76,190, .20,.18,.72,.78],
+  nightstand: [371,112,48,52, .10,.38,.80,.58],
+  lampOff: [377,75,36,51], lampOn: [377,75,36,51],
+  rug: [205,254,205,105],
+  backpack: [423,305,43,49, .12,.55,.76,.40],
+  clothes: [125,307,66,46, .12,.30,.76,.60],
+  shoes: [209,331,34,26, .08,.25,.84,.65],
+  flipflops: [270,336,30,23, .08,.25,.84,.65],
+  trash: [457,267,22,29, .12,.48,.76,.46]
+};
+function roomItemBounds(key) {
+  const [x,y,w,h] = roomItems[key].map(housePoint);
+  const image = playerRoomSprites[key];
+  const crop = spriteReady(image) ? getSpriteCrop(image) : {w,h};
+  const scale = Math.min(w/crop.w,h/crop.h);
+  const width = crop.w*scale, height = crop.h*scale;
+  return {x:x+(w-width)/2,y:y+h-height,w:width,h:height};
+}
+function drawRoomItem(key) {
+  const b = roomItemBounds(key);
+  drawSpriteContain(playerRoomSprites[key],b.x,b.y,b.w,b.h);
+}
+function roomCollision(o) {
+  const key = o.roomItem || {playerBed:"bed",playerShelf:"shelf",playerDesk:"desk",playerNightstand:"nightstand"}[o.type];
+  if (!key) return o;
+  const b=roomItemBounds(key), spec=roomItems[key];
+  return {...o,x:b.x+b.w*spec[4],y:b.y+b.h*spec[5],w:b.w*spec[6],h:b.h*spec[7]};
+}
+// O tapete é atravessável; objetos soltos usam a base visível como colisão.
+maps.bedroom.objects = maps.bedroom.objects.filter(o=>o.type!=="playerClutterBlock");
+for (const key of ["clothes","shoes","flipflops","backpack","trash"]) {
+  maps.bedroom.objects.push({type:"playerClutterBlock",roomItem:key});
+}
+// Recupera um save que tenha ficado dentro de um móvel reposicionado.
+const roomUpdateBeforeFix=update;
+let roomPositionChecked=false;
+update=function(dt) {
+  if (state?.room!=="bedroom") roomPositionChecked=false;
+  if (state?.room==="bedroom" && !roomPositionChecked && spriteReady(playerRoomSprites.bed) && spriteReady(playerRoomSprites.desk) && spriteReady(playerRoomSprites.shelf)) {
+    roomPositionChecked=true;
+    if (solid(state.x,state.y)) {
+      search: for(let radius=4;radius<200;radius+=4) {
+        for(let angle=0;angle<Math.PI*2;angle+=Math.PI/8) {
+          const x=state.x+Math.cos(angle)*radius,y=state.y+Math.sin(angle)*radius;
+          if(!solid(x,y)){state.x=x;state.y=y;break search;}
+        }
+      }
+    }
+  }
+  roomUpdateBeforeFix(dt);
+};
+
+$("version").textContent = "PROTÓTIPO · 0.6.12";
   
   requestAnimationFrame(frame);
   showBootSplash();
 })();
+
 
