@@ -6195,7 +6195,7 @@ drawWorld = function () {
 // 0.6.18 — Uma referência para proporção visual e colisão do quarto.
 const roomItems = {
   // Cama preservada da 0.6.22.
-  bed: [268, 94, 96, 124, .14, .26, .72, .62],
+  bed: [260, 97, 96, 124, .14, .26, .72, .62],
 
   // Tapete DEITADO, parcialmente sob a metade inferior/esquerda da cama.
   rug: [188, 222, 182, 92],
