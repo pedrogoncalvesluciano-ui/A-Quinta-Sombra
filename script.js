@@ -377,7 +377,7 @@
     ],
     [
       door(160, 374, "brother", 490, 85, "Quarto do irmão"),
-      door(490, 374, "bedroom", 131, 93, "Seu quarto"),
+      door(490, 374, "bedroom", 131, 132, "Seu quarto"),
       door(45, 215, null, 0, 0, "Banheiro", "bath"),
       door(240, 46, "attic", 310, 315, "Subir ao sótão")
     ]
@@ -754,10 +754,10 @@ function drawPlayerRoomBackground(m) {
 
   // O piso agora termina antes das paredes.
   // Isso deixa o quarto visualmente menor e as paredes mais presentes.
-  const floorX = housePoint(52);
-  const floorY = housePoint(72);
-  const floorW = m.w - housePoint(104);
-  const floorH = m.h - housePoint(134);
+  const floorX = housePoint(60);
+  const floorY = housePoint(78);
+  const floorW = m.w - housePoint(120);
+  const floorH = m.h - housePoint(142);
 
   if (
     !drawSprite(
@@ -6127,35 +6127,31 @@ drawWorld = function () {
 
 // 0.6.18 — Uma referência para proporção visual e colisão do quarto.
 const roomItems = {
-  // Cama menor e mais baixa
-  bed: [262, 92, 102, 132, .14, .24, .72, .66],
+  // Cama um pouco menor; mantém a leitura central do quarto.
+  bed: [268, 94, 96, 124, .14, .26, .72, .62],
 
-  // Tapete menor e parcialmente debaixo da cama
-  rug: [182, 150, 104, 148],
+  // Tapete deslocado para a direita: agora entra parcialmente sob a cama.
+  rug: [206, 154, 102, 140],
 
-  // Criado-mudo e abajur um pouco mais baixos
-  nightstand: [392, 86, 42, 46, .14, .46, .72, .48],
-  lampOff: [398, 49, 30, 41],
-  lampOn: [398, 49, 30, 41],
+  // Criado-mudo volta para perto da cama, formando um conjunto coerente.
+  nightstand: [374, 88, 40, 44, .14, .48, .72, .44],
+  lampOff: [380, 50, 28, 39],
+  lampOn: [380, 50, 28, 39],
 
-  // Estante alinhada com a parte alta direita
-  shelf: [452, 78, 82, 102, .12, .70, .76, .24],
+  // Estante aproximada do conjunto da parede superior.
+  shelf: [438, 78, 84, 102, .12, .70, .76, .24],
 
-  // Escrivaninha mais estreita e com passagem melhor
-  desk: [548, 160, 38, 134, .42, .18, .42, .74],
+  // Escrivaninha continua estreita, encostada à parede direita.
+  desk: [548, 160, 36, 132, .40, .18, .46, .74],
 
-  // Mochila afastada do recorte da porta
-  backpack: [214, 92, 26, 30, .18, .60, .64, .30],
+  // Mochila menor e junto da parede, sem invadir a passagem da porta.
+  backpack: [216, 90, 24, 28, .18, .58, .64, .30],
 
-  // Chinelo
-  flipflops: [375, 274, 26, 18, .18, .34, .64, .44],
-
-  // Lixeira
-  trash: [500, 286, 27, 34, .18, .56, .64, .34],
-
-  // Tênis e roupa mais pra dentro do quarto
-  shoes: [482, 338, 30, 21, .14, .34, .72, .48],
-  clothes: [522, 352, 52, 36, .16, .38, .68, .42]
+  // Objetos soltos: pequenos ajustes de escala/posição.
+  flipflops: [376, 276, 24, 17, .18, .34, .64, .42],
+  trash: [500, 286, 25, 32, .18, .56, .64, .34],
+  shoes: [482, 338, 28, 20, .14, .34, .72, .46],
+  clothes: [520, 350, 48, 34, .16, .38, .68, .42]
 };
 function roomItemBounds(key) {
   const [x,y,w,h] = roomItems[key].map(housePoint);
@@ -6183,16 +6179,40 @@ function drawRoomItem(key) {
   drawSpriteContain(playerRoomSprites[key],b.x,b.y,b.w,b.h);
 }
 function roomCollision(o) {
-  const key = o.roomItem || {playerBed:"bed",playerShelf:"shelf",playerDesk:"desk",playerNightstand:"nightstand"}[o.type];
+  const key = o.roomItem || {
+    playerBed:"bed",
+    playerShelf:"shelf",
+    playerDesk:"desk",
+    playerNightstand:"nightstand"
+  }[o.type];
+
   if (!key) return o;
-  const b=roomItemBounds(key), spec=roomItems[key];
-  const hit = {...o,x:b.x+b.w*spec[4],y:b.y+b.h*spec[5],w:b.w*spec[6],h:b.h*spec[7]};
-  // Fecha o espaço atrás dos móveis até o rodapé, preservando a borda frontal.
-  if (["bed","shelf","nightstand"].includes(key)) {
+
+  const b = roomItemBounds(key);
+  const spec = roomItems[key];
+
+  const hit = {
+    ...o,
+    x: b.x + b.w * spec[4],
+    y: b.y + b.h * spec[5],
+    w: b.w * spec[6],
+    h: b.h * spec[7]
+  };
+
+  // Móveis encostados na parede de cima não deixam corredor invisível atrás.
+  // O início da colisão coincide com a linha real piso/parede (y = 78).
+  if (["bed","shelf","nightstand","backpack"].includes(key)) {
     const bottom = hit.y + hit.h;
-    hit.y = Math.min(b.y, housePoint(68));
+    hit.y = Math.min(b.y, housePoint(78));
     hit.h = bottom - hit.y;
   }
+
+  // A escrivaninha encosta na parede direita: elimina o vão lateral invisível.
+  if (key === "desk") {
+    const right = Math.max(hit.x + hit.w, housePoint(580));
+    hit.w = right - hit.x;
+  }
+
   return hit;
 }
 // O tapete é atravessável; objetos soltos usam a base visível como colisão.
@@ -6248,7 +6268,7 @@ update=function(dt) {
   roomUpdateBeforeFix(dt);
 };
 
-$("version").textContent = "PROTÓTIPO · 0.6.21";
+$("version").textContent = "PROTÓTIPO · 0.6.22";
   
   requestAnimationFrame(frame);
   showBootSplash();
