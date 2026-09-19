@@ -37,19 +37,19 @@
     event.stopImmediatePropagation();
   }, true);
 
-  function waitForBootImage(image) {
-    if (!image || image.complete) return Promise.resolve();
+  function waitForBootImage(image, timeout = 10000) {
+    if (!image || image.complete) return Promise.resolve(Boolean(image?.naturalWidth));
     return new Promise(resolve => {
       let timer;
       const finish = () => {
         clearTimeout(timer);
         image.removeEventListener("load", finish);
         image.removeEventListener("error", finish);
-        resolve();
+        resolve(Boolean(image.complete && image.naturalWidth));
       };
       image.addEventListener("load", finish, { once: true });
       image.addEventListener("error", finish, { once: true });
-      timer = setTimeout(finish, 10000);
+      timer = setTimeout(finish, timeout);
     });
   }
 
@@ -70,15 +70,22 @@
       Object.values(fatherSpriteSheets).map(waitForBootImage)
     );
     try {
-      await waitForBootImage(logo);
-      if (logo.complete && logo.naturalWidth > 0) {
+      // Na primeira visita o PNG ainda não está em cache. Espere o download
+      // antes de iniciar os 5 segundos, mantendo uma indicação visível.
+      const logoReady = await waitForBootImage(logo, 45000);
+      if (logoReady) {
+        if (typeof logo.decode === "function") {
+          await Promise.race([logo.decode().catch(() => {}), pause(3000)]);
+        }
+        $("bootStatus").hidden = true;
         await fadeOpacity(logo, 0, 1, 5000);
         await Promise.all([pause(2000), spritesReady]);
         await fadeOpacity(logo, 1, 0, 1500);
       } else {
         // Um logo ausente nunca deve impedir o acesso ao jogo.
         logo.hidden = true;
-        await spritesReady;
+        $("bootStatus").textContent = "Abrindo o menu…";
+        await pause(700);
       }
       await fadeOpacity(splash, 1, 0, 1000);
     } catch (error) {
@@ -3791,7 +3798,7 @@ drawWorld = function () {
   }
 };
 
-$("version").textContent = "PROTÓTIPO · 0.5.1";
+$("version").textContent = "PROTÓTIPO · 0.5.2";
   
   requestAnimationFrame(frame);
   showBootSplash();
