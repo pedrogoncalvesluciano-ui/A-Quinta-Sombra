@@ -754,10 +754,10 @@ function drawPlayerRoomBackground(m) {
 
   // O piso agora termina antes das paredes.
   // Isso deixa o quarto visualmente menor e as paredes mais presentes.
-  const floorX = housePoint(42);
-  const floorY = housePoint(62);
-  const floorW = m.w - housePoint(84);
-  const floorH = m.h - housePoint(108);
+  const floorX = housePoint(50);
+  const floorY = housePoint(68);
+  const floorW = m.w - housePoint(100);
+  const floorH = m.h - housePoint(126);
 
   if (
     !drawSprite(
@@ -6121,28 +6121,29 @@ drawWorld = function () {
 
 // 0.6.18 — Uma referência para proporção visual e colisão do quarto.
 const roomItems = {
-  // Móveis principais
-  bed: [245,64,118,158, .12,.20,.76,.74],
-  nightstand: [382,66,46,50, .12,.42,.76,.54],
-  lampOff: [388,29,34,47],
-  lampOn: [388,29,34,47],
-  shelf: [440,57,88,114, .10,.66,.80,.30],
+  // Quarto do player — posicionamento 0.6.20
+  // Cama mais central e um pouco menor.
+  bed: [248,70,112,150, .13,.22,.74,.72],
 
-  // Escrivaninha: visual ainda encostado à parede,
-  // mas colisão bem mais estreita.
-  desk: [532,108,52,150, .38,.14,.52,.82],
+  // Criado-mudo e estante alinhados na parede superior.
+  nightstand: [376,70,44,48, .14,.44,.72,.50],
+  lampOff: [382,34,32,44],
+  lampOn: [382,34,32,44],
+  shelf: [432,62,82,106, .12,.68,.76,.27],
 
-  // Tapete continua atravessável.
-  rug: [102,126,108,162],
+  // Escrivaninha mais estreita e encostada na parede direita.
+  // A arte continua alta, mas a hitbox pega só a base útil.
+  desk: [544,112,44,146, .42,.18,.44,.76],
 
-  // Objetos soltos
-  backpack: [205,72,30,35, .16,.56,.68,.36],
-  flipflops: [365,228,28,21, .14,.30,.72,.58],
-  trash: [492,236,29,38, .16,.50,.68,.42],
+  // Tapete deslocado para a esquerda e livre para andar.
+  rug: [96,132,104,154],
 
-  // Tênis e roupas ficam totalmente dentro do quarto.
-  shoes: [496,322,31,23, .12,.28,.76,.58],
-  clothes: [536,326,58,40, .14,.34,.72,.52]
+  // Objetos soltos totalmente dentro do quarto.
+  backpack: [198,78,28,33, .18,.58,.64,.34],
+  flipflops: [348,232,27,20, .16,.34,.68,.50],
+  trash: [492,240,27,36, .18,.54,.64,.38],
+  shoes: [472,300,30,22, .14,.32,.72,.52],
+  clothes: [500,318,55,38, .16,.38,.68,.46]
 };
 function roomItemBounds(key) {
   const [x,y,w,h] = roomItems[key].map(housePoint);
@@ -6188,10 +6189,10 @@ maps.bedroom.objects = maps.bedroom.objects.filter(o =>
 // Contorno interno medido na arte paredes-player.png (640 × 420 no mapa).
 // O corredor da porta fica entre x=101 e x=162.
 for (const [x,y,w,h] of [
-  [0,0,54,420], [586,0,54,420],
-  [54,0,47,69], [162,0,424,69],
-  [101,0,61,16],
-  [54,375,532,45], [201,364,239,56]
+  [0,0,58,420], [582,0,58,420],
+  [58,0,43,74], [162,0,420,74],
+  [101,0,61,18],
+  [58,366,524,54], [205,356,231,64]
 ]) {
   maps.bedroom.objects.push({
     type:"playerBlock", x:housePoint(x), y:housePoint(y),
@@ -6220,7 +6221,7 @@ update=function(dt) {
   roomUpdateBeforeFix(dt);
 };
 
-$("version").textContent = "PROTÓTIPO · 0.6.19";
+$("version").textContent = "PROTÓTIPO · 0.6.20";
   
   requestAnimationFrame(frame);
   showBootSplash();
