@@ -55,50 +55,117 @@
 
   async function showBootSplash() {
     const splash = $("bootSplash");
-    if (!splash) return;
+
+    if (!splash) {
+      bootBusy = false;
+      $("game").inert = false;
+      return;
+    }
+
     const logo = $("bootLogo");
-    const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
-    const fadeOpacity = async (element, from, to, ms) => {
-      await element.animate(
-        [{ opacity: from }, { opacity: to }],
-        { duration: ms, easing: "ease-in-out", fill: "forwards" }
-      ).finished;
-      element.style.opacity = String(to);
-    };
-    // Os sprites já começaram a carregar quando esta função é chamada.
-    const spritesReady = Promise.all(
-      [
-        ...Object.values(characterSpriteSheets)
-          .flatMap(sheet => Object.values(sheet)),
-        ...Object.values(playerRoomSprites)
-      ].map(image => waitForBootImage(image))
-    );
-    try {
-      // Na primeira visita o PNG ainda não está em cache. Espere o download
-      // antes de iniciar os 5 segundos, mantendo uma indicação visível.
-      const logoReady = await waitForBootImage(logo, 45000);
-      if (logoReady) {
-        if (typeof logo.decode === "function") {
-          await Promise.race([logo.decode().catch(() => {}), pause(3000)]);
-        }
-        $("bootStatus").hidden = true;
-        await fadeOpacity(logo, 0, 1, 5000);
-        await Promise.all([pause(2000), spritesReady]);
-        await fadeOpacity(logo, 1, 0, 1500);
-      } else {
-        // Um logo ausente nunca deve impedir o acesso ao jogo.
-        logo.hidden = true;
-        $("bootStatus").textContent = "Abrindo o menu…";
-        await pause(700);
-      }
-      await fadeOpacity(splash, 1, 0, 1000);
-    } catch (error) {
-      console.warn("Não foi possível concluir a abertura do logo.", error);
-    } finally {
+    const status = $("bootStatus");
+
+    const pause = ms =>
+      new Promise(resolve => setTimeout(resolve, ms));
+
+    const releaseBoot = () => {
       splash.hidden = true;
       $("game").inert = false;
       bootBusy = false;
       keys.clear();
+    };
+
+    // Segurança: nenhuma imagem pode prender o jogo indefinidamente.
+    const hardTimeout = setTimeout(() => {
+      console.warn("A abertura excedeu o tempo limite. Abrindo o menu.");
+      releaseBoot();
+    }, 12000);
+
+    const fadeOpacity = async (element, from, to, ms) => {
+      if (!element || splash.hidden) return;
+
+      try {
+        await element.animate(
+          [
+            { opacity: from },
+            { opacity: to }
+          ],
+          {
+            duration: ms,
+            easing: "ease-in-out",
+            fill: "forwards"
+          }
+        ).finished;
+      } catch {}
+
+      if (element) {
+        element.style.opacity = String(to);
+      }
+    };
+
+    try {
+      // Sprites de personagens e do quarto carregam em segundo plano.
+      // A tela inicial NÃO espera mais por eles.
+      const logoReady = await waitForBootImage(
+        logo,
+        5000
+      );
+
+      if (!logoReady) {
+        if (logo) {
+          logo.hidden = true;
+        }
+
+        if (status) {
+          status.textContent = "Abrindo o menu…";
+        }
+
+        await pause(450);
+        return;
+      }
+
+      if (typeof logo.decode === "function") {
+        await Promise.race([
+          logo.decode().catch(() => {}),
+          pause(1200)
+        ]);
+      }
+
+      if (status) {
+        status.hidden = true;
+      }
+
+      // Logo visível por alguns segundos, sem bloquear por assets grandes.
+      await fadeOpacity(
+        logo,
+        0,
+        1,
+        1800
+      );
+
+      await pause(1800);
+
+      await fadeOpacity(
+        logo,
+        1,
+        0,
+        900
+      );
+
+      await fadeOpacity(
+        splash,
+        1,
+        0,
+        500
+      );
+    } catch (error) {
+      console.warn(
+        "Não foi possível concluir a abertura do logo.",
+        error
+      );
+    } finally {
+      clearTimeout(hardTimeout);
+      releaseBoot();
     }
   }
 
@@ -5969,7 +6036,7 @@ drawWorld = function () {
   c.restore();
 };
 
-$("version").textContent = "PROTÓTIPO · 0.6.9";
+$("version").textContent = "PROTÓTIPO · 0.6.10";
   
   requestAnimationFrame(frame);
   showBootSplash();
