@@ -299,9 +299,10 @@
       obj(0, 0, 34, 420, "playerBlock"),
       obj(607, 0, 33, 420, "playerBlock"),
 
-      // Cama — mantém praticamente onde já está.
+      // Cama — permanece no mesmo lugar.
+      // A hitbox é menor que o desenho para a colisão ficar natural.
       obj(
-        248, 82, 96, 132,
+        255, 92, 82, 118,
         "playerBed",
         "Cama",
         "bed"
@@ -315,17 +316,23 @@
         "togglePlayerLamp"
       ),
 
-      // Estante, depois do abajur.
+      // Estante ao lado do abajur.
       obj(
         438, 92, 78, 44,
         "playerShelf"
       ),
 
-      // Mesa menor e encostada na parede direita.
+      // Escrivaninha na parede direita.
+      // Hitbox estreita: acompanha somente a parte física do móvel.
       obj(
-        530, 86, 54, 194,
+        548, 96, 28, 176,
         "playerDesk"
-      )
+      ),
+
+      // Bagunça com colisões pequenas e próprias.
+      obj(132, 303, 55, 34, "playerClutterBlock"),
+      obj(211, 322, 36, 22, "playerClutterBlock"),
+      obj(271, 329, 31, 19, "playerClutterBlock")
     ],
     [
       door(90, 46, "hall", 490, 325, "Sair do quarto")
@@ -569,7 +576,15 @@ function drawSprite(image, x, y, w, h) {
   if (!spriteReady(image)) return false;
 
   c.save();
-  c.imageSmoothingEnabled = false;
+
+  // Os assets da casa são PNGs grandes. Nearest-neighbor ao reduzi-los
+  // destruía detalhes e fazia os móveis parecerem "quadriculados".
+  c.imageSmoothingEnabled = true;
+
+  if ("imageSmoothingQuality" in c) {
+    c.imageSmoothingQuality = "high";
+  }
+
   c.drawImage(
     image,
     Math.round(x),
@@ -577,19 +592,76 @@ function drawSprite(image, x, y, w, h) {
     Math.round(w),
     Math.round(h)
   );
-  c.restore();
 
+  c.restore();
   return true;
 }
 
-function drawPlayerRoomBackground(m) {
-  // O chão ocupa toda a base; as paredes vêm por cima
-  // como camada transparente.
-  if (!drawSprite(playerRoomSprites.floor, 0, 0, m.w, m.h)) {
-    rect(0, 0, m.w, m.h, "#61503d");
+// Desenha o sprite sem deformar sua proporção.
+// A hitbox continua independente do tamanho visual.
+function drawSpriteContain(image, x, y, w, h) {
+  if (!spriteReady(image)) return false;
+
+  const ratio =
+    image.naturalWidth / image.naturalHeight;
+
+  let dw = w;
+  let dh = dw / ratio;
+
+  if (dh > h) {
+    dh = h;
+    dw = dh * ratio;
   }
 
-  drawSprite(playerRoomSprites.walls, 0, 0, m.w, m.h);
+  const dx = x + (w - dw) / 2;
+  const dy = y + (h - dh) / 2;
+
+  return drawSprite(
+    image,
+    dx,
+    dy,
+    dw,
+    dh
+  );
+}
+
+function drawPlayerRoomBackground(m) {
+  // Base escura atrás das paredes.
+  rect(0, 0, m.w, m.h, "#241f1b");
+
+  // O piso agora termina antes das paredes.
+  // Isso deixa o quarto visualmente menor e as paredes mais presentes.
+  const floorX = housePoint(42);
+  const floorY = housePoint(62);
+  const floorW = m.w - housePoint(84);
+  const floorH = m.h - housePoint(108);
+
+  if (
+    !drawSprite(
+      playerRoomSprites.floor,
+      floorX,
+      floorY,
+      floorW,
+      floorH
+    )
+  ) {
+    rect(
+      floorX,
+      floorY,
+      floorW,
+      floorH,
+      "#61503d"
+    );
+  }
+
+  // Parede sempre por cima do piso.
+  drawSprite(
+    playerRoomSprites.walls,
+    0,
+    0,
+    m.w,
+    m.h
+  );
 
   // Pôsteres ficam presos na parede superior.
   drawSprite(
@@ -627,8 +699,8 @@ function drawPlayerRoomClutter() {
     housePoint(205),
     housePoint(105)
   );
-  // Objetos pequenos não entram na colisão:
-  // são detalhes visuais do quarto.
+  // Mochila e lixeira continuam decorativas.
+  // Roupa, tênis e chinelo possuem hitboxes pequenas no mapa.
   drawSprite(
     playerRoomSprites.backpack,
     housePoint(420),
@@ -879,41 +951,47 @@ function drawCharacterSprite(
     const { x, y, w, h, type } = o;
 
         // Hitbox invisível das paredes.
-    if (type === "playerBlock") {
+    if (
+      type === "playerBlock" ||
+      type === "playerClutterBlock"
+    ) {
       return;
     }
 
     // Cama real do quarto do player.
     if (type === "playerBed") {
-      drawSprite(
+      // Visual mais largo que a hitbox e sem deformar a imagem.
+      drawSpriteContain(
         playerRoomSprites.bed,
-        x - housePoint(6),
-        y - housePoint(6),
-        w + housePoint(12),
-        h + housePoint(12)
+        x - housePoint(22),
+        y - housePoint(12),
+        w + housePoint(44),
+        h + housePoint(28)
       );
       return;
     }
 
     // Estante real do quarto do player.
     if (type === "playerShelf") {
-      drawSprite(
+      drawSpriteContain(
         playerRoomSprites.shelf,
-        x - housePoint(4),
-        y - housePoint(8),
-        w + housePoint(8),
-        h + housePoint(12)
+        x - housePoint(8),
+        y - housePoint(12),
+        w + housePoint(16),
+        h + housePoint(24)
       );
       return;
     }
 
-       if (type === "playerDesk") {
-      drawSprite(
+    if (type === "playerDesk") {
+      // A arte continua visível e encostada na parede,
+      // mas a colisão é bem mais estreita.
+      drawSpriteContain(
         playerRoomSprites.desk,
-        x - housePoint(3),
-        y - housePoint(6),
-        w + housePoint(9),
-        h + housePoint(12)
+        x - housePoint(27),
+        y - housePoint(8),
+        w + housePoint(42),
+        h + housePoint(16)
       );
       return;
     }
@@ -4694,6 +4772,17 @@ prepareSystems = function () {
     state.brotherFood = 75;
   }
 
+  // Compatibilidade com saves anteriores:
+  // dormir só é liberado depois da primeira comida dada ao irmão.
+  if (typeof state.firstBrotherMealDone !== "boolean") {
+    state.firstBrotherMealDone = ![
+      "prologue",
+      "parents",
+      "meal",
+      "feed"
+    ].includes(state.stage);
+  }
+
   state.brotherFood = Math.max(
     0,
     Math.min(100, state.brotherFood)
@@ -4877,6 +4966,13 @@ function v06UpdateBrotherFood() {
 
 function v06Sleep() {
   prepareSystems();
+
+  if (!state.firstBrotherMealDone) {
+    say([
+      "Ainda não vou dormir. Primeiro preciso levar comida para o meu irmão."
+    ]);
+    return;
+  }
 
   if (dangerActive()) {
     say([
@@ -5204,6 +5300,7 @@ interact = function (action) {
       ],
       () => {
         v06FeedBrother();
+        state.firstBrotherMealDone = true;
         state.stage = "sleep";
         updateHud();
         save();
@@ -6036,7 +6133,7 @@ drawWorld = function () {
   c.restore();
 };
 
-$("version").textContent = "PROTÓTIPO · 0.6.10";
+$("version").textContent = "PROTÓTIPO · 0.6.11";
   
   requestAnimationFrame(frame);
   showBootSplash();
