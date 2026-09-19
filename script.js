@@ -754,10 +754,10 @@ function drawPlayerRoomBackground(m) {
 
   // O piso agora termina antes das paredes.
   // Isso deixa o quarto visualmente menor e as paredes mais presentes.
-  const floorX = housePoint(50);
-  const floorY = housePoint(68);
-  const floorW = m.w - housePoint(100);
-  const floorH = m.h - housePoint(126);
+  const floorX = housePoint(52);
+  const floorY = housePoint(72);
+  const floorW = m.w - housePoint(104);
+  const floorH = m.h - housePoint(134);
 
   if (
     !drawSprite(
@@ -790,7 +790,7 @@ function drawPlayerRoomBackground(m) {
 }
 
 function drawPlayerRoomClutter() {
-  for (const key of ["rug", "backpack", "clothes", "shoes", "flipflops", "trash"]) {
+  for (const key of ["backpack", "flipflops", "trash", "shoes", "clothes"]) {
     drawRoomItem(key);
   }
 }
@@ -1328,6 +1328,12 @@ function drawCharacterSprite(
           rect(d.x - 10, d.y - 22, 20, 44, "#282929");
           rect(d.x - 8, d.y - 18, 14, 36, "#716049");
         }
+      }
+
+      if (state.room === "bedroom") {
+        // O tapete é a primeira camada decorativa:
+        // cama e demais móveis ficam desenhados por cima.
+        drawRoomItem("rug");
       }
 
       for (const o of m.objects) {
@@ -6121,29 +6127,35 @@ drawWorld = function () {
 
 // 0.6.18 — Uma referência para proporção visual e colisão do quarto.
 const roomItems = {
-  // Quarto do player — posicionamento 0.6.20
-  // Cama mais central e um pouco menor.
-  bed: [248,70,112,150, .13,.22,.74,.72],
+  // Cama menor e mais baixa
+  bed: [262, 92, 102, 132, .14, .24, .72, .66],
 
-  // Criado-mudo e estante alinhados na parede superior.
-  nightstand: [376,70,44,48, .14,.44,.72,.50],
-  lampOff: [382,34,32,44],
-  lampOn: [382,34,32,44],
-  shelf: [432,62,82,106, .12,.68,.76,.27],
+  // Tapete menor e parcialmente debaixo da cama
+  rug: [182, 150, 104, 148],
 
-  // Escrivaninha mais estreita e encostada na parede direita.
-  // A arte continua alta, mas a hitbox pega só a base útil.
-  desk: [544,112,44,146, .42,.18,.44,.76],
+  // Criado-mudo e abajur um pouco mais baixos
+  nightstand: [392, 86, 42, 46, .14, .46, .72, .48],
+  lampOff: [398, 49, 30, 41],
+  lampOn: [398, 49, 30, 41],
 
-  // Tapete deslocado para a esquerda e livre para andar.
-  rug: [96,132,104,154],
+  // Estante alinhada com a parte alta direita
+  shelf: [452, 78, 82, 102, .12, .70, .76, .24],
 
-  // Objetos soltos totalmente dentro do quarto.
-  backpack: [198,78,28,33, .18,.58,.64,.34],
-  flipflops: [348,232,27,20, .16,.34,.68,.50],
-  trash: [492,240,27,36, .18,.54,.64,.38],
-  shoes: [472,300,30,22, .14,.32,.72,.52],
-  clothes: [500,318,55,38, .16,.38,.68,.46]
+  // Escrivaninha mais estreita e com passagem melhor
+  desk: [548, 160, 38, 134, .42, .18, .42, .74],
+
+  // Mochila afastada do recorte da porta
+  backpack: [214, 92, 26, 30, .18, .60, .64, .30],
+
+  // Chinelo
+  flipflops: [375, 274, 26, 18, .18, .34, .64, .44],
+
+  // Lixeira
+  trash: [500, 286, 27, 34, .18, .56, .64, .34],
+
+  // Tênis e roupa mais pra dentro do quarto
+  shoes: [482, 338, 30, 21, .14, .34, .72, .48],
+  clothes: [522, 352, 52, 36, .16, .38, .68, .42]
 };
 function roomItemBounds(key) {
   const [x,y,w,h] = roomItems[key].map(housePoint);
@@ -6189,10 +6201,25 @@ maps.bedroom.objects = maps.bedroom.objects.filter(o =>
 // Contorno interno medido na arte paredes-player.png (640 × 420 no mapa).
 // O corredor da porta fica entre x=101 e x=162.
 for (const [x,y,w,h] of [
-  [0,0,58,420], [582,0,58,420],
-  [58,0,43,74], [162,0,420,74],
-  [101,0,61,18],
-  [58,366,524,54], [205,356,231,64]
+  // laterais
+  [0, 0, 60, 420],
+  [580, 0, 60, 420],
+
+  // parede de cima com UMA entrada só (superior esquerda)
+  [60, 0, 52, 78],
+  [172, 0, 408, 78],
+  [112, 0, 60, 18],
+
+  // reforço ao redor da entrada para limpar o recorte do canvas
+  [96, 18, 16, 58],
+  [172, 18, 14, 58],
+
+  // parede inferior inteira: impede cair no preto
+  [60, 356, 520, 64],
+
+  // cantos de baixo, para não sobrar espaço vazio no recorte
+  [60, 338, 24, 24],
+  [556, 338, 24, 24]
 ]) {
   maps.bedroom.objects.push({
     type:"playerBlock", x:housePoint(x), y:housePoint(y),
@@ -6221,7 +6248,7 @@ update=function(dt) {
   roomUpdateBeforeFix(dt);
 };
 
-$("version").textContent = "PROTÓTIPO · 0.6.20";
+$("version").textContent = "PROTÓTIPO · 0.6.21";
   
   requestAnimationFrame(frame);
   showBootSplash();
