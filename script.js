@@ -530,13 +530,17 @@ function drawCharacterSprite(
     c.scale(fallbackScale, fallbackScale);
 
     const skin =
-      kind === "mother" ? "#c6967b" : "#bc9071";
+      kind === "mother" || kind === "npcFemale"
+        ? "#c6967b"
+        : "#bc9071";
 
     const shirt = {
       player: "#587a78",
       father: "#665d49",
       mother: "#8e5960",
-      brother: "#a58757"
+      brother: "#a58757",
+      npcMale: "#53585a",
+      npcFemale: "#6a5966"
     }[kind] || "#587a78";
 
     const leg = Math.sin(walk) * 2;
@@ -554,7 +558,7 @@ function drawCharacterSprite(
     rect(-5, -30, 10, 11, skin);
     rect(-6, -32, 12, 5, "#392c2a");
 
-    if (kind === "mother") {
+    if (kind === "mother" || kind === "npcFemale") {
       rect(-7, -29, 3, 13, "#392c2a");
       rect(5, -29, 3, 13, "#392c2a");
     }
@@ -849,7 +853,7 @@ function drawCharacterSprite(
       if (state.stage === "prologue") {
                drawMother();
       } else {
-        person(325, 405, "mother", 0);
+        person(325, 405, "npcFemale", 0);
         txt("MORADORA", 303, 363, "#bac2a4", 7);
       }
     } else {
@@ -2759,7 +2763,7 @@ function drawCharacterSprite(
       person(
         e.x,
         e.y,
-        "father",
+        "npcMale",
         e.walk,
         e.facing
       );
@@ -4757,7 +4761,7 @@ drawWorld = function () {
     person(
       housePoint(355),
       housePoint(128),
-      "father",
+      "npcMale",
       0,
       "down",
       0.9
@@ -5295,7 +5299,7 @@ drawWorld = function () {
     person(
       V061_INFORMANT.x,
       V061_INFORMANT.y,
-      "father",
+      "npcMale",
       0,
       "left",
       0.9
@@ -5324,7 +5328,7 @@ drawWorld = function () {
       person(
         V061_TARGET.x,
         V061_TARGET.y,
-        "father",
+        "npcMale",
         0,
         "right",
         0.9
