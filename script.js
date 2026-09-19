@@ -1104,7 +1104,49 @@ function drawCharacterSprite(
   // Mãe acompanhante: segue o percurso do pai com distância.
 
   function prepareMother() {
-    if (state.mother) return;
+    if (
+      state.mother &&
+      Number.isFinite(state.mother.x) &&
+      Number.isFinite(state.mother.y)
+    ) {
+      const mother = state.mother;
+
+      // Converte automaticamente saves do sistema antigo de trilha.
+      if (!Number.isFinite(mother.think)) {
+        mother.think = 0;
+      }
+
+      if (!Number.isFinite(mother.targetX)) {
+        mother.targetX = mother.x;
+      }
+
+      if (!Number.isFinite(mother.targetY)) {
+        mother.targetY = mother.y;
+      }
+
+      if (!Number.isFinite(mother.preferredSide)) {
+        mother.preferredSide = 1;
+      }
+
+      if (!Number.isFinite(mother.pause)) {
+        mother.pause = 0;
+      }
+
+      if (!Number.isFinite(mother.lastFatherX)) {
+        mother.lastFatherX = state.x;
+      }
+
+      if (!Number.isFinite(mother.lastFatherY)) {
+        mother.lastFatherY = state.y;
+      }
+
+      // Dados da IA anterior não são mais necessários.
+      delete mother.trail;
+      delete mother.lastX;
+      delete mother.lastY;
+
+      return;
+    }
 
     const start = {
       x: state.x,
@@ -5610,7 +5652,7 @@ drawWorld = function () {
   c.restore();
 };
 
-$("version").textContent = "PROTÓTIPO · 0.6.4";
+$("version").textContent = "PROTÓTIPO · 0.6.5";
   
   requestAnimationFrame(frame);
   showBootSplash();
