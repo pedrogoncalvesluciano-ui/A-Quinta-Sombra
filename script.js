@@ -6119,18 +6119,18 @@ drawWorld = function () {
   c.restore();
 };
 
-// 0.6.15 — Uma referência para proporção visual e colisão do quarto.
+// 0.6.16 — Uma referência para proporção visual e colisão do quarto.
 const roomItems = {
   bed: [233,61,126,165, .10,.20,.80,.76],
-  shelf: [425,61,76,100, .08,.67,.84,.30],
-  desk: [507,92,76,190, .06,.12,.89,.84],
+  shelf: [420,50,91,120, .08,.67,.84,.30],
+  desk: [521,92,62,160, .06,.12,.89,.84],
   nightstand: [371,61,48,52, .10,.38,.80,.58],
   lampOff: [377,24,36,51], lampOn: [377,24,36,51],
   rug: [109,98,100,158],
   backpack: [201,61,30,35, .12,.55,.76,.40],
   clothes: [508,323,66,46, .12,.30,.76,.60],
-  shoes: [475,299,34,26, .08,.25,.84,.65],
-  flipflops: [362,218,34,26, .08,.25,.84,.65],
+  shoes: [475,299,28,21, .08,.25,.84,.65],
+  flipflops: [362,218,26,20, .08,.25,.84,.65],
   trash: [459,244,34,45, .12,.48,.76,.46]
 };
 function roomItemBounds(key) {
@@ -6144,7 +6144,7 @@ function roomItemBounds(key) {
   const width = sourceW*scale, height = sourceH*scale;
   // Móveis de parede e mochila ficam alinhados pelo topo visível.
   const wallAligned = ["bed","shelf","nightstand","lampOff","lampOn","backpack"].includes(key);
-  return {x:x+(w-width)/2,y:wallAligned ? y : y+h-height,w:width,h:height};
+  return {x:key === "desk" ? x+w-width : x+(w-width)/2,y:wallAligned ? y : y+h-height,w:width,h:height};
 }
 function drawRoomItem(key) {
   const b = roomItemBounds(key);
@@ -6202,7 +6202,7 @@ update=function(dt) {
   roomUpdateBeforeFix(dt);
 };
 
-$("version").textContent = "PROTÓTIPO · 0.6.15";
+$("version").textContent = "PROTÓTIPO · 0.6.16";
   
   requestAnimationFrame(frame);
   showBootSplash();
