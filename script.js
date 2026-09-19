@@ -2810,9 +2810,7 @@ go = function (nextRoom, x, y) {
     }
   );
 };
-  
-  requestAnimationFrame(frame);
-})();
+
 
 // CONTINUAÇÃO 0.3 — PISTAS E FOTOGRAFIA
 let photoScene = null;
@@ -3404,3 +3402,7 @@ window.addEventListener(
 );
 
 $("version").textContent = "PROTÓTIPO · 0.3.0";
+
+  
+  requestAnimationFrame(frame);
+})();
