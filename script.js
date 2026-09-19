@@ -786,30 +786,7 @@ function drawPlayerRoomBackground(m) {
     m.h
   );
 
-  // Pôsteres ficam presos na parede superior.
-  drawSprite(
-    playerRoomSprites.poster1,
-    housePoint(165),
-    housePoint(28),
-    housePoint(48),
-    housePoint(62)
-  );
-
-  drawSprite(
-    playerRoomSprites.poster2,
-    housePoint(220),
-    housePoint(28),
-    housePoint(48),
-    housePoint(62)
-  );
-
-  drawSprite(
-    playerRoomSprites.poster3,
-    housePoint(275),
-    housePoint(28),
-    housePoint(48),
-    housePoint(62)
-  );
+  // Pôsteres retirados temporariamente.
 }
 
 function drawPlayerRoomClutter() {
@@ -6142,15 +6119,15 @@ drawWorld = function () {
   c.restore();
 };
 
-// 0.6.13 — Uma referência para proporção visual e colisão do quarto.
+// 0.6.14 — Uma referência para proporção visual e colisão do quarto.
 const roomItems = {
-  bed: [233,80,126,165, .10,.20,.80,.76],
-  shelf: [425,80,76,100, .08,.67,.84,.30],
+  bed: [233,69,126,165, .10,.20,.80,.76],
+  shelf: [425,69,76,100, .08,.67,.84,.30],
   desk: [507,92,76,190, .06,.12,.89,.84],
-  nightstand: [371,112,48,52, .10,.38,.80,.58],
-  lampOff: [377,75,36,51], lampOn: [377,75,36,51],
-  rug: [205,254,205,105],
-  backpack: [420,312,43,49, .12,.55,.76,.40],
+  nightstand: [371,69,48,52, .10,.38,.80,.58],
+  lampOff: [377,32,36,51], lampOn: [377,32,36,51],
+  rug: [64,98,158,100],
+  backpack: [169,69,30,35, .12,.55,.76,.40],
   clothes: [508,323,66,46, .12,.30,.76,.60],
   shoes: [475,299,34,26, .08,.25,.84,.65],
   flipflops: [362,218,34,26, .08,.25,.84,.65],
@@ -6162,7 +6139,9 @@ function roomItemBounds(key) {
   const crop = spriteReady(image) ? getSpriteCrop(image) : {w,h};
   const scale = Math.min(w/crop.w,h/crop.h);
   const width = crop.w*scale, height = crop.h*scale;
-  return {x:x+(w-width)/2,y:y+h-height,w:width,h:height};
+  // Móveis de parede e mochila ficam alinhados pelo topo visível.
+  const wallAligned = ["bed","shelf","nightstand","lampOff","lampOn","backpack"].includes(key);
+  return {x:x+(w-width)/2,y:wallAligned ? y : y+h-height,w:width,h:height};
 }
 function drawRoomItem(key) {
   const b = roomItemBounds(key);
@@ -6212,7 +6191,7 @@ update=function(dt) {
   roomUpdateBeforeFix(dt);
 };
 
-$("version").textContent = "PROTÓTIPO · 0.6.13";
+$("version").textContent = "PROTÓTIPO · 0.6.14";
   
   requestAnimationFrame(frame);
   showBootSplash();
