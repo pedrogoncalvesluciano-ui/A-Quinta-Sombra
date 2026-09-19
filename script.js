@@ -28,6 +28,69 @@
 
   const keys = new Set();
 
+  // Bloqueia cliques e atalhos apenas durante a apresentação do logotipo.
+  let bootBusy = Boolean($("bootSplash"));
+  if (bootBusy) $("game").inert = true;
+  window.addEventListener("keydown", event => {
+    if (!bootBusy) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }, true);
+
+  function waitForBootImage(image) {
+    if (!image || image.complete) return Promise.resolve();
+    return new Promise(resolve => {
+      let timer;
+      const finish = () => {
+        clearTimeout(timer);
+        image.removeEventListener("load", finish);
+        image.removeEventListener("error", finish);
+        resolve();
+      };
+      image.addEventListener("load", finish, { once: true });
+      image.addEventListener("error", finish, { once: true });
+      timer = setTimeout(finish, 10000);
+    });
+  }
+
+  async function showBootSplash() {
+    const splash = $("bootSplash");
+    if (!splash) return;
+    const logo = $("bootLogo");
+    const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
+    const fadeOpacity = async (element, from, to, ms) => {
+      await element.animate(
+        [{ opacity: from }, { opacity: to }],
+        { duration: ms, easing: "ease-in-out", fill: "forwards" }
+      ).finished;
+      element.style.opacity = String(to);
+    };
+    // Os sprites já começaram a carregar quando esta função é chamada.
+    const spritesReady = Promise.all(
+      Object.values(fatherSpriteSheets).map(waitForBootImage)
+    );
+    try {
+      await waitForBootImage(logo);
+      if (logo.complete && logo.naturalWidth > 0) {
+        await fadeOpacity(logo, 0, 1, 5000);
+        await Promise.all([pause(2000), spritesReady]);
+        await fadeOpacity(logo, 1, 0, 1500);
+      } else {
+        // Um logo ausente nunca deve impedir o acesso ao jogo.
+        logo.hidden = true;
+        await spritesReady;
+      }
+      await fadeOpacity(splash, 1, 0, 1000);
+    } catch (error) {
+      console.warn("Não foi possível concluir a abertura do logo.", error);
+    } finally {
+      splash.hidden = true;
+      $("game").inert = false;
+      bootBusy = false;
+      keys.clear();
+    }
+  }
+
   let mode = "menu";
   let state = null;
   let dialog = null;
@@ -3728,8 +3791,9 @@ drawWorld = function () {
   }
 };
 
-$("version").textContent = "PROTÓTIPO · 0.4.1";
+$("version").textContent = "PROTÓTIPO · 0.5.1";
   
   requestAnimationFrame(frame);
+  showBootSplash();
 })();
 
