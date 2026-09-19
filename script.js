@@ -1204,7 +1204,7 @@ if (
     $("time").textContent = hours + ":" + minutes;
 
     $("timeNote").textContent = state.firstExit
-      ? "1 HORA = 3 MINUTOS"
+      ? "1 HORA = 2 MINUTOS"
       : "TEMPO PARADO · INTRODUÇÃO";
 
     $("inventory").textContent =
@@ -1642,7 +1642,7 @@ if (
 
       // 3 segundos reais = 1 minuto do jogo.
       // 3 minutos reais = 1 hora do jogo.
-      state.minutes += dt / 3;
+      state.minutes += dt / 2;
 
       if (state.minutes >= 1440) {
         state.minutes -= 1440;
@@ -1723,6 +1723,7 @@ if (
   // =========================================================
 
   window.addEventListener("keydown", event => {
+    if (photoScene) return;
     const key = event.key.toLowerCase();
 
     if (
@@ -2673,6 +2674,7 @@ if (
     "keydown",
     event => {
       if (mode !== "game" || !state) return;
+      if (photoScene) return;
 
       if (state.gameOver) {
         if (
@@ -2811,3 +2813,594 @@ go = function (nextRoom, x, y) {
   
   requestAnimationFrame(frame);
 })();
+
+// CONTINUAÇÃO 0.3 — PISTAS E FOTOGRAFIA
+let photoScene = null;
+
+const chapterBase = {
+  update,
+  updateHud,
+  getNear,
+  interact,
+  drawWorld
+};
+
+const clueText = {
+  list:
+    "Pão, feijão, sal, óleo e ataduras. " +
+    "Sob os riscos: DUAS CÓPIAS. No rodapé: LUA.",
+
+  photo:
+    "Quatro pessoas, cinco sombras. No verso: OLHO.",
+
+  note:
+    "Se voltarmos diferentes, compare a fotografia. " +
+    "A câmera está no segundo baú do sótão. " +
+    "Feche a sequência com CASA."
+};
+
+const clueSpots = [
+  [
+    "parents", 125, 165,
+    "list", "Ler lista de mantimentos"
+  ],
+  [
+    "parents", 440, 170,
+    "photo", "Examinar fotografia"
+  ],
+  [
+    "parents", 320, 250,
+    "note", "Ler bilhete"
+  ],
+  [
+    "bedroom", 110, 240,
+    "normal", "Observar sua fotografia"
+  ],
+  [
+    "attic", 410, 175,
+    "chest", "Abrir baú da câmera"
+  ]
+];
+
+function chapter() {
+  if (!state) return null;
+
+  if (!state.investigation) {
+    state.investigation = {
+      phase: "waiting",
+      clues: [],
+      camera: false,
+      photo: null
+    };
+  }
+
+  return state.investigation;
+}
+
+function chapterObjective() {
+  const q = chapter();
+
+  if (!q || q.phase === "waiting") return null;
+
+  return {
+    brother:
+      "Converse com seu irmão sobre a invasão.",
+
+    clues:
+      "Investigue o quarto dos pais: " +
+      q.clues.length + "/3 pistas. J: diário.",
+
+    chest:
+      "Abra o segundo baú no sótão. " +
+      "Consulte as pistas com J.",
+
+    camera:
+      "Aproxime-se da figura diante do portão norte.",
+
+    done:
+      "Registro salvo. O caminho oeste será a próxima " +
+      "investigação. J: diário."
+  }[q.phase];
+}
+
+function openJournal() {
+  const q = chapter();
+
+  modal(
+    "Diário de investigação",
+
+    q.clues.map(id => clueText[id]).join("\n\n") ||
+      "Nenhuma pista registrada.",
+
+    q.photo
+      ? [
+          ["Ver fotografia", () => showPhoto(false)],
+          ["Fechar", closeModal]
+        ]
+      : [["Fechar", closeModal]]
+  );
+}
+
+function showPhoto(first) {
+  modal(
+    "Registro 01 — A figura no portão",
+
+    "Ela estava de costas. Na fotografia, " +
+    "está olhando para mim.",
+
+    [
+      [
+        "Guardar",
+        () => {
+          closeModal();
+
+          if (first) {
+            say(
+              [
+                [
+                  "Você",
+                  "Ela sumiu… mas continua na fotografia."
+                ],
+                [
+                  "Você",
+                  "Atrás dela há uma marca apontando para o oeste."
+                ]
+              ],
+              () => {
+                photoScene = null;
+                keys.clear();
+                updateHud();
+                save();
+              }
+            );
+          }
+        }
+      ]
+    ]
+  );
+
+  const img = document.createElement("img");
+
+  img.src = chapter().photo;
+
+  img.alt =
+    "Figura escura diante do portão, com dois olhos " +
+    "claros e uma marca para oeste.";
+
+  img.width = 320;
+  img.style.maxWidth = "100%";
+  img.style.imageRendering = "pixelated";
+
+  $("modalText").append(
+    document.createElement("br"),
+    img
+  );
+}
+
+function captureEvidence() {
+  if (
+    !photoScene ||
+    photoScene.phase !== "ready"
+  ) {
+    return;
+  }
+
+  photoScene.phase = "review";
+
+  // Fotografia provisória feita em Canvas.
+  const shot = document.createElement("canvas");
+
+  shot.width = 320;
+  shot.height = 180;
+
+  const p = shot.getContext("2d");
+
+  p.fillStyle = "#24312d";
+  p.fillRect(0, 0, 320, 180);
+
+  p.fillStyle = "#75654d";
+  p.fillRect(30, 25, 260, 10);
+
+  for (let x = 40; x < 290; x += 25) {
+    p.fillRect(x, 35, 5, 135);
+  }
+
+  p.fillStyle = "#080d12";
+  p.fillRect(139, 68, 42, 93);
+
+  p.beginPath();
+  p.arc(160, 62, 21, 0, Math.PI * 2);
+  p.fill();
+
+  p.fillStyle = "#d8dfc8";
+  p.fillRect(149, 60, 4, 3);
+  p.fillRect(167, 60, 4, 3);
+
+  p.font = "14px monospace";
+  p.fillText("< OESTE", 35, 155);
+
+  const q = chapter();
+
+  q.photo = shot.toDataURL("image/png");
+  q.phase = "done";
+
+  $("prompt").hidden = true;
+
+  save();
+  showPhoto(true);
+}
+
+function beginPhoto() {
+  if (photoScene || chapter().photo) return;
+
+  photoScene = {
+    phase: "fade",
+    time: 0
+  };
+
+  keys.clear();
+  state.walk = 0;
+  near = null;
+
+  $("prompt").hidden = true;
+}
+
+function chestPuzzle(sequence = []) {
+  const symbols = ["LUA", "OLHO", "CASA"];
+
+  modal(
+    "Fechadura de três símbolos",
+
+    "Escolha a ordem indicada nas três pistas.\n" +
+      sequence.join(" → "),
+
+    [
+      ...symbols.map(symbol => [
+        symbol,
+
+        () => {
+          const next = [...sequence, symbol];
+
+          if (next.length < 3) {
+            return chestPuzzle(next);
+          }
+
+          if (next.join("/") !== symbols.join("/")) {
+            return modal(
+              "O baú continua fechado",
+
+              "Confira os versos e o bilhete no diário.",
+
+              [
+                [
+                  "Tentar novamente",
+                  () => chestPuzzle()
+                ],
+                ["Voltar", closeModal]
+              ]
+            );
+          }
+
+          closeModal();
+
+          say(
+            [
+              ["Você", "Uma câmera… Ainda funciona."],
+              [
+                "Anotação",
+                "A imagem guarda aquilo que os olhos esquecem."
+              ],
+              [
+                "Você",
+                "Há uma figura perto do portão. Preciso registrá-la."
+              ]
+            ],
+            () => {
+              chapter().camera = true;
+              chapter().phase = "camera";
+
+              updateHud();
+              save();
+            }
+          );
+        }
+      ]),
+
+      ["Voltar", closeModal]
+    ]
+  );
+}
+
+getNear = function () {
+  const q = chapter();
+
+  if (photoScene) return null;
+
+  if (
+    q &&
+    !["waiting", "brother"].includes(q.phase)
+  ) {
+    const spot = clueSpots.find(
+      ([room, x, y, id]) =>
+        state.room === room &&
+        Math.hypot(state.x - x, state.y - y) < 35 &&
+        (id !== "chest" || q.clues.length === 3)
+    );
+
+    if (spot) {
+      return {
+        action: "clue:" + spot[3],
+        label: spot[4]
+      };
+    }
+  }
+
+  return chapterBase.getNear();
+};
+
+interact = function (action) {
+  const q = chapter();
+
+  if (
+    action === "brother" &&
+    q.phase === "brother"
+  ) {
+    say(
+      [
+        [
+          "Irmão",
+          "Ouvi a voz da mãe perto do porão. " +
+          "Mas não sei se era ela."
+        ],
+        [
+          "Irmão",
+          "Ela jamais falaria uma coisa assim."
+        ],
+        ["Você", "O quê? O que ela disse?"],
+        ["Irmão", "Não é nada… esquece."]
+      ],
+      () => {
+        q.phase = "clues";
+
+        updateHud();
+        save();
+      }
+    );
+
+    return;
+  }
+
+  if (!action.startsWith("clue:")) {
+    return chapterBase.interact(action);
+  }
+
+  const id = action.slice(5);
+
+  if (id === "chest") {
+    if (q.camera) {
+      return say([
+        "O baú está vazio. A câmera está comigo."
+      ]);
+    }
+
+    return chestPuzzle();
+  }
+
+  if (id === "normal") {
+    return say([
+      "Nossa foto na escada. Quatro pessoas, quatro sombras."
+    ]);
+  }
+
+  say([clueText[id]], () => {
+    if (!q.clues.includes(id)) {
+      q.clues.push(id);
+    }
+
+    if (
+      q.clues.length === 3 &&
+      q.phase === "clues"
+    ) {
+      q.phase = "chest";
+    }
+
+    updateHud();
+    save();
+  });
+};
+
+updateHud = function () {
+  chapterBase.updateHud();
+
+  if (!state) return;
+
+  const objective = chapterObjective();
+
+  if (objective && !dangerActive()) {
+    $("objective").textContent = objective;
+  }
+};
+
+update = function (dt) {
+  const q = chapter();
+
+  // Durante a foto, não atualiza movimento,
+  // relógio, exposição ao sol ou invasores.
+  if (photoScene) {
+    if (
+      photoScene.phase === "fade" &&
+      document.visibilityState !== "hidden"
+    ) {
+      photoScene.time += dt;
+
+      // Reposiciona no instante de tela preta.
+      if (
+        photoScene.time >= 0.4 &&
+        !photoScene.placed
+      ) {
+        state.x = 500;
+        state.y = 210;
+        state.facing = "up";
+
+        photoScene.placed = true;
+      }
+
+      if (photoScene.time >= 0.8) {
+        photoScene.phase = "ready";
+
+        $("prompt").textContent = "[E] Fotografar";
+        $("prompt").hidden = false;
+      }
+    }
+
+    return;
+  }
+
+  chapterBase.update(dt);
+
+  if (
+    !q ||
+    mode !== "game" ||
+    dialog ||
+    transitionBusy ||
+    !$("overlay").hidden ||
+    state.gameOver
+  ) {
+    return;
+  }
+
+  // Também funciona em saves com a invasão já vencida.
+  if (
+    q.phase === "waiting" &&
+    state.danger.victories > 0
+  ) {
+    q.phase = "brother";
+
+    updateHud();
+    save();
+  }
+
+  // Dispara apenas perto do alvo e sem invasão ativa.
+  if (
+    q.phase === "camera" &&
+    state.room === "village" &&
+    !dangerActive() &&
+    Math.hypot(state.x - 500, state.y - 175) < 85
+  ) {
+    beginPhoto();
+  }
+};
+
+drawWorld = function () {
+  chapterBase.drawWorld();
+
+  const q = chapter();
+
+  c.save();
+
+  c.translate(
+    -Math.floor(camera.x),
+    -Math.floor(camera.y)
+  );
+
+  // Marcadores provisórios das pistas.
+  if (
+    q &&
+    !["waiting", "brother"].includes(q.phase)
+  ) {
+    for (const [room, x, y, id] of clueSpots) {
+      if (state.room !== room) continue;
+
+      rect(
+        x - 5,
+        y - 7,
+        10,
+        7,
+        q.clues.includes(id) ? "#69756a" : "#dfc997"
+      );
+    }
+  }
+
+  // A figura deixa de existir no cenário após a foto.
+  if (
+    q &&
+    q.phase === "camera" &&
+    state.room === "village"
+  ) {
+    rect(491, 139, 18, 36, "#080d12");
+    rect(494, 129, 12, 12, "#080d12");
+  }
+
+  c.restore();
+
+  if (
+    photoScene &&
+    photoScene.phase === "fade"
+  ) {
+    const alpha = Math.max(
+      0,
+      1 - Math.abs(photoScene.time - 0.4) / 0.4
+    );
+
+    rect(
+      0, 0, W, H,
+      "rgba(0,0,0," + alpha + ")"
+    );
+  }
+
+  if (
+    photoScene &&
+    photoScene.phase === "ready"
+  ) {
+    c.strokeStyle = "#d4d5be";
+    c.strokeRect(175, 50, 130, 150);
+  }
+};
+
+window.addEventListener(
+  "keydown",
+  event => {
+    if (mode !== "game" || !state) return;
+
+    const key = event.key.toLowerCase();
+
+    if (photoScene) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+
+      // Exige um novo toque para cada ação.
+      if (event.repeat || key !== "e") return;
+
+      if (photoScene.phase === "ready") {
+        captureEvidence();
+      } else if (photoScene.phase === "review") {
+        if (!$("overlay").hidden) {
+          $("modalActions")
+            .querySelector("button")
+            ?.click();
+        } else if (dialog) {
+          advance();
+        }
+      }
+
+      return;
+    }
+
+    if (
+      key === "j" &&
+      !event.repeat &&
+      !dialog &&
+      !transitionBusy &&
+      !state.gameOver &&
+      $("overlay").hidden
+    ) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+
+      openJournal();
+    }
+  },
+  true
+);
+
+$("version").textContent = "PROTÓTIPO · 0.3.0";
