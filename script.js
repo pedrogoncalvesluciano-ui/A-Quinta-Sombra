@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 20612)
+Total output lines: 3735
+
 /*CODIGO JAVA SCRIPT*/
 "use strict";
 
@@ -76,9 +79,11 @@
   function initial() {
     return {
       schema: 1,
-      room: "village",
-      x: 500,
-      y: 690,
+      room: "foyer",
+      x: housePoint(220),
+      y: housePoint(315),
+      houseLayout: 1,
+      familyFarewell: false,
       stage: "prologue",
       minutes: 14 * 60,
       day: 0,
@@ -97,13 +102,42 @@
   // =========================================================
 
   const maps = {};
+  // Coordenadas legadas continuam sendo usadas nas ligações entre cômodos.
+  // O mapa interno ocupa 80% da largura e altura, sem encolher personagens.
+  const HOUSE_SCALE = 0.8;
+  const housePoint = value => value * HOUSE_SCALE;
+  const children = { x: housePoint(330), y: housePoint(195) };
+  let openingStaticUntil = 0;
+
+  function migrateHouseSave(saved) {
+    if (!saved || saved.houseLayout === 1) return;
+    if (saved.room !== "village") {
+      saved.x = housePoint(saved.x);
+      saved.y = housePoint(saved.y);
+    }
+    const enemy = saved.danger?.enemy;
+    if (enemy && enemy.room !== "village") {
+      enemy.x = housePoint(enemy.x);
+      enemy.y = housePoint(enemy.y);
+      enemy.path = enemy.path.map(point => point.map(housePoint));
+    }
+    if (saved.stage === "prologue") saved.familyFarewell = true;
+    delete saved.mother;
+    saved.houseLayout = 1;
+    migrateHouseSave(saved.rescueCheckpoint);
+  }
 
   function room(id, objects, doors) {
     maps[id] = {
-      w: 640,
-      h: 420,
-      objects,
-      doors
+      w: housePoint(640),
+      h: housePoint(420),
+      objects: objects.map(o => ({ ...o,
+        x: housePoint(o.x), y: housePoint(o.y),
+        w: housePoint(o.w), h: housePoint(o.h)
+      })),
+      doors: doors.map(d => ({ ...d,
+        x: housePoint(d.x), y: housePoint(d.y)
+      }))
     };
   }
 
@@ -456,7 +490,7 @@ if (
         rect(x + i, y + 47, 2, h - 59, "#ffffff10");
       }
 
-      if (type === "brotherbed") {
+      if (type === "brotherbed" && state.stage !== "prologue") {
         person(x + w / 2, y + 58, "brother", 0, "down", 0.8);
       }
 
@@ -696,6 +730,8 @@ if (
         txt("MORADORA", 303, 363, "#bac2a4", 7);
       }
     } else {
+      c.save();
+      c.scale(HOUSE_SCALE, HOUSE_SCALE);
       rect(0, 0, 640, 420, "#10191e");
       rect(32, 34, 576, 352, "#61503d");
 
@@ -720,9 +756,10 @@ if (
       rect(25, 45, 12, 342, "#353a38");
       rect(603, 45, 12, 342, "#353a38");
       rect(25, 378, 590, 12, "#353a38");
+      c.restore();
 
       for (const d of m.doors) {
-        if (d.y < 70 || d.y > 350) {
+        if (d.y < housePoint(70) || d.y > housePoint(350)) {
           rect(d.x - 19, d.y - 10, 38, 20, "#282929");
           rect(d.x - 15, d.y - 8, 30, 14, "#716049");
         } else {
@@ -733,6 +770,14 @@ if (
 
       for (const o of m.objects) {
         furnishing(o);
+      }
+    }
+
+    if (state.stage === "prologue" && state.room !== "village") {
+      drawMother();
+      if (state.room === "foyer") {
+        person(children.x - 18, children.y, "player", 0, "down");
+        person(children.x + 18, children.y + 5, "brother", 0, "down", 0.8);
       }
     }
 
@@ -862,9 +907,7 @@ if (
         rect(p[0] + 5, p[1] + 8, 2, 17, "#842f30");
       }
 
-      for (let i = 0; i < 16; i++) {
-        rect(165, Math.random() * H, 315, 1, "#c8c9b116");
-      }
+      drawStatic(165, 315);
     }
 
     const glow = c.createRadialGradient(
@@ -949,8 +992,7 @@ if (
 
   function updateMother(dt) {
     if (
-      state.stage !== "prologue" ||
-      state.room !== "village"
+      state.stage !== "prologue"
     ) {
       return;
     }
@@ -1101,8 +1143,9 @@ if (
 
   function go(nextRoom, x, y) {
     state.room = nextRoom;
-    state.x = x;
-    state.y = y;
+    state.x = nextRoom === "village" ? x : housePoint(x);
+    state.y = nextRoom === "village" ? y : housePoint(y);
+    delete state.mother;
 
     keys.clear();
     near = null;
@@ -1144,20 +1187,33 @@ if (
     state = initial();
     enterGame();
 
+    // O diálogo começa apenas quando o pai se aproxima dos filhos.
+    $("prompt").hidden = true;
+  }
+
+  function familyConversation() {
+    if (state.familyFarewell || dialog || transitionBusy) return;
+    state.walk = 0;
+    state.facing = "up";
+    openingStaticUntil = elapsed + 1.8;
     say([
-      [
-        "Mãe",
-        "A comida dele está na cozinha. Cuide do seu irmão, como sempre."
-      ],
-      [
-        "Pai",
-        "Vamos buscar mais mantimentos. Fiquem dentro de casa."
-      ],
-      [
-        "Tutorial",
-        "Agora você controla o pai. Use WASD ou as setas para caminhar. Sua esposa acompanha você. Vá ao portão norte e pressione E."
-      ]
-    ]);
+      ["Pai", "Vamos buscar mantimentos. Cuide do seu irmão até voltarmos."],
+      ["Mãe", "Deixei a comida dele na cozinha. Fiquem dentro de casa."],
+      ["Você", "Pode deixar. Vocês vão demorar?"],
+      ["Pai", "Voltamos assim que conseguirmos o que falta."],
+      ["Irmão", "Eu vou esperar vocês aqui."]
+    ], () => {
+      state.familyFarewell = true;
+      updateHud();
+      save();
+    });
+  }
+
+  // Mesmas linhas de interferência do menu, em pulsos fracos e breves.
+  function drawStatic(x, width, lines = 16) {
+    for (let i = 0; i < lines; i++) {
+      rect(x, Math.random() * H, width, 1, "#c8c9b116");
+    }
   }
 
   function modal(title, text, buttons) {
@@ -1190,7 +1246,13 @@ if (
     }
 
     $("location").textContent = roomNames[state.room];
-    $("objective").textContent = objectives[state.stage];
+    $("objective").textContent = state.stage === "prologue"
+      ? state.room === "village"
+        ? "Siga com sua esposa até o portão norte."
+        : state.familyFarewell
+          ? "Saia de casa com sua esposa."
+          : "Você controla o pai. Aproxime-se dos seus filhos no térreo."
+      : objectives[state.stage];
     $("day").textContent = state.day ? "DIA " + state.day : "PRÓLOGO";
 
     const hours = String(
@@ -1216,6 +1278,20 @@ if (
   // =========================================================
 
   function interact(action) {
+    if (state.stage === "prologue") {
+      if (action === "children") return familyConversation();
+      if (action === "outside") {
+        if (!state.familyFarewell) {
+          return say([["Pai", "Antes de sair, preciso falar com os meninos."]]);
+        }
+        openingStaticUntil = elapsed + 1.8;
+        go("village", 500, 694);
+        return;
+      }
+      if (!["gate", "home", "supply"].includes(action)) {
+        return say([["Pai", "Vamos falar com os meninos e buscar mantimentos."]]);
+      }
+    }
     switch (action) {
       case "gate":
         if (state.stage === "prologue") {
@@ -1229,8 +1305,8 @@ if (
               "15:00 · O silêncio da casa continua.",
               () => {
                 state.minutes = 900;
-                go("bedroom", 180, 235);
                 stage("parents");
+                go("bedroom", 180, 235);
               }
             )
           );
@@ -1560,7 +1636,7 @@ if (
 
   function solid(x, y) {
     const m = maps[state.room];
-    const pad = state.room === "village" ? 18 : 47;
+    const pad = state.room === "village" ? 18 : housePoint(47);
 
     if (
       x < pad ||
@@ -1624,116 +1700,7 @@ if (
       state.facing = Math.abs(dx) > Math.abs(dy)
         ? (dx > 0 ? "right" : "left")
         : (dy > 0 ? "down" : "up");
-    } else {
-      state.walk = 0;
-    }
-
-    updateMother(dt);
-    
-    near = getNear();
-    $("prompt").hidden = !near;
-
-    if (near) {
-      $("prompt").textContent = "[E] " + near.label;
-    }
-
-    if (state.firstExit) {
-      const old = state.minutes;
-
-      // 3 segundos reais = 1 minuto do jogo.
-      // 3 minutos reais = 1 hora do jogo.
-      state.minutes += dt / 2;
-
-      if (state.minutes >= 1440) {
-        state.minutes -= 1440;
-        state.day++;
-        state.rain = state.day % 3 === 0;
-        save();
-      }
-
-      if (
-        old < 360 &&
-        state.minutes >= 360 &&
-        state.room === "village"
-      ) {
-        say([
-          "A luz… minha cabeça está girando. Preciso entrar em algum lugar."
-        ]);
-      }
-
-      if (
-        state.room === "village" &&
-        state.minutes >= 360 &&
-        state.minutes < 1080
-      ) {
-        state.sun = (state.sun || 0) + dt;
-
-        if (state.sun > 18) {
-          state.sun = 0;
-
-          fade(
-            "Você perdeu os sentidos",
-            "Por enquanto, o protótipo retorna você à entrada de casa.",
-            () => go("foyer", 530, 305)
-          );
-        }
-      } else {
-        state.sun = 0;
-      }
-
-      updateHud();
-
-      messageTime += dt;
-
-      if (messageTime > 10) {
-        messageTime = 0;
-        save();
-      }
-    }
-  }
-
-  function frame(time) {
-    const dt = Math.min((time - last) / 1000, 0.04);
-    last = time;
-
-    update(dt);
-    c.imageSmoothingEnabled = false;
-
-    if (mode === "menu") {
-      drawMenu();
-    } else if (state) {
-      drawWorld();
-    }
-
-    if (state && mode === "game" && state.sun) {
-      rect(
-        0,
-        0,
-        W,
-        H,
-        `rgba(189,153,117,${Math.min(0.5, state.sun / 36)})`
-      );
-    }
-
-    requestAnimationFrame(frame);
-  }
-
-  // =========================================================
-  // TECLADO E PAUSA
-  // =========================================================
-
-  window.addEventListener("keydown", event => {
-    if (photoScene) return;
-    const key = event.key.toLowerCase();
-
-    if (
-      [
-        "arrowup",
-        "arrowdown",
-        "arrowleft",
-        "arrowright",
-        " ",
-        "escape"
+…612 tokens truncated…        "escape"
       ].includes(key)
     ) {
       event.preventDefault();
@@ -1889,7 +1856,26 @@ if (
         throw new Error("Progresso incompatível.");
       }
 
+      migrateHouseSave(saved);
       state = saved;
+      // O corpo mantém seu tamanho: afasta saves antigos das bordas dos móveis.
+      if (solid(state.x, state.y)) {
+        const origin = { x: state.x, y: state.y };
+        let placed = false;
+        for (let radius = 2; radius <= 40 && !placed; radius += 2) {
+          for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1],
+                                 [1,1],[-1,1],[1,-1],[-1,-1]]) {
+            const x = origin.x + dx * radius;
+            const y = origin.y + dy * radius;
+            if (!solid(x, y)) {
+              state.x = x;
+              state.y = y;
+              placed = true;
+              break;
+            }
+          }
+        }
+      }
       enterGame();
     } catch {
       modal(
@@ -2167,13 +2153,13 @@ if (
       d.time = 0;
 
       e.room = "foyer";
-      e.x = 550;
-      e.y = 305;
+      e.x = housePoint(550);
+      e.y = housePoint(305);
 
       e.path = [
         [370, 305],
         [370, 255]
-      ];
+      ].map(point => point.map(housePoint));
 
       save();
     } else if (
@@ -2186,13 +2172,13 @@ if (
       d.countdown = 60;
 
       e.room = "hall";
-      e.x = 450;
-      e.y = 200;
+      e.x = housePoint(450);
+      e.y = housePoint(200);
 
       e.path = [
         [160, 200],
         [160, 360]
-      ];
+      ].map(point => point.map(housePoint));
 
       save();
     } else if (d.phase === "critical") {
@@ -2203,14 +2189,14 @@ if (
         !e.path.length
       ) {
         e.room = "brother";
-        e.x = 490;
-        e.y = 85;
+        e.x = housePoint(490);
+        e.y = housePoint(85);
 
         e.path = [
           [490, 240],
           [400, 240],
           [400, 205]
-        ];
+        ].map(point => point.map(housePoint));
 
         save();
       }
@@ -2736,7 +2722,7 @@ const enterGameBeforeTransitions = enterGame;
 const goBeforeTransitions = go;
 
 const START_TRANSITION_MS = 5000;
-const DOOR_TRANSITION_MS = 5000;
+const DOOR_TRANSITION_MS = 1400;
 
 function runScreenTransition(title, hint, duration, changeRoom) {
   transitionBusy = true;
@@ -2783,6 +2769,12 @@ enterGame = function () {
 };
 
 go = function (nextRoom, x, y) {
+  if (state?.stage === "prologue" && nextRoom !== "village") {
+    say([["Pai", state.familyFarewell
+      ? "Precisamos sair. A porta de entrada fica à direita."
+      : "Os meninos estão aqui no térreo. Vou falar com eles."]]);
+    return;
+  }
   if (!state || transitionBusy || state.room === nextRoom) {
     goBeforeTransitions(nextRoom, x, y);
     return;
@@ -2791,8 +2783,10 @@ go = function (nextRoom, x, y) {
   const labels = {
     foyer: 'Entrada',
     hall: 'Corredor',
-    room1: 'Quarto dos pais',
-    room2: 'Quarto do irmão',
+    parents: 'Quarto dos pais',
+    brother: 'Quarto do irmão',
+    bedroom: 'Seu quarto',
+    living: 'Sala',
     kitchen: 'Cozinha',
     attic: 'Sótão',
     basement: 'Porão',
@@ -2807,6 +2801,9 @@ go = function (nextRoom, x, y) {
     DOOR_TRANSITION_MS,
     () => {
       goBeforeTransitions(nextRoom, x, y);
+      if (state.stage === "prologue" && nextRoom === "village") {
+        openingStaticUntil = elapsed + 2;
+      }
     }
   );
 };
@@ -2859,6 +2856,12 @@ const clueSpots = [
     "chest", "Abrir baú da câmera"
   ]
 ];
+
+// Mantém as pistas alinhadas aos móveis após compactar os cômodos.
+for (const spot of clueSpots) {
+  spot[1] = housePoint(spot[1]);
+  spot[2] = housePoint(spot[2]);
+}
 
 function chapter() {
   if (!state) return null;
@@ -3602,7 +3605,17 @@ window.addEventListener(
   true
 );
 
-$("version").textContent = "PROTÓTIPO · 0.4.0";
+const drawWorldBeforeOpeningStatic = drawWorld;
+drawWorld = function () {
+  drawWorldBeforeOpeningStatic();
+  if (state.stage === "prologue" && elapsed < openingStaticUntil &&
+      $("overlay").hidden && Math.floor(elapsed * 8) % 3 === 0) {
+    drawStatic(0, W, 10);
+  }
+};
+
+$("version").textContent = "PROTÓTIPO · 0.4.1";
   
   requestAnimationFrame(frame);
 })();
+
