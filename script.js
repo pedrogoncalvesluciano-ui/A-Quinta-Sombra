@@ -463,7 +463,7 @@ for (const kind of Object.keys(characterSpriteSheets)) {
 const playerRoomSpriteNames = {
   floor: "chao-player.png",
   walls: "paredes-player.png",
-    bed: "cama-player.png",
+  bed: "cama-player.png",
   shelf: "estante-player.png",
   desk: "escrivaninha-player.png",
   nightstand: "criado-mudo-player.png",
@@ -810,6 +810,35 @@ function drawCharacterSprite(
 
   function furnishing(o) {
     const { x, y, w, h, type } = o;
+
+        // Hitbox invisível das paredes.
+    if (type === "playerBlock") {
+      return;
+    }
+
+    // Cama real do quarto do player.
+    if (type === "playerBed") {
+      drawSprite(
+        playerRoomSprites.bed,
+        x - housePoint(6),
+        y - housePoint(6),
+        w + housePoint(12),
+        h + housePoint(12)
+      );
+      return;
+    }
+
+    // Estante real do quarto do player.
+    if (type === "playerShelf") {
+      drawSprite(
+        playerRoomSprites.shelf,
+        x - housePoint(4),
+        y - housePoint(8),
+        w + housePoint(8),
+        h + housePoint(12)
+      );
+      return;
+    }
 
        if (type === "playerDesk") {
       drawSprite(
