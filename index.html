@@ -6,9 +6,9 @@
 
   <title>A Quinta Sombra</title>
 
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=0.5.1">
   <link rel="stylesheet" href="journal.css?v=0.5.0">
-<script src="script.js?v=0.5.0" defer></script>
+<script src="script.js?v=0.5.1" defer></script>
 </head>
 
 <body>
@@ -89,7 +89,11 @@
       <span id="transitionHint"></span>
     </div>
 
-  <span id="version">PROTÓTIPO · 0.5.0</span>
+  <span id="version">PROTÓTIPO · 0.5.1</span>
   </main>
+  <div id="bootSplash" role="status" aria-label="A Quinta Sombra — carregando">
+    <img id="bootLogo" src="assets/ui/logo.png" alt="A Quinta Sombra"
+      fetchpriority="high" decoding="async">
+  </div>
 </body>
 </html>
