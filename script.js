@@ -3872,6 +3872,51 @@ if (v06CameraChest) {
   v06CameraChest.cameraChest = true;
 }
 
+// Móveis antigos cobertos por lençóis no sótão.
+if (!maps.attic.objects.some(o => o.coveredFurniture)) {
+  maps.attic.objects.push(
+    {
+      x: housePoint(225),
+      y: housePoint(215),
+      w: housePoint(120),
+      h: housePoint(55),
+      type: "sofa",
+      coveredFurniture: true
+    },
+    {
+      x: housePoint(485),
+      y: housePoint(245),
+      w: housePoint(70),
+      h: housePoint(48),
+      type: "table",
+      coveredFurniture: true
+    }
+  );
+}
+
+const v06FurnishingBase = furnishing;
+furnishing = function (o) {
+  v06FurnishingBase(o);
+
+  if (!o.coveredFurniture) return;
+
+  rect(
+    o.x - 3,
+    o.y - 5,
+    o.w + 6,
+    Math.max(18, o.h * 0.72),
+    "#a39c8d"
+  );
+
+  rect(
+    o.x + 8,
+    o.y + 5,
+    Math.max(10, o.w - 16),
+    2,
+    "#c8c1b350"
+  );
+};
+
 // Interior compacto da venda.
 if (!maps.shop) {
   room(
