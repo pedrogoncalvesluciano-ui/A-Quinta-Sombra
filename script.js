@@ -6119,7 +6119,7 @@ drawWorld = function () {
   c.restore();
 };
 
-// 0.6.17 — Uma referência para proporção visual e colisão do quarto.
+// 0.6.18 — Uma referência para proporção visual e colisão do quarto.
 const roomItems = {
   bed: [233,61,126,165, .10,.20,.80,.76],
   shelf: [420,4,91,120, .08,.67,.84,.30],
@@ -6162,7 +6162,14 @@ function roomCollision(o) {
   const key = o.roomItem || {playerBed:"bed",playerShelf:"shelf",playerDesk:"desk",playerNightstand:"nightstand"}[o.type];
   if (!key) return o;
   const b=roomItemBounds(key), spec=roomItems[key];
-  return {...o,x:b.x+b.w*spec[4],y:b.y+b.h*spec[5],w:b.w*spec[6],h:b.h*spec[7]};
+  const hit = {...o,x:b.x+b.w*spec[4],y:b.y+b.h*spec[5],w:b.w*spec[6],h:b.h*spec[7]};
+  // Fecha o espaço atrás dos móveis até o rodapé, preservando a borda frontal.
+  if (["bed","shelf","nightstand"].includes(key)) {
+    const bottom = hit.y + hit.h;
+    hit.y = Math.min(b.y, housePoint(68));
+    hit.h = bottom - hit.y;
+  }
+  return hit;
 }
 // O tapete é atravessável; objetos soltos usam a base visível como colisão.
 maps.bedroom.objects = maps.bedroom.objects.filter(o =>
@@ -6188,7 +6195,7 @@ const roomUpdateBeforeFix=update;
 let roomPositionChecked=false;
 update=function(dt) {
   if (state?.room!=="bedroom") roomPositionChecked=false;
-  if (state?.room==="bedroom" && !roomPositionChecked && spriteReady(playerRoomSprites.bed) && spriteReady(playerRoomSprites.desk) && spriteReady(playerRoomSprites.shelf)) {
+  if (state?.room==="bedroom" && !roomPositionChecked && spriteReady(playerRoomSprites.bed) && spriteReady(playerRoomSprites.desk) && spriteReady(playerRoomSprites.shelf) && spriteReady(playerRoomSprites.nightstand)) {
     roomPositionChecked=true;
     if (solid(state.x,state.y)) {
       search: for(let radius=4;radius<200;radius+=4) {
@@ -6202,7 +6209,7 @@ update=function(dt) {
   roomUpdateBeforeFix(dt);
 };
 
-$("version").textContent = "PROTÓTIPO · 0.6.17";
+$("version").textContent = "PROTÓTIPO · 0.6.18";
   
   requestAnimationFrame(frame);
   showBootSplash();
