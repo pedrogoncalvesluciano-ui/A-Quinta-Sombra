@@ -554,3 +554,14 @@ h2 {
   object-fit: contain;
   opacity: 0;
 }
+
+#bootStatus {
+  position: absolute;
+  bottom: 12%;
+  left: 0;
+  right: 0;
+  text-align: center;
+  color: #a79b91;
+  font: 12px monospace;
+  letter-spacing: .12em;
+}
