@@ -5996,7 +5996,7 @@ drawWorld = function () {
   c.restore();
 };
 
-$("version").textContent = "PROTÓTIPO · 0.6.7";
+$("version").textContent = "PROTÓTIPO · 0.6.8";
   
   requestAnimationFrame(frame);
   showBootSplash();
