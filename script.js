@@ -1000,33 +1000,6 @@ function drawCharacterSprite(
     }
   }
 
-      // Parede invisível: só colisão, nada para desenhar.
-    if (type === "playerBlock") {
-      return;
-    }
-
-    if (type === "playerBed") {
-      drawSprite(
-        playerRoomSprites.bed,
-        x - housePoint(6),
-        y - housePoint(6),
-        w + housePoint(12),
-        h + housePoint(12)
-      );
-      return;
-    }
-
-    if (type === "playerShelf") {
-      drawSprite(
-        playerRoomSprites.shelf,
-        x - housePoint(4),
-        y - housePoint(8),
-        w + housePoint(8),
-        h + housePoint(12)
-      );
-      return;
-    }
-
   // =========================================================
   // CONSTRUÇÕES DA VILA
   // =========================================================
@@ -5996,7 +5969,7 @@ drawWorld = function () {
   c.restore();
 };
 
-$("version").textContent = "PROTÓTIPO · 0.6.8";
+$("version").textContent = "PROTÓTIPO · 0.6.9";
   
   requestAnimationFrame(frame);
   showBootSplash();
