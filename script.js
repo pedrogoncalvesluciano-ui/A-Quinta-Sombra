@@ -1111,29 +1111,22 @@ function drawCharacterSprite(
       y: state.y
     };
 
+    // Tenta nascer perto do pai, mas não exatamente atrás dele.
     const positions = [
-      [0, 52],
-      [52, 0],
-      [-52, 0],
-      [0, -52]
+      [38, 46],
+      [-38, 46],
+      [48, 0],
+      [-48, 0],
+      [0, 52]
     ];
 
     for (const [dx, dy] of positions) {
-      let clear = true;
+      const x = state.x + dx;
+      const y = state.y + dy;
 
-      for (let n = 0; n <= 26; n++) {
-        const x = state.x + dx * n / 26;
-        const y = state.y + dy * n / 26;
-
-        if (solid(x, y)) {
-          clear = false;
-          break;
-        }
-      }
-
-      if (clear) {
-        start.x += dx;
-        start.y += dy;
+      if (!solid(x, y)) {
+        start.x = x;
+        start.y = y;
         break;
       }
     }
@@ -1143,11 +1136,15 @@ function drawCharacterSprite(
       y: start.y,
       walk: 0,
       facing: "up",
-      trail: [
-        { x: state.x, y: state.y }
-      ],
-      lastX: state.x,
-      lastY: state.y
+
+      // "Cérebro" próprio.
+      think: 0,
+      targetX: start.x,
+      targetY: start.y,
+      preferredSide: 1,
+      pause: 0,
+      lastFatherX: state.x,
+      lastFatherY: state.y
     };
   }
 
@@ -1165,10 +1162,118 @@ function drawCharacterSprite(
     );
   }
 
+  function motherDesiredOffset() {
+    const mother = state.mother;
+
+    const behind = {
+      up: [0, 1],
+      down: [0, -1],
+      left: [1, 0],
+      right: [-1, 0]
+    }[state.facing] || [0, 1];
+
+    const side = {
+      up: [1, 0],
+      down: [-1, 0],
+      left: [0, -1],
+      right: [0, 1]
+    }[state.facing] || [1, 0];
+
+    // Ela anda atrás, mas levemente de lado, como outra pessoa.
+    const backDistance = 45;
+    const sideDistance = 20 * mother.preferredSide;
+
+    return {
+      x:
+        state.x +
+        behind[0] * backDistance +
+        side[0] * sideDistance,
+
+      y:
+        state.y +
+        behind[1] * backDistance +
+        side[1] * sideDistance
+    };
+  }
+
+  function motherChooseTarget() {
+    const mother = state.mother;
+    const desired = motherDesiredOffset();
+
+    // Se o ponto ideal estiver livre, ela segue para ele.
+    if (!solid(desired.x, desired.y)) {
+      mother.targetX = desired.x;
+      mother.targetY = desired.y;
+      return;
+    }
+
+    // Caso contrário, procura uma alternativa própria ao redor do pai.
+    const options = [
+      [52, 0],
+      [-52, 0],
+      [0, 52],
+      [0, -52],
+      [38, 38],
+      [-38, 38],
+      [38, -38],
+      [-38, -38]
+    ];
+
+    let best = null;
+    let bestScore = Infinity;
+
+    for (const [dx, dy] of options) {
+      const x = state.x + dx;
+      const y = state.y + dy;
+
+      if (solid(x, y)) continue;
+
+      const fromMother = Math.hypot(
+        x - mother.x,
+        y - mother.y
+      );
+
+      const fromDesired = Math.hypot(
+        x - desired.x,
+        y - desired.y
+      );
+
+      const score =
+        fromMother +
+        fromDesired * 0.65;
+
+      if (score < bestScore) {
+        bestScore = score;
+        best = { x, y };
+      }
+    }
+
+    if (best) {
+      mother.targetX = best.x;
+      mother.targetY = best.y;
+    } else {
+      mother.targetX = state.x;
+      mother.targetY = state.y;
+    }
+  }
+
+  function motherTryMove(dx, dy) {
+    const mother = state.mother;
+
+    const nx = mother.x + dx;
+    const ny = mother.y + dy;
+
+    if (!solid(nx, ny)) {
+      mother.x = nx;
+      mother.y = ny;
+      return true;
+    }
+
+    return false;
+  }
+
   function updateMother(dt) {
-    if (
-      state.stage !== "prologue"
-    ) {
+    if (state.stage !== "prologue") {
       return;
     }
 
@@ -1176,80 +1281,175 @@ function drawCharacterSprite(
 
     const mother = state.mother;
 
-    // Registra o caminho real do pai, incluindo as curvas.
-    if (state.x !== mother.lastX) {
-      mother.trail.push({
-        x: state.x,
-        y: mother.lastY
-      });
-    }
-
-    if (state.y !== mother.lastY) {
-      mother.trail.push({
-        x: state.x,
-        y: state.y
-      });
-    }
-
-    mother.lastX = state.x;
-    mother.lastY = state.y;
-
-    let length = 0;
-    let previous = mother;
-
-    for (const point of mother.trail) {
-      length += Math.hypot(
-        point.x - previous.x,
-        point.y - previous.y
-      );
-
-      previous = point;
-    }
-
-    // Mantém 52 pixels de distância ao longo do percurso.
-    let distance = Math.min(
-      140 * dt,
-      Math.max(0, length - 52)
+    mother.think -= dt;
+    mother.pause = Math.max(
+      0,
+      mother.pause - dt
     );
+
+    const fatherMoved =
+      Math.hypot(
+        state.x - mother.lastFatherX,
+        state.y - mother.lastFatherY
+      ) > 6;
+
+    // A mãe não recalcula a cada pixel.
+    // Ela "pensa" em pequenos intervalos e escolhe outro ponto.
+    if (mother.think <= 0 || fatherMoved) {
+      mother.think =
+        0.45 +
+        hash(
+          Math.floor(elapsed * 10),
+          Math.floor(mother.x + mother.y)
+        ) * 0.55;
+
+      mother.lastFatherX = state.x;
+      mother.lastFatherY = state.y;
+
+      // Às vezes troca o lado por onde prefere acompanhar.
+      if (
+        hash(
+          Math.floor(elapsed * 3),
+          Math.floor(state.x + state.y)
+        ) > 0.72
+      ) {
+        mother.preferredSide *= -1;
+      }
+
+      motherChooseTarget();
+    }
+
+    const distanceToFather = Math.hypot(
+      state.x - mother.x,
+      state.y - mother.y
+    );
+
+    const dx =
+      mother.targetX - mother.x;
+
+    const dy =
+      mother.targetY - mother.y;
+
+    const distanceToTarget =
+      Math.hypot(dx, dy);
+
+    // Se já está perto, ela não fica grudada nem tremendo.
+    if (
+      distanceToFather >= 38 &&
+      distanceToFather <= 68 &&
+      distanceToTarget < 12
+    ) {
+      mother.walk = 0;
+
+      if (mother.pause <= 0) {
+        mother.pause =
+          0.15 +
+          hash(
+            Math.floor(mother.x),
+            Math.floor(elapsed * 7)
+          ) * 0.35;
+      }
+
+      return;
+    }
+
+    if (mother.pause > 0 && distanceToFather < 80) {
+      mother.walk = 0;
+      return;
+    }
+
+    // Se ficou muito longe, acelera um pouco para alcançar.
+    const speed =
+      distanceToFather > 105
+        ? 118
+        : distanceToFather > 75
+          ? 92
+          : 72;
+
+    if (distanceToTarget < 1) {
+      mother.walk = 0;
+      return;
+    }
+
+    const length =
+      distanceToTarget || 1;
+
+    const vx =
+      dx / length;
+
+    const vy =
+      dy / length;
+
+    const step =
+      Math.min(
+        speed * dt,
+        distanceToTarget,
+        3
+      );
 
     let moved = false;
 
-    while (distance > 0.001 && mother.trail.length) {
-      const target = mother.trail[0];
+    // Primeiro tenta ir diretamente para o alvo.
+    moved = motherTryMove(
+      vx * step,
+      vy * step
+    );
 
-      const dx = target.x - mother.x;
-      const dy = target.y - mother.y;
-      const remaining = Math.hypot(dx, dy);
+    // Se bateu em alguma coisa, tenta deslizar por um eixo.
+    if (!moved) {
+      const horizontalFirst =
+        Math.abs(dx) > Math.abs(dy);
 
-      if (remaining < 0.001) {
-        mother.trail.shift();
-        continue;
-      }
-
-      const step = Math.min(remaining, distance, 2);
-      const x = mother.x + dx / remaining * step;
-      const y = mother.y + dy / remaining * step;
-
-      if (solid(x, y)) break;
-
-      mother.x = x;
-      mother.y = y;
-
-      mother.facing = Math.abs(dx) > Math.abs(dy)
-        ? (dx > 0 ? "right" : "left")
-        : (dy > 0 ? "down" : "up");
-
-      distance -= step;
-      moved = true;
-
-      if (remaining <= step + 0.001) {
-        mother.trail.shift();
+      if (horizontalFirst) {
+        moved =
+          motherTryMove(
+            Math.sign(dx) * step,
+            0
+          ) ||
+          motherTryMove(
+            0,
+            Math.sign(dy) * step
+          );
+      } else {
+        moved =
+          motherTryMove(
+            0,
+            Math.sign(dy) * step
+          ) ||
+          motherTryMove(
+            Math.sign(dx) * step,
+            0
+          );
       }
     }
 
-    mother.walk = moved
-      ? mother.walk + dt * 13
-      : 0;
+    // Última tentativa: pequena curva lateral.
+    if (!moved) {
+      const turn =
+        mother.preferredSide;
+
+      moved =
+        motherTryMove(
+          -vy * step * turn,
+          vx * step * turn
+        );
+
+      if (!moved) {
+        mother.preferredSide *= -1;
+        mother.think = 0;
+      }
+    }
+
+    if (moved) {
+      mother.facing =
+        Math.abs(dx) > Math.abs(dy)
+          ? (dx > 0 ? "right" : "left")
+          : (dy > 0 ? "down" : "up");
+
+      mother.walk += dt * 11;
+    } else {
+      mother.walk = 0;
+    }
   }
 
   
@@ -5410,7 +5610,7 @@ drawWorld = function () {
   c.restore();
 };
 
-$("version").textContent = "PROTÓTIPO · 0.6.3";
+$("version").textContent = "PROTÓTIPO · 0.6.4";
   
   requestAnimationFrame(frame);
   showBootSplash();
