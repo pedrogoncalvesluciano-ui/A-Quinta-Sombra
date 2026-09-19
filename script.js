@@ -335,7 +335,7 @@
       obj(271, 329, 31, 19, "playerClutterBlock")
     ],
     [
-      door(90, 46, "hall", 490, 325, "Sair do quarto")
+      door(131, 46, "hall", 490, 325, "Sair do quarto")
     ]
   );
   room(
@@ -377,7 +377,7 @@
     ],
     [
       door(160, 374, "brother", 490, 85, "Quarto do irmão"),
-      door(490, 374, "bedroom", 90, 85, "Seu quarto"),
+      door(490, 374, "bedroom", 131, 93, "Seu quarto"),
       door(45, 215, null, 0, 0, "Banheiro", "bath"),
       door(240, 46, "attic", 310, 315, "Subir ao sótão")
     ]
@@ -505,10 +505,10 @@ const CHARACTER_ROWS = {
 // Player: adolescente de 14 anos, um pouco menor.
 // Irmão: criança de 8 anos, menor que o player.
 const CHARACTER_BASE_SCALE = {
-  father: 0.82,
-  mother: 0.82,
-  player: 0.74,
-  brother: 0.62
+  father: 0.98,
+  mother: 0.98,
+  player: 0.89,
+  brother: 0.75
 };
 
 const characterSpriteSheets = {
@@ -2477,7 +2477,7 @@ function drawCharacterSprite(
 
   function solid(x, y) {
     const m = maps[state.room];
-    const pad = state.room === "village" ? 18 : housePoint(47);
+    const pad = state.room === "bedroom" ? 0 : state.room === "village" ? 18 : housePoint(47);
 
     if (
       x < pad ||
@@ -6142,19 +6142,19 @@ drawWorld = function () {
   c.restore();
 };
 
-// 0.6.12 — Uma referência para proporção visual e colisão do quarto.
+// 0.6.13 — Uma referência para proporção visual e colisão do quarto.
 const roomItems = {
   bed: [233,80,126,165, .10,.20,.80,.76],
-  shelf: [435,88,88,104, .08,.67,.84,.30],
-  desk: [520,92,76,190, .20,.18,.72,.78],
+  shelf: [425,80,76,100, .08,.67,.84,.30],
+  desk: [507,92,76,190, .06,.12,.89,.84],
   nightstand: [371,112,48,52, .10,.38,.80,.58],
   lampOff: [377,75,36,51], lampOn: [377,75,36,51],
   rug: [205,254,205,105],
-  backpack: [423,305,43,49, .12,.55,.76,.40],
-  clothes: [125,307,66,46, .12,.30,.76,.60],
-  shoes: [209,331,34,26, .08,.25,.84,.65],
-  flipflops: [270,336,30,23, .08,.25,.84,.65],
-  trash: [457,267,22,29, .12,.48,.76,.46]
+  backpack: [420,312,43,49, .12,.55,.76,.40],
+  clothes: [508,323,66,46, .12,.30,.76,.60],
+  shoes: [475,299,34,26, .08,.25,.84,.65],
+  flipflops: [362,218,34,26, .08,.25,.84,.65],
+  trash: [459,244,34,45, .12,.48,.76,.46]
 };
 function roomItemBounds(key) {
   const [x,y,w,h] = roomItems[key].map(housePoint);
@@ -6175,7 +6175,21 @@ function roomCollision(o) {
   return {...o,x:b.x+b.w*spec[4],y:b.y+b.h*spec[5],w:b.w*spec[6],h:b.h*spec[7]};
 }
 // O tapete é atravessável; objetos soltos usam a base visível como colisão.
-maps.bedroom.objects = maps.bedroom.objects.filter(o=>o.type!=="playerClutterBlock");
+maps.bedroom.objects = maps.bedroom.objects.filter(o =>
+  o.type !== "playerClutterBlock" && o.type !== "playerBlock");
+// Contorno interno medido na arte paredes-player.png (640 × 420 no mapa).
+// O corredor da porta fica entre x=101 e x=162.
+for (const [x,y,w,h] of [
+  [0,0,54,420], [586,0,54,420],
+  [54,0,47,69], [162,0,424,69],
+  [101,0,61,16],
+  [54,375,532,45], [201,364,239,56]
+]) {
+  maps.bedroom.objects.push({
+    type:"playerBlock", x:housePoint(x), y:housePoint(y),
+    w:housePoint(w), h:housePoint(h)
+  });
+}
 for (const key of ["clothes","shoes","flipflops","backpack","trash"]) {
   maps.bedroom.objects.push({type:"playerClutterBlock",roomItem:key});
 }
@@ -6198,7 +6212,7 @@ update=function(dt) {
   roomUpdateBeforeFix(dt);
 };
 
-$("version").textContent = "PROTÓTIPO · 0.6.12";
+$("version").textContent = "PROTÓTIPO · 0.6.13";
   
   requestAnimationFrame(frame);
   showBootSplash();
