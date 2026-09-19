@@ -2901,22 +2901,223 @@ function chapterObjective() {
   }[q.phase];
 }
 
-function openJournal() {
-  const q = chapter();
+const clueImages = {
+  list: "assets/ui/journal/supply-list.png",
+  note: "assets/ui/journal/note-parents.png"
+};
+
+function openJournal(view = "book") {
+  chapter();
 
   modal(
     "Diário de investigação",
-
-    q.clues.map(id => clueText[id]).join("\n\n") ||
-      "Nenhuma pista registrada.",
-
-    q.photo
-      ? [
-          ["Ver fotografia", () => showPhoto(false)],
-          ["Fechar", closeModal]
-        ]
-      : [["Fechar", closeModal]]
+    "",
+    [["Fechar", closeModal]]
   );
+
+  renderJournalView(view);
+}
+
+function renderJournalView(view) {
+  const q = chapter();
+  const text = $("modalText");
+
+  const collected = q.clues.filter(
+    id => id === "list" || id === "note"
+  );
+
+  text.innerHTML = "";
+
+  const layout = document.createElement("div");
+  layout.className = "journal-layout";
+
+  const page = document.createElement("div");
+  page.className = "journal-page";
+
+  if (view === "book") {
+    const book = document.createElement("div");
+
+    book.className = "journal-book-sprite";
+    book.setAttribute(
+      "aria-label",
+      "Livro de pistas aberto"
+    );
+
+    page.append(book);
+
+    const title = document.createElement("strong");
+
+    title.className = "journal-page-title";
+    title.textContent =
+      "REGISTRO DE INVESTIGAÇÃO";
+
+    page.append(title);
+
+    const entries = document.createElement("div");
+    entries.className = "journal-entries";
+
+    if (!collected.length) {
+      entries.textContent =
+        "Nenhuma pista registrada ainda.";
+    } else {
+      for (const id of collected) {
+        const item = document.createElement("button");
+
+        item.className = "journal-entry";
+        item.textContent =
+          id === "list"
+            ? "Lista de mantimentos"
+            : "Bilhete dos pais";
+
+        item.onclick = () =>
+          renderJournalView(id);
+
+        entries.append(item);
+      }
+    }
+
+    page.append(entries);
+  } else if (view === "letters") {
+    const title = document.createElement("strong");
+
+    title.className = "journal-page-title";
+    title.textContent = "CARTAS COLETADAS";
+
+    page.append(title);
+
+    const cards = document.createElement("div");
+    cards.className = "journal-cards";
+
+    if (!collected.length) {
+      cards.textContent =
+        "Nenhuma carta coletada ainda.";
+    } else {
+      for (const id of collected) {
+        const card = document.createElement("button");
+
+        card.className = "journal-card";
+        card.onclick = () =>
+          renderJournalView(id);
+
+        const thumbnail =
+          document.createElement("img");
+
+        thumbnail.src = clueImages[id];
+        thumbnail.alt =
+          id === "list"
+            ? "Lista de mantimentos"
+            : "Bilhete dos pais";
+
+        card.append(thumbnail);
+
+        const label =
+          document.createElement("span");
+
+        label.textContent =
+          id === "list"
+            ? "Lista de mantimentos"
+            : "Bilhete dos pais";
+
+        card.append(label);
+        cards.append(card);
+      }
+    }
+
+    page.append(cards);
+  } else {
+    const id = view;
+
+    const image = document.createElement("img");
+
+    image.className = "journal-clue-image";
+    image.src = clueImages[id];
+    image.alt =
+      id === "list"
+        ? "Lista de mantimentos coletada"
+        : "Bilhete dos pais coletado";
+
+    image.title = "Clique para ampliar";
+
+    image.onclick = () =>
+      enlargeClue(id);
+
+    page.append(image);
+
+    const hint = document.createElement("p");
+
+    hint.className = "journal-hint";
+    hint.textContent =
+      "Clique na pista para ampliar.";
+
+    page.append(hint);
+  }
+
+  const rail = document.createElement("aside");
+  rail.className = "journal-rail";
+
+  const bookButton =
+    document.createElement("button");
+
+  bookButton.className =
+    "journal-rail-button" +
+    (view === "book" ? " active" : "");
+
+  bookButton.textContent = "LIVRO";
+  bookButton.title = "Abrir o livro";
+
+  bookButton.onclick = () =>
+    renderJournalView("book");
+
+  rail.append(bookButton);
+
+  const noteButton =
+    document.createElement("button");
+
+  noteButton.className =
+    "journal-rail-button" +
+    (view === "letters" ? " active" : "");
+
+  noteButton.textContent = "CARTAS";
+  noteButton.title =
+    "Ver as cartas coletadas";
+
+  noteButton.onclick = () =>
+    renderJournalView("letters");
+
+  noteButton.disabled = !collected.length;
+
+  rail.append(noteButton);
+
+  layout.append(page, rail);
+  text.append(layout);
+}
+
+function enlargeClue(id) {
+  const image = document.createElement("img");
+
+  image.src = clueImages[id];
+  image.alt =
+    id === "list"
+      ? "Lista de mantimentos ampliada"
+      : "Bilhete dos pais ampliado";
+
+  image.className = "journal-clue-large";
+
+  modal(
+    id === "list"
+      ? "Lista de mantimentos"
+      : "Bilhete dos pais",
+    "",
+    [
+      [
+        "Voltar ao diário",
+        () => renderJournalView(id)
+      ],
+      ["Fechar", closeModal]
+    ]
+  );
+
+  $("modalText").append(image);
 }
 
 function showPhoto(first) {
@@ -3190,21 +3391,21 @@ interact = function (action) {
     ]);
   }
 
-  say([clueText[id]], () => {
-    if (!q.clues.includes(id)) {
-      q.clues.push(id);
-    }
+ say([clueText[id]], () => {
+  if (!q.clues.includes(id)) {
+    q.clues.push(id);
+  }
 
-    if (
-      q.clues.length === 3 &&
-      q.phase === "clues"
-    ) {
-      q.phase = "chest";
-    }
+  if (
+    q.clues.length === 3 &&
+    q.phase === "clues"
+  ) {
+    q.phase = "chest";
+  }
 
-    updateHud();
-    save();
-  });
+  updateHud();
+  save();
+});
 };
 
 updateHud = function () {
@@ -3401,8 +3602,7 @@ window.addEventListener(
   true
 );
 
-$("version").textContent = "PROTÓTIPO · 0.3.0";
-
+$("version").textContent = "PROTÓTIPO · 0.4.0";
   
   requestAnimationFrame(frame);
 })();
