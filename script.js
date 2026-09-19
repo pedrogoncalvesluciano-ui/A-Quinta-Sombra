@@ -221,28 +221,49 @@
     x, y, to, tx, ty, label, action
   });
 
-  room(
+   room(
     "bedroom",
     [
-      // Cama e estante continuam provisórias até os PNGs serem enviados.
-      obj(250, 82, 88, 130, "bed", "Cama", "bed"),
-      obj(78, 165, 92, 42, "shelf"),
+      // Hitbox da parede superior, deixando o vão da porta livre.
+      obj(0, 0, 58, 92, "playerBlock"),
+      obj(145, 0, 495, 92, "playerBlock"),
 
-      // Sprites novos do quarto.
-      obj(468, 95, 100, 185, "playerDesk"),
+      // Hitbox das paredes laterais.
+      obj(0, 0, 34, 420, "playerBlock"),
+      obj(607, 0, 33, 420, "playerBlock"),
+
+      // Cama — mantém praticamente onde já está.
       obj(
-        355, 92, 55, 58,
+        248, 82, 96, 132,
+        "playerBed",
+        "Cama",
+        "bed"
+      ),
+
+      // Abajur / criado-mudo.
+      obj(
+        372, 94, 48, 50,
         "playerNightstand",
         "Luminária",
         "togglePlayerLamp"
       ),
-      obj(205, 240, 205, 105, "playerRug")
+
+      // Estante, depois do abajur.
+      obj(
+        438, 92, 78, 44,
+        "playerShelf"
+      ),
+
+      // Mesa menor e encostada na parede direita.
+      obj(
+        530, 86, 54, 194,
+        "playerDesk"
+      )
     ],
     [
       door(90, 46, "hall", 490, 325, "Sair do quarto")
     ]
   );
-
   room(
     "brother",
     [
@@ -442,6 +463,8 @@ for (const kind of Object.keys(characterSpriteSheets)) {
 const playerRoomSpriteNames = {
   floor: "chao-player.png",
   walls: "paredes-player.png",
+    bed: "cama-player.png",
+  shelf: "estante-player.png",
   desk: "escrivaninha-player.png",
   nightstand: "criado-mudo-player.png",
   lampOff: "luminaria-player-off.png",
@@ -528,6 +551,15 @@ function drawPlayerRoomBackground(m) {
 }
 
 function drawPlayerRoomClutter() {
+
+    // Tapete não possui colisão.
+  drawSprite(
+    playerRoomSprites.rug,
+    housePoint(205),
+    housePoint(240),
+    housePoint(205),
+    housePoint(105)
+  );
   // Objetos pequenos não entram na colisão:
   // são detalhes visuais do quarto.
   drawSprite(
@@ -779,13 +811,13 @@ function drawCharacterSprite(
   function furnishing(o) {
     const { x, y, w, h, type } = o;
 
-    if (type === "playerDesk") {
+       if (type === "playerDesk") {
       drawSprite(
         playerRoomSprites.desk,
-        x - housePoint(8),
-        y - housePoint(10),
-        w + housePoint(16),
-        h + housePoint(20)
+        x - housePoint(3),
+        y - housePoint(6),
+        w + housePoint(9),
+        h + housePoint(12)
       );
       return;
     }
@@ -833,17 +865,6 @@ function drawCharacterSprite(
         );
       }
 
-      return;
-    }
-
-    if (type === "playerRug") {
-      drawSprite(
-        playerRoomSprites.rug,
-        x,
-        y,
-        w,
-        h
-      );
       return;
     }
 
@@ -949,6 +970,33 @@ function drawCharacterSprite(
       rect(x + w - 12, y + 6, 4, h - 17, "#a18659");
     }
   }
+
+      // Parede invisível: só colisão, nada para desenhar.
+    if (type === "playerBlock") {
+      return;
+    }
+
+    if (type === "playerBed") {
+      drawSprite(
+        playerRoomSprites.bed,
+        x - housePoint(6),
+        y - housePoint(6),
+        w + housePoint(12),
+        h + housePoint(12)
+      );
+      return;
+    }
+
+    if (type === "playerShelf") {
+      drawSprite(
+        playerRoomSprites.shelf,
+        x - housePoint(4),
+        y - housePoint(8),
+        w + housePoint(8),
+        h + housePoint(12)
+      );
+      return;
+    }
 
   // =========================================================
   // CONSTRUÇÕES DA VILA
