@@ -748,19 +748,49 @@ function drawSpriteContain(image, x, y, w, h) {
   return true;
 }
 
+// Para pisos: remove a margem transparente do PNG e estica o conteúdo
+// exatamente até o contorno interno do cômodo.
+function drawSpriteCropStretch(image, x, y, w, h) {
+  if (!spriteReady(image)) return false;
+
+  const crop = getSpriteCrop(image);
+
+  c.save();
+  c.imageSmoothingEnabled = true;
+
+  if ("imageSmoothingQuality" in c) {
+    c.imageSmoothingQuality = "high";
+  }
+
+  c.drawImage(
+    image,
+    crop.x,
+    crop.y,
+    crop.w,
+    crop.h,
+    Math.round(x),
+    Math.round(y),
+    Math.round(w),
+    Math.round(h)
+  );
+
+  c.restore();
+  return true;
+}
+
 function drawPlayerRoomBackground(m) {
   // Base escura atrás das paredes.
   rect(0, 0, m.w, m.h, "#241f1b");
 
-  // O piso agora termina antes das paredes.
-  // Isso deixa o quarto visualmente menor e as paredes mais presentes.
-  const floorX = housePoint(60);
-  const floorY = housePoint(78);
-  const floorW = m.w - housePoint(120);
-  const floorH = m.h - housePoint(142);
+  // O piso entra 2 unidades sob as paredes. A parede é desenhada depois,
+  // então esse pequeno sangramento elimina frestas sem aparecer.
+  const floorX = housePoint(58);
+  const floorY = housePoint(76);
+  const floorW = housePoint(524);
+  const floorH = housePoint(282);
 
   if (
-    !drawSprite(
+    !drawSpriteCropStretch(
       playerRoomSprites.floor,
       floorX,
       floorY,
@@ -777,7 +807,7 @@ function drawPlayerRoomBackground(m) {
     );
   }
 
-  // Parede sempre por cima do piso.
+  // Parede de fundo.
   drawSprite(
     playerRoomSprites.walls,
     0,
@@ -787,6 +817,35 @@ function drawPlayerRoomBackground(m) {
   );
 
   // Pôsteres retirados temporariamente.
+}
+
+// A faixa inferior é redesenhada DEPOIS do personagem.
+// Assim o player pode andar nessa área e parecer passar atrás/por baixo
+// da parede, em vez de ficar bloqueado ou desenhado sobre ela.
+function drawPlayerRoomForeground(m) {
+  if (!spriteReady(playerRoomSprites.walls)) return;
+
+  const foregroundY = housePoint(338);
+
+  c.save();
+  c.beginPath();
+  c.rect(
+    0,
+    foregroundY,
+    m.w,
+    m.h - foregroundY
+  );
+  c.clip();
+
+  drawSprite(
+    playerRoomSprites.walls,
+    0,
+    0,
+    m.w,
+    m.h
+  );
+
+  c.restore();
 }
 
 function drawPlayerRoomClutter() {
@@ -1321,6 +1380,10 @@ function drawCharacterSprite(
       }
 
       for (const d of m.doors) {
+        // O quarto possui a abertura desenhada no próprio sprite de parede.
+        // Não sobrepõe a porta genérica do Canvas nessa cena.
+        if (state.room === "bedroom") continue;
+
         if (d.y < housePoint(70) || d.y > housePoint(350)) {
           rect(d.x - 19, d.y - 10, 38, 20, "#282929");
           rect(d.x - 15, d.y - 8, 30, 14, "#716049");
@@ -1360,6 +1423,10 @@ function drawCharacterSprite(
       state.walk,
       state.facing
     );
+
+    if (state.room === "bedroom") {
+      drawPlayerRoomForeground(m);
+    }
 
     c.restore();
 
@@ -6127,55 +6194,59 @@ drawWorld = function () {
 
 // 0.6.18 — Uma referência para proporção visual e colisão do quarto.
 const roomItems = {
-  // Cama um pouco menor; mantém a leitura central do quarto.
+  // Cama preservada da 0.6.22.
   bed: [268, 94, 96, 124, .14, .26, .72, .62],
 
-  // Tapete deslocado para a direita: agora entra parcialmente sob a cama.
-  rug: [206, 154, 102, 140],
+  // Tapete DEITADO, parcialmente sob a metade inferior/esquerda da cama.
+  rug: [188, 222, 182, 92],
 
-  // Criado-mudo volta para perto da cama, formando um conjunto coerente.
+  // Criado-mudo / luminária.
   nightstand: [374, 88, 40, 44, .14, .48, .72, .44],
   lampOff: [380, 50, 28, 39],
   lampOn: [380, 50, 28, 39],
 
-  // Estante aproximada do conjunto da parede superior.
+  // Estante.
   shelf: [438, 78, 84, 102, .12, .70, .76, .24],
 
-  // Escrivaninha continua estreita, encostada à parede direita.
-  desk: [548, 160, 36, 132, .40, .18, .46, .74],
+  // Escrivaninha maior e mais baixa: os pés chegam ao piso junto da parede.
+  desk: [520, 178, 60, 168, .34, .20, .58, .72],
 
-  // Mochila menor e junto da parede, sem invadir a passagem da porta.
+  // Mochila junto à parede superior.
   backpack: [216, 90, 24, 28, .18, .58, .64, .30],
 
-  // Objetos soltos: pequenos ajustes de escala/posição.
-  flipflops: [376, 276, 24, 17, .18, .34, .64, .42],
-  trash: [500, 286, 25, 32, .18, .56, .64, .34],
-  shoes: [482, 338, 28, 20, .14, .34, .72, .46],
-  clothes: [520, 350, 48, 34, .16, .38, .68, .42]
+  // Chinelo perto do pé da cama.
+  flipflops: [365, 248, 28, 20, .18, .34, .64, .42],
+
+  // Lixeira junto da escrivaninha.
+  trash: [492, 296, 28, 34, .18, .56, .64, .34],
+
+  // Tênis perto da porta superior esquerda.
+  shoes: [150, 108, 34, 24, .14, .34, .72, .46],
+
+  // Roupa no canto inferior esquerdo, ainda sobre o piso.
+  clothes: [84, 292, 58, 40, .16, .38, .68, .42]
 };
 function roomItemBounds(key) {
   const [x,y,w,h] = roomItems[key].map(housePoint);
   const image = playerRoomSprites[key];
   const crop = spriteReady(image) ? getSpriteCrop(image) : {w,h};
-  // O tapete gira 90°: sua largura original passa a ser a altura.
-  const sourceW = key === "rug" ? crop.h : crop.w;
-  const sourceH = key === "rug" ? crop.w : crop.h;
+  const sourceW = crop.w;
+  const sourceH = crop.h;
   const scale = Math.min(w/sourceW,h/sourceH);
   const width = sourceW*scale, height = sourceH*scale;
+
   // Móveis de parede e mochila ficam alinhados pelo topo visível.
   const wallAligned = ["bed","shelf","nightstand","lampOff","lampOn","backpack"].includes(key);
-  return {x:key === "desk" ? x+w-width : x+(w-width)/2,y:wallAligned ? y : y+h-height,w:width,h:height};
+
+  return {
+    x: key === "desk" ? x+w-width : x+(w-width)/2,
+    y: wallAligned ? y : y+h-height,
+    w: width,
+    h: height
+  };
 }
 function drawRoomItem(key) {
   const b = roomItemBounds(key);
-  if (key === "rug") {
-    c.save();
-    c.translate(b.x+b.w/2,b.y+b.h/2);
-    c.rotate(Math.PI/2);
-    drawSpriteContain(playerRoomSprites[key],-b.h/2,-b.w/2,b.h,b.w);
-    c.restore();
-    return;
-  }
   drawSpriteContain(playerRoomSprites[key],b.x,b.y,b.w,b.h);
 }
 function roomCollision(o) {
@@ -6209,8 +6280,8 @@ function roomCollision(o) {
 
   // A escrivaninha encosta na parede direita: elimina o vão lateral invisível.
   if (key === "desk") {
-    const right = Math.max(hit.x + hit.w, housePoint(580));
-    hit.w = right - hit.x;
+    const right = housePoint(580);
+    hit.w = Math.max(hit.w, right - hit.x);
   }
 
   return hit;
@@ -6234,12 +6305,8 @@ for (const [x,y,w,h] of [
   [96, 18, 16, 58],
   [172, 18, 14, 58],
 
-  // parede inferior inteira: impede cair no preto
-  [60, 356, 520, 64],
-
-  // cantos de baixo, para não sobrar espaço vazio no recorte
-  [60, 338, 24, 24],
-  [556, 338, 24, 24]
+  // A parede inferior NÃO bloqueia mais o jogador.
+  // Ela é redesenhada em primeiro plano para o player passar por baixo.
 ]) {
   maps.bedroom.objects.push({
     type:"playerBlock", x:housePoint(x), y:housePoint(y),
@@ -6268,7 +6335,7 @@ update=function(dt) {
   roomUpdateBeforeFix(dt);
 };
 
-$("version").textContent = "PROTÓTIPO · 0.6.22";
+$("version").textContent = "PROTÓTIPO · 0.6.23";
   
   requestAnimationFrame(frame);
   showBootSplash();
