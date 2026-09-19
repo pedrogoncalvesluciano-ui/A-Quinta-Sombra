@@ -67,9 +67,11 @@
     };
     // Os sprites já começaram a carregar quando esta função é chamada.
     const spritesReady = Promise.all(
-      Object.values(characterSpriteSheets)
-        .flatMap(sheet => Object.values(sheet))
-        .map(image => waitForBootImage(image))
+      [
+        ...Object.values(characterSpriteSheets)
+          .flatMap(sheet => Object.values(sheet)),
+        ...Object.values(playerRoomSprites)
+      ].map(image => waitForBootImage(image))
     );
     try {
       // Na primeira visita o PNG ainda não está em cache. Espere o download
@@ -161,6 +163,7 @@
       firstExit: false,
       finished: false,
       rain: false,
+      playerLampOn: false,
       facing: "down",
       walk: 0
     };
@@ -221,10 +224,19 @@
   room(
     "bedroom",
     [
-      obj(280, 70, 88, 130, "bed", "Cama", "bed"),
-      obj(397, 90, 40, 40, "lamp"),
-      obj(270, 280, 140, 55, "rug"),
-           obj(65, 180, 90, 40, "shelf")
+      // Cama e estante continuam provisórias até os PNGs serem enviados.
+      obj(250, 82, 88, 130, "bed", "Cama", "bed"),
+      obj(78, 165, 92, 42, "shelf"),
+
+      // Sprites novos do quarto.
+      obj(468, 95, 100, 185, "playerDesk"),
+      obj(
+        355, 92, 55, 58,
+        "playerNightstand",
+        "Luminária",
+        "togglePlayerLamp"
+      ),
+      obj(205, 240, 205, 105, "playerRug")
     ],
     [
       door(90, 46, "hall", 490, 325, "Sair do quarto")
@@ -425,6 +437,138 @@ for (const kind of Object.keys(characterSpriteSheets)) {
 
     characterSpriteSheets[kind][animation] = image;
   }
+}
+
+const playerRoomSpriteNames = {
+  floor: "chao-player.png",
+  walls: "paredes-player.png",
+  desk: "escrivaninha-player.png",
+  nightstand: "criado-mudo-player.png",
+  lampOff: "luminaria-player-off.png",
+  lampOn: "luminaria-player-on.png",
+  rug: "tapete-player.png",
+  backpack: "mochila-player.png",
+  clothes: "roupas-player.png",
+  shoes: "tenis-player.png",
+  flipflops: "chinelo-player.png",
+  trash: "lixeira-player.png",
+  poster1: "cartaz-escola-player-01.png",
+  poster2: "cartaz-escola-player-02.png",
+  poster3: "cartaz-escola-player-03.png"
+};
+
+const playerRoomSprites = {};
+
+for (const [key, filename] of Object.entries(playerRoomSpriteNames)) {
+  const image = new Image();
+  image.src =
+    `assets/sprites/house/player-room/${filename}?v=0.6.7`;
+  playerRoomSprites[key] = image;
+}
+
+function spriteReady(image) {
+  return Boolean(
+    image &&
+    image.complete &&
+    image.naturalWidth > 0 &&
+    image.naturalHeight > 0
+  );
+}
+
+function drawSprite(image, x, y, w, h) {
+  if (!spriteReady(image)) return false;
+
+  c.save();
+  c.imageSmoothingEnabled = false;
+  c.drawImage(
+    image,
+    Math.round(x),
+    Math.round(y),
+    Math.round(w),
+    Math.round(h)
+  );
+  c.restore();
+
+  return true;
+}
+
+function drawPlayerRoomBackground(m) {
+  // O chão ocupa toda a base; as paredes vêm por cima
+  // como camada transparente.
+  if (!drawSprite(playerRoomSprites.floor, 0, 0, m.w, m.h)) {
+    rect(0, 0, m.w, m.h, "#61503d");
+  }
+
+  drawSprite(playerRoomSprites.walls, 0, 0, m.w, m.h);
+
+  // Pôsteres ficam presos na parede superior.
+  drawSprite(
+    playerRoomSprites.poster1,
+    housePoint(165),
+    housePoint(28),
+    housePoint(48),
+    housePoint(62)
+  );
+
+  drawSprite(
+    playerRoomSprites.poster2,
+    housePoint(220),
+    housePoint(28),
+    housePoint(48),
+    housePoint(62)
+  );
+
+  drawSprite(
+    playerRoomSprites.poster3,
+    housePoint(275),
+    housePoint(28),
+    housePoint(48),
+    housePoint(62)
+  );
+}
+
+function drawPlayerRoomClutter() {
+  // Objetos pequenos não entram na colisão:
+  // são detalhes visuais do quarto.
+  drawSprite(
+    playerRoomSprites.backpack,
+    housePoint(420),
+    housePoint(292),
+    housePoint(48),
+    housePoint(48)
+  );
+
+  drawSprite(
+    playerRoomSprites.clothes,
+    housePoint(125),
+    housePoint(292),
+    housePoint(70),
+    housePoint(55)
+  );
+
+  drawSprite(
+    playerRoomSprites.shoes,
+    housePoint(205),
+    housePoint(315),
+    housePoint(48),
+    housePoint(38)
+  );
+
+  drawSprite(
+    playerRoomSprites.flipflops,
+    housePoint(265),
+    housePoint(322),
+    housePoint(42),
+    housePoint(34)
+  );
+
+  drawSprite(
+    playerRoomSprites.trash,
+    housePoint(445),
+    housePoint(250),
+    housePoint(38),
+    housePoint(42)
+  );
 }
 
 function drawCharacterSprite(
@@ -634,6 +778,74 @@ function drawCharacterSprite(
 
   function furnishing(o) {
     const { x, y, w, h, type } = o;
+
+    if (type === "playerDesk") {
+      drawSprite(
+        playerRoomSprites.desk,
+        x - housePoint(8),
+        y - housePoint(10),
+        w + housePoint(16),
+        h + housePoint(20)
+      );
+      return;
+    }
+
+    if (type === "playerNightstand") {
+      drawSprite(
+        playerRoomSprites.nightstand,
+        x,
+        y + housePoint(15),
+        w,
+        h - housePoint(8)
+      );
+
+      const lamp =
+        state && state.playerLampOn
+          ? playerRoomSprites.lampOn
+          : playerRoomSprites.lampOff;
+
+      drawSprite(
+        lamp,
+        x + housePoint(8),
+        y - housePoint(18),
+        w - housePoint(16),
+        housePoint(48)
+      );
+
+      if (state && state.playerLampOn) {
+        const gx = x + w / 2;
+        const gy = y + housePoint(6);
+
+        const glow = c.createRadialGradient(
+          gx, gy, 2,
+          gx, gy, housePoint(95)
+        );
+
+        glow.addColorStop(0, "#f2c87936");
+        glow.addColorStop(1, "#f2c87900");
+
+        c.fillStyle = glow;
+        c.fillRect(
+          gx - housePoint(95),
+          gy - housePoint(95),
+          housePoint(190),
+          housePoint(190)
+        );
+      }
+
+      return;
+    }
+
+    if (type === "playerRug") {
+      drawSprite(
+        playerRoomSprites.rug,
+        x,
+        y,
+        w,
+        h
+      );
+      return;
+    }
 
     rect(x + 5, y + h - 4, w, 8, "#0005");
 
@@ -905,33 +1117,37 @@ function drawCharacterSprite(
         txt("MORADORA", 303, 363, "#bac2a4", 7);
       }
     } else {
-      c.save();
-      c.scale(HOUSE_SCALE, HOUSE_SCALE);
-      rect(0, 0, 640, 420, "#10191e");
-      rect(32, 34, 576, 352, "#61503d");
+      if (state.room === "bedroom") {
+        drawPlayerRoomBackground(m);
+      } else {
+        c.save();
+        c.scale(HOUSE_SCALE, HOUSE_SCALE);
+        rect(0, 0, 640, 420, "#10191e");
+        rect(32, 34, 576, 352, "#61503d");
 
-      for (let y = 48; y < 375; y += 18) {
-        rect(40, y, 560, 1, "#382f29");
+        for (let y = 48; y < 375; y += 18) {
+          rect(40, y, 560, 1, "#382f29");
 
-        for (
-          let x = 40 + (y % 36 ? 35 : 0);
-          x < 597;
-          x += 75
-        ) {
-          rect(x, y, 1, 18, "#3b342c");
+          for (
+            let x = 40 + (y % 36 ? 35 : 0);
+            x < 597;
+            x += 75
+          ) {
+            rect(x, y, 1, 18, "#3b342c");
 
-          if (hash(x, y) > 0.4) {
-            rect(x + 8, y + 5, 22, 1, "#8a70502e");
+            if (hash(x, y) > 0.4) {
+              rect(x + 8, y + 5, 22, 1, "#8a70502e");
+            }
           }
         }
-      }
 
-      rect(25, 18, 590, 31, "#444846");
-      rect(25, 18, 590, 5, "#757163");
-      rect(25, 45, 12, 342, "#353a38");
-      rect(603, 45, 12, 342, "#353a38");
-      rect(25, 378, 590, 12, "#353a38");
-      c.restore();
+        rect(25, 18, 590, 31, "#444846");
+        rect(25, 18, 590, 5, "#757163");
+        rect(25, 45, 12, 342, "#353a38");
+        rect(603, 45, 12, 342, "#353a38");
+        rect(25, 378, 590, 12, "#353a38");
+        c.restore();
+      }
 
       for (const d of m.doors) {
         if (d.y < housePoint(70) || d.y > housePoint(350)) {
@@ -945,6 +1161,10 @@ function drawCharacterSprite(
 
       for (const o of m.objects) {
         furnishing(o);
+      }
+
+      if (state.room === "bedroom") {
+        drawPlayerRoomClutter();
       }
     }
 
@@ -1662,6 +1882,10 @@ function drawCharacterSprite(
       return;
     }
 
+    if (typeof state.playerLampOn !== "boolean") {
+      state.playerLampOn = false;
+    }
+
     $("location").textContent = roomNames[state.room];
     $("objective").textContent = state.stage === "prologue"
       ? state.room === "village"
@@ -1710,6 +1934,11 @@ function drawCharacterSprite(
       }
     }
     switch (action) {
+      case "togglePlayerLamp":
+        state.playerLampOn = !state.playerLampOn;
+        save();
+        return;
+
       case "gate":
         if (state.stage === "prologue") {
           say(
@@ -5690,7 +5919,7 @@ drawWorld = function () {
   c.restore();
 };
 
-$("version").textContent = "PROTÓTIPO · 0.6.6";
+$("version").textContent = "PROTÓTIPO · 0.6.7";
   
   requestAnimationFrame(frame);
   showBootSplash();
