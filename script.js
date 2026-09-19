@@ -2893,443 +2893,6 @@ if (
 
   
 // =========================================================
-// CONTINUAÇÃO 0.6.1 — FONTES EXTRAS E MISSÃO DO OESTE
-// Sem expandir a região oeste nem a história principal.
-// =========================================================
-
-const v061Base = {
-  getNear,
-  interact,
-  updateHud,
-  drawWorld
-};
-
-const v061PrepareBase = prepareSystems;
-prepareSystems = function () {
-  v061PrepareBase();
-
-  if (!state) return;
-
-  if (!state.westMission) {
-    state.westMission = {
-      status: "waiting",
-      targetHp: 3
-    };
-  }
-
-  if (typeof state.westUnlocked !== "boolean") {
-    state.westUnlocked = false;
-  }
-};
-
-const V061_GARDEN = { x: 820, y: 515 };
-const V061_ORCHARD = { x: 125, y: 505 };
-const V061_INFORMANT = { x: 325, y: 470 };
-const V061_TARGET = { x: 805, y: 470 };
-const V061_WEST_PATH = { x: 38, y: 401 };
-
-function v061TakeFood(sourceKey, label) {
-  prepareSystems();
-
-  if (state.food >= 1) {
-    say([
-      "Já estou carregando uma porção. Preciso alimentar meu irmão primeiro."
-    ]);
-    return;
-  }
-
-  const cycle = v06StockCycle();
-
-  if (state[sourceKey] === cycle) {
-    say([
-      "Não há mais nada útil aqui por enquanto."
-    ]);
-    return;
-  }
-
-  state[sourceKey] = cycle;
-  state.food = 1;
-
-  v06Toast(label + ": porção coletada");
-  updateHud();
-  save();
-}
-
-function v061OfferWestMission() {
-  const mission = state.westMission;
-
-  if (mission.status === "waiting") {
-    modal(
-      "Uma proposta",
-      "O homem diz que sabe algo sobre seus pais. Em troca da informação e da passagem para o oeste, ele quer que você mate o homem de casaco claro que permanece no lado leste da vila.",
-      [
-        [
-          "Aceitar",
-          () => {
-            closeModal();
-            mission.status = "accepted";
-            mission.targetHp = 3;
-            updateHud();
-            save();
-
-            say([
-              ["Homem", "Volte quando ele não puder mais me atrapalhar."]
-            ]);
-          }
-        ],
-        ["Recusar por enquanto", closeModal]
-      ]
-    );
-    return;
-  }
-
-  if (mission.status === "accepted") {
-    say([
-      ["Homem", "O acordo ainda está de pé. Ele fica no lado leste da vila."]
-    ]);
-    return;
-  }
-
-  if (mission.status === "target_down") {
-    say(
-      [
-        ["Homem", "Então terminou."],
-        ["Homem", "Vi seus pais seguirem para oeste com alguém que não reconheci."],
-        ["Homem", "A passagem está livre agora. O resto você terá de descobrir sozinho."]
-      ],
-      () => {
-        mission.status = "done";
-        state.westUnlocked = true;
-        updateHud();
-        save();
-      }
-    );
-    return;
-  }
-
-  say([
-    ["Homem", "O caminho oeste está aberto. Não tenho mais nada para você."]
-  ]);
-}
-
-getNear = function () {
-  prepareSystems();
-
-  if (state.room === "village" && state.finished) {
-    if (
-      Math.hypot(
-        state.x - V061_GARDEN.x,
-        state.y - V061_GARDEN.y
-      ) < 42
-    ) {
-      return {
-        label: "Colher legumes",
-        action: "food:garden"
-      };
-    }
-
-    if (
-      Math.hypot(
-        state.x - V061_ORCHARD.x,
-        state.y - V061_ORCHARD.y
-      ) < 42
-    ) {
-      return {
-        label: "Procurar frutas",
-        action: "food:orchard"
-      };
-    }
-  }
-
-  const q = chapter();
-
-  if (
-    state.room === "village" &&
-    q &&
-    q.phase === "done"
-  ) {
-    if (
-      Math.hypot(
-        state.x - V061_INFORMANT.x,
-        state.y - V061_INFORMANT.y
-      ) < 44
-    ) {
-      return {
-        label: "Falar com o homem",
-        action: "westInformant"
-      };
-    }
-
-    if (
-      Math.hypot(
-        state.x - V061_WEST_PATH.x,
-        state.y - V061_WEST_PATH.y
-      ) < 48
-    ) {
-      return {
-        label: state.westUnlocked
-          ? "Seguir para oeste"
-          : "Examinar caminho oeste",
-        action: "westPath"
-      };
-    }
-  }
-
-  return v061Base.getNear();
-};
-
-interact = function (action) {
-  prepareSystems();
-
-  if (action === "food:garden") {
-    v061TakeFood(
-      "gardenFoodCycle",
-      "Horta"
-    );
-    return;
-  }
-
-  if (action === "food:orchard") {
-    v061TakeFood(
-      "orchardFoodCycle",
-      "Pomar"
-    );
-    return;
-  }
-
-  if (action === "westInformant") {
-    v061OfferWestMission();
-    return;
-  }
-
-  if (action === "westPath") {
-    if (!state.westUnlocked) {
-      say([
-        "A passagem para oeste está bloqueada. O homem perto da estrada parece saber alguma coisa."
-      ]);
-    } else {
-      say([
-        "O caminho para oeste está livre. A região além daqui será construída na próxima etapa."
-      ]);
-    }
-    return;
-  }
-
-  v061Base.interact(action);
-};
-
-const v061PunchBase = punchInvader;
-punchInvader = function () {
-  prepareSystems();
-
-  const e = state.danger && state.danger.enemy;
-
-  if (
-    e &&
-    e.room === state.room &&
-    Math.hypot(e.x - state.x, e.y - state.y) <= 44
-  ) {
-    v061PunchBase();
-    return;
-  }
-
-  const mission = state.westMission;
-
-  if (
-    state.room === "village" &&
-    mission.status === "accepted" &&
-    mission.targetHp > 0 &&
-    Math.hypot(
-      state.x - V061_TARGET.x,
-      state.y - V061_TARGET.y
-    ) <= 44
-  ) {
-    state.danger.punch = 0.45;
-    mission.targetHp -= 1;
-
-    if (mission.targetHp <= 0) {
-      mission.targetHp = 0;
-      mission.status = "target_down";
-      v06Toast("Alvo derrotado");
-      updateHud();
-    }
-
-    save();
-    return;
-  }
-
-  v061PunchBase();
-};
-
-updateHud = function () {
-  prepareSystems();
-  v061Base.updateHud();
-
-  const q = chapter();
-
-  if (
-    !q ||
-    q.phase !== "done" ||
-    dangerActive()
-  ) {
-    return;
-  }
-
-  const mission = state.westMission;
-
-  if (mission.status === "waiting") {
-    $("objective").textContent =
-      "A fotografia aponta para oeste. Procure alguém que conheça a região.";
-  } else if (mission.status === "accepted") {
-    $("objective").textContent =
-      "Encontre o homem de casaco claro no lado leste da vila.";
-  } else if (mission.status === "target_down") {
-    $("objective").textContent =
-      "Volte ao informante perto do caminho oeste.";
-  } else if (mission.status === "done") {
-    $("objective").textContent =
-      "O caminho oeste foi liberado.";
-  }
-};
-
-drawWorld = function () {
-  v061Base.drawWorld();
-  prepareSystems();
-
-  if (
-    state.room !== "village" ||
-    !state.finished
-  ) {
-    return;
-  }
-
-  c.save();
-  c.translate(
-    -Math.floor(camera.x),
-    -Math.floor(camera.y)
-  );
-
-  // Horta simples — fonte extra de uma porção por ciclo.
-  rect(
-    V061_GARDEN.x - 34,
-    V061_GARDEN.y - 20,
-    68,
-    40,
-    "#4b3b2d"
-  );
-
-  for (let i = -24; i <= 24; i += 12) {
-    rect(
-      V061_GARDEN.x + i,
-      V061_GARDEN.y - 12,
-      5,
-      24,
-      "#567a47"
-    );
-  }
-
-  // Pomar simples — segunda fonte extra.
-  rect(
-    V061_ORCHARD.x - 4,
-    V061_ORCHARD.y - 2,
-    8,
-    32,
-    "#4b3d2e"
-  );
-
-  rect(
-    V061_ORCHARD.x - 23,
-    V061_ORCHARD.y - 28,
-    46,
-    31,
-    "#31543c"
-  );
-
-  const q = chapter();
-
-  if (q && q.phase === "done") {
-    person(
-      V061_INFORMANT.x,
-      V061_INFORMANT.y,
-      "father",
-      0,
-      "left",
-      0.9
-    );
-
-    rect(
-      V061_INFORMANT.x - 8,
-      V061_INFORMANT.y - 27,
-      16,
-      18,
-      "#34323b"
-    );
-
-    txt(
-      "HOMEM",
-      V061_INFORMANT.x - 18,
-      V061_INFORMANT.y - 34,
-      "#c9b69a",
-      7
-    );
-
-    if (
-      state.westMission.status === "accepted" &&
-      state.westMission.targetHp > 0
-    ) {
-      person(
-        V061_TARGET.x,
-        V061_TARGET.y,
-        "father",
-        0,
-        "right",
-        0.9
-      );
-
-      rect(
-        V061_TARGET.x - 8,
-        V061_TARGET.y - 26,
-        16,
-        18,
-        "#c3b79d"
-      );
-
-      for (let i = 0; i < 3; i++) {
-        rect(
-          V061_TARGET.x - 10 + i * 8,
-          V061_TARGET.y - 42,
-          5,
-          3,
-          i < state.westMission.targetHp
-            ? "#cf7160"
-            : "#39343b"
-        );
-      }
-
-      txt(
-        "ESPAÇO",
-        V061_TARGET.x - 20,
-        V061_TARGET.y - 48,
-        "#e5cda8",
-        7
-      );
-    }
-
-    if (state.westUnlocked) {
-      txt(
-        "OESTE LIBERADO",
-        52,
-        386,
-        "#d7c895",
-        8
-      );
-    }
-  }
-
-  c.restore();
-};
-
-$("version").textContent = "PROTÓTIPO · 0.6.1";
 
   $("help").onclick = () => modal(
     "Como jogar",
@@ -5273,7 +4836,443 @@ $("help").onclick = () => modal(
   [["Voltar", closeModal]]
 );
 
-$("version").textContent = "PROTÓTIPO · 0.6.0";
+// CONTINUAÇÃO 0.6.1 — FONTES EXTRAS E MISSÃO DO OESTE
+// Sem expandir a região oeste nem a história principal.
+// =========================================================
+
+const v061Base = {
+  getNear,
+  interact,
+  updateHud,
+  drawWorld
+};
+
+const v061PrepareBase = prepareSystems;
+prepareSystems = function () {
+  v061PrepareBase();
+
+  if (!state) return;
+
+  if (!state.westMission) {
+    state.westMission = {
+      status: "waiting",
+      targetHp: 3
+    };
+  }
+
+  if (typeof state.westUnlocked !== "boolean") {
+    state.westUnlocked = false;
+  }
+};
+
+const V061_GARDEN = { x: 820, y: 515 };
+const V061_ORCHARD = { x: 125, y: 505 };
+const V061_INFORMANT = { x: 325, y: 470 };
+const V061_TARGET = { x: 805, y: 470 };
+const V061_WEST_PATH = { x: 38, y: 401 };
+
+function v061TakeFood(sourceKey, label) {
+  prepareSystems();
+
+  if (state.food >= 1) {
+    say([
+      "Já estou carregando uma porção. Preciso alimentar meu irmão primeiro."
+    ]);
+    return;
+  }
+
+  const cycle = v06StockCycle();
+
+  if (state[sourceKey] === cycle) {
+    say([
+      "Não há mais nada útil aqui por enquanto."
+    ]);
+    return;
+  }
+
+  state[sourceKey] = cycle;
+  state.food = 1;
+
+  v06Toast(label + ": porção coletada");
+  updateHud();
+  save();
+}
+
+function v061OfferWestMission() {
+  const mission = state.westMission;
+
+  if (mission.status === "waiting") {
+    modal(
+      "Uma proposta",
+      "O homem diz que sabe algo sobre seus pais. Em troca da informação e da passagem para o oeste, ele quer que você mate o homem de casaco claro que permanece no lado leste da vila.",
+      [
+        [
+          "Aceitar",
+          () => {
+            closeModal();
+            mission.status = "accepted";
+            mission.targetHp = 3;
+            updateHud();
+            save();
+
+            say([
+              ["Homem", "Volte quando ele não puder mais me atrapalhar."]
+            ]);
+          }
+        ],
+        ["Recusar por enquanto", closeModal]
+      ]
+    );
+    return;
+  }
+
+  if (mission.status === "accepted") {
+    say([
+      ["Homem", "O acordo ainda está de pé. Ele fica no lado leste da vila."]
+    ]);
+    return;
+  }
+
+  if (mission.status === "target_down") {
+    say(
+      [
+        ["Homem", "Então terminou."],
+        ["Homem", "Vi seus pais seguirem para oeste com alguém que não reconheci."],
+        ["Homem", "A passagem está livre agora. O resto você terá de descobrir sozinho."]
+      ],
+      () => {
+        mission.status = "done";
+        state.westUnlocked = true;
+        updateHud();
+        save();
+      }
+    );
+    return;
+  }
+
+  say([
+    ["Homem", "O caminho oeste está aberto. Não tenho mais nada para você."]
+  ]);
+}
+
+getNear = function () {
+  prepareSystems();
+
+  if (state.room === "village" && state.finished) {
+    if (
+      Math.hypot(
+        state.x - V061_GARDEN.x,
+        state.y - V061_GARDEN.y
+      ) < 42
+    ) {
+      return {
+        label: "Colher legumes",
+        action: "food:garden"
+      };
+    }
+
+    if (
+      Math.hypot(
+        state.x - V061_ORCHARD.x,
+        state.y - V061_ORCHARD.y
+      ) < 42
+    ) {
+      return {
+        label: "Procurar frutas",
+        action: "food:orchard"
+      };
+    }
+  }
+
+  const q = chapter();
+
+  if (
+    state.room === "village" &&
+    q &&
+    q.phase === "done"
+  ) {
+    if (
+      Math.hypot(
+        state.x - V061_INFORMANT.x,
+        state.y - V061_INFORMANT.y
+      ) < 44
+    ) {
+      return {
+        label: "Falar com o homem",
+        action: "westInformant"
+      };
+    }
+
+    if (
+      Math.hypot(
+        state.x - V061_WEST_PATH.x,
+        state.y - V061_WEST_PATH.y
+      ) < 48
+    ) {
+      return {
+        label: state.westUnlocked
+          ? "Seguir para oeste"
+          : "Examinar caminho oeste",
+        action: "westPath"
+      };
+    }
+  }
+
+  return v061Base.getNear();
+};
+
+interact = function (action) {
+  prepareSystems();
+
+  if (action === "food:garden") {
+    v061TakeFood(
+      "gardenFoodCycle",
+      "Horta"
+    );
+    return;
+  }
+
+  if (action === "food:orchard") {
+    v061TakeFood(
+      "orchardFoodCycle",
+      "Pomar"
+    );
+    return;
+  }
+
+  if (action === "westInformant") {
+    v061OfferWestMission();
+    return;
+  }
+
+  if (action === "westPath") {
+    if (!state.westUnlocked) {
+      say([
+        "A passagem para oeste está bloqueada. O homem perto da estrada parece saber alguma coisa."
+      ]);
+    } else {
+      say([
+        "O caminho para oeste está livre. A região além daqui será construída na próxima etapa."
+      ]);
+    }
+    return;
+  }
+
+  v061Base.interact(action);
+};
+
+const v061PunchBase = punchInvader;
+punchInvader = function () {
+  prepareSystems();
+
+  const e = state.danger && state.danger.enemy;
+
+  if (
+    e &&
+    e.room === state.room &&
+    Math.hypot(e.x - state.x, e.y - state.y) <= 44
+  ) {
+    v061PunchBase();
+    return;
+  }
+
+  const mission = state.westMission;
+
+  if (
+    state.room === "village" &&
+    mission.status === "accepted" &&
+    mission.targetHp > 0 &&
+    Math.hypot(
+      state.x - V061_TARGET.x,
+      state.y - V061_TARGET.y
+    ) <= 44
+  ) {
+    state.danger.punch = 0.45;
+    mission.targetHp -= 1;
+
+    if (mission.targetHp <= 0) {
+      mission.targetHp = 0;
+      mission.status = "target_down";
+      v06Toast("Alvo derrotado");
+      updateHud();
+    }
+
+    save();
+    return;
+  }
+
+  v061PunchBase();
+};
+
+updateHud = function () {
+  prepareSystems();
+  v061Base.updateHud();
+
+  const q = chapter();
+
+  if (
+    !q ||
+    q.phase !== "done" ||
+    dangerActive()
+  ) {
+    return;
+  }
+
+  const mission = state.westMission;
+
+  if (mission.status === "waiting") {
+    $("objective").textContent =
+      "A fotografia aponta para oeste. Procure alguém que conheça a região.";
+  } else if (mission.status === "accepted") {
+    $("objective").textContent =
+      "Encontre o homem de casaco claro no lado leste da vila.";
+  } else if (mission.status === "target_down") {
+    $("objective").textContent =
+      "Volte ao informante perto do caminho oeste.";
+  } else if (mission.status === "done") {
+    $("objective").textContent =
+      "O caminho oeste foi liberado.";
+  }
+};
+
+drawWorld = function () {
+  v061Base.drawWorld();
+  prepareSystems();
+
+  if (
+    state.room !== "village" ||
+    !state.finished
+  ) {
+    return;
+  }
+
+  c.save();
+  c.translate(
+    -Math.floor(camera.x),
+    -Math.floor(camera.y)
+  );
+
+  // Horta simples — fonte extra de uma porção por ciclo.
+  rect(
+    V061_GARDEN.x - 34,
+    V061_GARDEN.y - 20,
+    68,
+    40,
+    "#4b3b2d"
+  );
+
+  for (let i = -24; i <= 24; i += 12) {
+    rect(
+      V061_GARDEN.x + i,
+      V061_GARDEN.y - 12,
+      5,
+      24,
+      "#567a47"
+    );
+  }
+
+  // Pomar simples — segunda fonte extra.
+  rect(
+    V061_ORCHARD.x - 4,
+    V061_ORCHARD.y - 2,
+    8,
+    32,
+    "#4b3d2e"
+  );
+
+  rect(
+    V061_ORCHARD.x - 23,
+    V061_ORCHARD.y - 28,
+    46,
+    31,
+    "#31543c"
+  );
+
+  const q = chapter();
+
+  if (q && q.phase === "done") {
+    person(
+      V061_INFORMANT.x,
+      V061_INFORMANT.y,
+      "father",
+      0,
+      "left",
+      0.9
+    );
+
+    rect(
+      V061_INFORMANT.x - 8,
+      V061_INFORMANT.y - 27,
+      16,
+      18,
+      "#34323b"
+    );
+
+    txt(
+      "HOMEM",
+      V061_INFORMANT.x - 18,
+      V061_INFORMANT.y - 34,
+      "#c9b69a",
+      7
+    );
+
+    if (
+      state.westMission.status === "accepted" &&
+      state.westMission.targetHp > 0
+    ) {
+      person(
+        V061_TARGET.x,
+        V061_TARGET.y,
+        "father",
+        0,
+        "right",
+        0.9
+      );
+
+      rect(
+        V061_TARGET.x - 8,
+        V061_TARGET.y - 26,
+        16,
+        18,
+        "#c3b79d"
+      );
+
+      for (let i = 0; i < 3; i++) {
+        rect(
+          V061_TARGET.x - 10 + i * 8,
+          V061_TARGET.y - 42,
+          5,
+          3,
+          i < state.westMission.targetHp
+            ? "#cf7160"
+            : "#39343b"
+        );
+      }
+
+      txt(
+        "ESPAÇO",
+        V061_TARGET.x - 20,
+        V061_TARGET.y - 48,
+        "#e5cda8",
+        7
+      );
+    }
+
+    if (state.westUnlocked) {
+      txt(
+        "OESTE LIBERADO",
+        52,
+        386,
+        "#d7c895",
+        8
+      );
+    }
+  }
+
+  c.restore();
+};
+
+$("version").textContent = "PROTÓTIPO · 0.6.1";
   
   requestAnimationFrame(frame);
   showBootSplash();
