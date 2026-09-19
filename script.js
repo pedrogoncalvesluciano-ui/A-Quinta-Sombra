@@ -67,7 +67,9 @@
     };
     // Os sprites já começaram a carregar quando esta função é chamada.
     const spritesReady = Promise.all(
-      Object.values(fatherSpriteSheets).map(image => waitForBootImage(image))
+      Object.values(characterSpriteSheets)
+        .flatMap(sheet => Object.values(sheet))
+        .map(image => waitForBootImage(image))
     );
     try {
       // Na primeira visita o PNG ainda não está em cache. Espere o download
@@ -379,84 +381,121 @@
   // PERSONAGENS PROVISÓRIOS
   // =========================================================
 
-// Sprites do pai em formato LPC, com frames de 64x64.
-const fatherSpriteSheets = {};
-const FATHER_FRAME_SIZE = 64;
+// Sprites LPC dos quatro integrantes da família.
+// Todos usam frames de 64x64 e a mesma ordem de direção:
+// cima, esquerda, baixo, direita.
+const CHARACTER_FRAME_SIZE = 64;
 
-const FATHER_ROWS = {
+const CHARACTER_ROWS = {
   up: 0,
   left: 1,
   down: 2,
   right: 3
 };
 
-for (const animation of ["idle", "walk", "run"]) {
-  const image = new Image();
+// A diferença de idade é feita pela escala final.
+// Pai e mãe: mesmo tamanho.
+// Player: adolescente de 14 anos, um pouco menor.
+// Irmão: criança de 8 anos, menor que o player.
+const CHARACTER_BASE_SCALE = {
+  father: 0.82,
+  mother: 0.82,
+  player: 0.74,
+  brother: 0.62
+};
 
-  image.src =
-    `assets/sprites/characters/father/${animation}.png`;
+const characterSpriteSheets = {
+  father: {},
+  mother: {},
+  player: {},
+  brother: {}
+};
 
-  fatherSpriteSheets[animation] = image;
+for (const kind of Object.keys(characterSpriteSheets)) {
+  for (const animation of ["idle", "walk"]) {
+    const image = new Image();
+
+    image.src =
+      `assets/sprites/characters/${kind}/${animation}.png`;
+
+    characterSpriteSheets[kind][animation] = image;
+  }
 }
 
-function drawFatherSprite(
+function drawCharacterSprite(
   x,
   y,
+  kind = "player",
   walk = 0,
   face = "down",
   scale = 1
 ) {
-  // Mantém o desenho provisório nas fotos da família.
-  if (scale !== 1) return false;
+  const sheets = characterSpriteSheets[kind];
 
- const moving = Math.abs(walk) > 0.01;
-const animation = "idle";
-const image = fatherSpriteSheets[animation];
+  if (!sheets) return false;
 
-if (!image || !image.complete || image.naturalWidth <= 0) {
-  return false;
-}
+  const moving = Math.abs(walk) > 0.01;
+  const animation = moving ? "walk" : "idle";
+  const image = sheets[animation];
+
+  if (
+    !image ||
+    !image.complete ||
+    image.naturalWidth <= 0 ||
+    image.naturalHeight <= 0
+  ) {
+    return false;
+  }
 
   const columns = Math.max(
     1,
-    Math.floor(image.naturalWidth / FATHER_FRAME_SIZE)
+    Math.floor(
+      image.naturalWidth / CHARACTER_FRAME_SIZE
+    )
   );
 
   const rows = Math.max(
     1,
-    Math.floor(image.naturalHeight / FATHER_FRAME_SIZE)
+    Math.floor(
+      image.naturalHeight / CHARACTER_FRAME_SIZE
+    )
   );
 
   const row = Math.min(
-    FATHER_ROWS[face] ?? FATHER_ROWS.down,
+    CHARACTER_ROWS[face] ?? CHARACTER_ROWS.down,
     rows - 1
   );
 
-const frame = 0;
-  
-  const spriteScale = 0.85;
+  const frame = moving
+    ? Math.floor(Math.abs(walk)) % columns
+    : Math.floor(elapsed * 3) % columns;
+
+  const spriteScale =
+    CHARACTER_BASE_SCALE[kind] * scale;
+
+  const size =
+    CHARACTER_FRAME_SIZE * spriteScale;
 
   c.save();
-
   c.imageSmoothingEnabled = false;
 
   c.drawImage(
     image,
-    frame * FATHER_FRAME_SIZE,
-    row * FATHER_FRAME_SIZE,
-    FATHER_FRAME_SIZE,
-    FATHER_FRAME_SIZE,
-    Math.round(x - FATHER_FRAME_SIZE * spriteScale / 2),
-    Math.round(y - FATHER_FRAME_SIZE * spriteScale),
-    Math.round(FATHER_FRAME_SIZE * spriteScale),
-    Math.round(FATHER_FRAME_SIZE * spriteScale)
+    frame * CHARACTER_FRAME_SIZE,
+    row * CHARACTER_FRAME_SIZE,
+    CHARACTER_FRAME_SIZE,
+    CHARACTER_FRAME_SIZE,
+    Math.round(x - size / 2),
+    Math.round(y - size),
+    Math.round(size),
+    Math.round(size)
   );
 
   c.restore();
 
   return true;
 }
-  
+
   function person(
     x,
     y,
@@ -465,25 +504,40 @@ const frame = 0;
     face = "down",
     scale = 1
   ) {
-if (
-  kind === "father" &&
-  drawFatherSprite(x, y, walk, face, scale)
-) {
-  return;
-}
+    if (
+      drawCharacterSprite(
+        x,
+        y,
+        kind,
+        walk,
+        face,
+        scale
+      )
+    ) {
+      return;
+    }
 
+    // Fallback provisório caso alguma imagem ainda não tenha
+    // terminado de carregar ou algum arquivo esteja ausente.
     c.save();
     c.translate(Math.round(x), Math.round(y));
-    c.scale(scale, scale);
 
-    const skin = kind === "mother" ? "#c6967b" : "#bc9071";
+    const fallbackScale =
+      (CHARACTER_BASE_SCALE[kind] || 0.74) /
+      CHARACTER_BASE_SCALE.player *
+      scale;
+
+    c.scale(fallbackScale, fallbackScale);
+
+    const skin =
+      kind === "mother" ? "#c6967b" : "#bc9071";
 
     const shirt = {
       player: "#587a78",
       father: "#665d49",
       mother: "#8e5960",
       brother: "#a58757"
-    }[kind];
+    }[kind] || "#587a78";
 
     const leg = Math.sin(walk) * 2;
 
@@ -506,15 +560,17 @@ if (
     }
 
     if (face !== "up") {
-      rect(face === "left" ? -5 : -2, -25, 2, 2, "#1a232a");
+      rect(
+        face === "left" ? -5 : -2,
+        -25,
+        2,
+        2,
+        "#1a232a"
+      );
 
       if (face === "down") {
         rect(3, -25, 2, 2, "#1a232a");
       }
-    }
-
-    if (kind === "player" || kind === "brother") {
-      rect(-5, -21, 2, 2, "#b5d8c8");
     }
 
     c.restore();
@@ -5317,7 +5373,7 @@ drawWorld = function () {
   c.restore();
 };
 
-$("version").textContent = "PROTÓTIPO · 0.6.1";
+$("version").textContent = "PROTÓTIPO · 0.6.2";
   
   requestAnimationFrame(frame);
   showBootSplash();
