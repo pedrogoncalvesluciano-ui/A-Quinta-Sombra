@@ -396,3 +396,144 @@ h2 {
     padding: 14px 20px;
   }
 }
+
+/* Diário de pistas */
+.journal-layout{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 86px;
+  gap:16px;
+  align-items:stretch;
+  min-height:360px;
+}
+
+.journal-page{
+  position:relative;
+  min-height:360px;
+  padding:18px;
+  background:#0b1114;
+  border:1px solid #756346;
+  overflow:hidden;
+}
+
+.journal-book-sprite{
+  position:absolute;
+  inset:0;
+  background-image:url("assets/ui/journal/journal-opening.png");
+  background-repeat:no-repeat;
+  background-size:300% 200%;
+  background-position:100% 100%;
+  opacity:.96;
+}
+
+.journal-page-title{
+  position:relative;
+  display:block;
+  text-align:center;
+  font:11px monospace;
+  letter-spacing:.16em;
+  color:#594a38;
+  margin:8px 0 12px;
+}
+
+.journal-entries{
+  position:relative;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  max-width:280px;
+  margin:225px auto 0;
+}
+
+.journal-entry{
+  padding:8px 10px;
+  border:1px solid #8c7654;
+  background:#1c2525d9;
+  color:#e0d4b9;
+  text-align:left;
+  font:12px monospace;
+  cursor:pointer;
+}
+
+.journal-entry:hover{
+  background:#34403a;
+  border-color:#c8aa78;
+}
+
+.journal-rail{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  justify-content:center;
+}
+
+.journal-rail-button{
+  min-height:76px;
+  border:1px solid #8b795e;
+  background:#1b2525;
+  color:#cdb98f;
+  font:11px monospace;
+  cursor:pointer;
+}
+
+.journal-rail-button:hover:not(:disabled),
+.journal-rail-button.active{
+  background:#5b4935;
+  border-color:#d4b67b;
+  color:#fff0c9;
+}
+
+.journal-rail-button:disabled{
+  opacity:.35;
+  cursor:not-allowed;
+}
+
+.journal-clue-image{
+  display:block;
+  max-height:335px;
+  max-width:100%;
+  margin:auto;
+  cursor:zoom-in;
+  box-shadow:0 8px 24px #0008;
+}
+
+.journal-clue-large{
+  display:block;
+  max-width:min(100%,520px);
+  max-height:62vh;
+  margin:0 auto;
+}
+
+.journal-hint{
+  margin:10px 0 0;
+  text-align:center;
+  color:#a9a18f;
+  font:11px monospace;
+}
+
+.journal-cards{
+  position:relative;
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+  margin:28px auto 0;
+  max-width:470px;
+}
+
+.journal-card{
+  display:flex;
+  flex-direction:column;
+  gap:7px;
+  padding:8px;
+  background:#1b2525;
+  border:1px solid #806c4e;
+  color:#ddcba7;
+  font:11px monospace;
+  cursor:pointer;
+}
+
+.journal-card img{
+  display:block;
+  width:100%;
+  height:170px;
+  object-fit:cover;
+}
