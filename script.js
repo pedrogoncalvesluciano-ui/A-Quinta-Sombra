@@ -597,13 +597,122 @@ function drawSprite(image, x, y, w, h) {
   return true;
 }
 
-// Desenha o sprite sem deformar sua proporção.
-// A hitbox continua independente do tamanho visual.
+// Recorta automaticamente as margens transparentes dos PNGs.
+// Isso evita que cama, estante e mesa fiquem achatadas por causa
+// do tamanho do canvas original da imagem.
+const spriteCropCache = new WeakMap();
+
+function getSpriteCrop(image) {
+  if (spriteCropCache.has(image)) {
+    return spriteCropCache.get(image);
+  }
+
+  const full = {
+    x: 0,
+    y: 0,
+    w: image.naturalWidth,
+    h: image.naturalHeight
+  };
+
+  try {
+    const maxSample = 160;
+    const scale = Math.min(
+      1,
+      maxSample / image.naturalWidth,
+      maxSample / image.naturalHeight
+    );
+
+    const sw = Math.max(
+      1,
+      Math.round(image.naturalWidth * scale)
+    );
+
+    const sh = Math.max(
+      1,
+      Math.round(image.naturalHeight * scale)
+    );
+
+    const sample = document.createElement("canvas");
+    sample.width = sw;
+    sample.height = sh;
+
+    const sc = sample.getContext("2d", {
+      willReadFrequently: true
+    });
+
+    sc.clearRect(0, 0, sw, sh);
+    sc.drawImage(image, 0, 0, sw, sh);
+
+    const data = sc.getImageData(
+      0,
+      0,
+      sw,
+      sh
+    ).data;
+
+    let minX = sw;
+    let minY = sh;
+    let maxX = -1;
+    let maxY = -1;
+
+    for (let yy = 0; yy < sh; yy++) {
+      for (let xx = 0; xx < sw; xx++) {
+        const alpha =
+          data[(yy * sw + xx) * 4 + 3];
+
+        if (alpha <= 10) continue;
+
+        if (xx < minX) minX = xx;
+        if (xx > maxX) maxX = xx;
+        if (yy < minY) minY = yy;
+        if (yy > maxY) maxY = yy;
+      }
+    }
+
+    if (maxX < minX || maxY < minY) {
+      spriteCropCache.set(image, full);
+      return full;
+    }
+
+    const pad = 2;
+
+    minX = Math.max(0, minX - pad);
+    minY = Math.max(0, minY - pad);
+    maxX = Math.min(sw - 1, maxX + pad);
+    maxY = Math.min(sh - 1, maxY + pad);
+
+    const crop = {
+      x: Math.floor(minX / scale),
+      y: Math.floor(minY / scale),
+      w: Math.min(
+        image.naturalWidth,
+        Math.ceil((maxX - minX + 1) / scale)
+      ),
+      h: Math.min(
+        image.naturalHeight,
+        Math.ceil((maxY - minY + 1) / scale)
+      )
+    };
+
+    spriteCropCache.set(image, crop);
+    return crop;
+  } catch (error) {
+    console.warn(
+      "Não foi possível recortar o sprite.",
+      error
+    );
+
+    spriteCropCache.set(image, full);
+    return full;
+  }
+}
+
+// Desenha usando somente a área real do objeto e mantém a proporção.
 function drawSpriteContain(image, x, y, w, h) {
   if (!spriteReady(image)) return false;
 
-  const ratio =
-    image.naturalWidth / image.naturalHeight;
+  const crop = getSpriteCrop(image);
+  const ratio = crop.w / crop.h;
 
   let dw = w;
   let dh = dw / ratio;
@@ -616,13 +725,27 @@ function drawSpriteContain(image, x, y, w, h) {
   const dx = x + (w - dw) / 2;
   const dy = y + (h - dh) / 2;
 
-  return drawSprite(
+  c.save();
+  c.imageSmoothingEnabled = true;
+
+  if ("imageSmoothingQuality" in c) {
+    c.imageSmoothingQuality = "high";
+  }
+
+  c.drawImage(
     image,
-    dx,
-    dy,
-    dw,
-    dh
+    crop.x,
+    crop.y,
+    crop.w,
+    crop.h,
+    Math.round(dx),
+    Math.round(dy),
+    Math.round(dw),
+    Math.round(dh)
   );
+
+  c.restore();
+  return true;
 }
 
 function drawPlayerRoomBackground(m) {
