@@ -565,3 +565,346 @@ h2 {
   font: 12px monospace;
   letter-spacing: .12em;
 }
+
+
+/* =========================================================
+   0.6.27 — COMO JOGAR E CRÉDITOS
+   Painéis preparados para receber arte de fundo futuramente.
+   Basta definir --panel-art: url("caminho-da-imagem.png");
+   ========================================================= */
+
+#overlay.info-overlay {
+  background:
+    radial-gradient(circle at 50% 42%, #8c6b3010, transparent 34%),
+    linear-gradient(#05090df2, #05080bf7);
+  backdrop-filter: blur(5px);
+}
+
+.info-card {
+  --panel-art: none;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid #8d795552;
+  background:
+    linear-gradient(135deg, #131a1dcc, #090e11f2);
+  box-shadow:
+    0 28px 90px #000d,
+    inset 0 0 0 1px #d0b2750a,
+    inset 0 0 70px #0007;
+}
+
+.info-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background-image: var(--panel-art);
+  background-size: cover;
+  background-position: center;
+  opacity: .18;
+  filter: saturate(.7) contrast(1.08);
+}
+
+.info-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, transparent, #d1ad6510 50%, transparent),
+    radial-gradient(circle at 50% 0%, #d6b86c0d, transparent 36%);
+  box-shadow: inset 0 0 80px #000b;
+}
+
+.info-card .eyebrow {
+  display: block;
+  margin-bottom: 4px;
+  color: #b99b69;
+  font-size: 8px;
+  letter-spacing: .28em;
+}
+
+.info-card h2 {
+  margin: 2px 0 14px;
+  color: #eee2c8;
+  font-size: clamp(23px, 2.6vw, 38px);
+  letter-spacing: .07em;
+  text-shadow: 0 0 22px #caa96b1c;
+}
+
+.info-card #modalText {
+  white-space: normal;
+  color: #b9beb8;
+}
+
+.info-art-slot {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  border: 0;
+}
+
+.info-art-slot span {
+  display: none;
+}
+
+/* COMO JOGAR — retângulo grande */
+.help-card {
+  width: min(940px, 88%);
+  max-height: 91%;
+  padding: 24px 28px 20px;
+}
+
+.help-intro {
+  max-width: 760px;
+  margin: 0 0 16px;
+  color: #969e98;
+  font: 11px/1.55 system-ui, sans-serif;
+}
+
+.help-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.control-card {
+  min-height: 82px;
+  display: grid;
+  grid-template-columns: 38px 1fr;
+  gap: 11px;
+  align-items: start;
+  padding: 11px 12px;
+  border: 1px solid #73654835;
+  background:
+    linear-gradient(110deg, #182022b8, #10161994);
+  box-shadow: inset 0 1px #ffffff05;
+}
+
+.control-card:hover {
+  border-color: #a68b5966;
+  background:
+    linear-gradient(110deg, #1d2828d1, #11191ba8);
+}
+
+.control-icon {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  color: #d5b66f;
+  border: 1px solid #8e74464d;
+  background: #0d1417b8;
+  font-size: 17px;
+  box-shadow: inset 0 0 18px #b9934b0d;
+}
+
+.control-card strong {
+  display: inline-block;
+  margin: 0 8px 4px 0;
+  color: #dcc89d;
+  font: 700 11px/1.2 Georgia, serif;
+  letter-spacing: .06em;
+}
+
+.control-card strong em {
+  margin-left: 5px;
+  color: #8d8167;
+  font: 7px/1 monospace;
+  letter-spacing: .12em;
+}
+
+.control-card kbd {
+  display: inline-block;
+  margin: 0 3px 3px 0;
+  padding: 2px 6px;
+  border: 1px solid #7c694657;
+  border-radius: 2px;
+  background: #0a1012a6;
+  color: #c6b384;
+  font: 7px/1.3 monospace;
+  box-shadow: none;
+}
+
+.control-card p {
+  margin: 3px 0 0;
+  color: #929a95;
+  font: 9px/1.45 system-ui, sans-serif;
+}
+
+.control-card.planned {
+  opacity: .82;
+  border-style: dashed;
+}
+
+.control-key-muted {
+  display: inline-block;
+  color: #7f7868;
+  font: 7px/1.2 monospace;
+  letter-spacing: .08em;
+}
+
+.help-future {
+  margin-top: 11px;
+  padding: 10px 12px;
+  border-left: 1px solid #9b8251;
+  background: #0b1114a8;
+}
+
+.help-future span {
+  color: #ad9362;
+  font: 7px monospace;
+  letter-spacing: .18em;
+}
+
+.help-future p {
+  margin: 4px 0 0;
+  color: #858d89;
+  font: 9px/1.5 system-ui, sans-serif;
+}
+
+.info-quote {
+  margin: 13px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid #806e4b24;
+  color: #817a6c;
+  text-align: center;
+  font: italic 9px/1.5 Georgia, serif;
+}
+
+/* CRÉDITOS — quadrado menor */
+.credits-card {
+  width: min(470px, 62%);
+  aspect-ratio: 1 / 1;
+  max-height: 82%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 34px 46px;
+  text-align: center;
+}
+
+.credits-card .eyebrow,
+.credits-card h2 {
+  text-align: center;
+}
+
+.credits-card h2 {
+  margin-bottom: 6px;
+  letter-spacing: .16em;
+}
+
+.credits-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
+  margin: 4px auto 22px;
+  color: #b99c63;
+}
+
+.credits-mark span {
+  width: 38px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #987d4b);
+}
+
+.credits-mark span:last-child {
+  background: linear-gradient(90deg, #987d4b, transparent);
+}
+
+.credits-mark i {
+  font-style: normal;
+  font-size: 15px;
+  opacity: .85;
+}
+
+.credit-entry {
+  display: grid;
+  gap: 7px;
+  margin: 12px 0;
+}
+
+.credit-entry small {
+  color: #7f817a;
+  font: 7px monospace;
+  letter-spacing: .19em;
+}
+
+.credit-entry strong {
+  color: #d4bc87;
+  font: normal 18px Georgia, serif;
+  letter-spacing: .02em;
+}
+
+.credit-divider {
+  width: 54px;
+  height: 1px;
+  margin: 4px auto;
+  background: linear-gradient(90deg, transparent, #ad8d54, transparent);
+}
+
+.credits-quote {
+  margin-top: 24px;
+  color: #77766e;
+}
+
+/* Botão inferior discreto das telas especiais */
+.info-card #modalActions {
+  justify-content: center;
+  margin-top: 14px;
+}
+
+.info-card #modalActions button {
+  min-width: 88px;
+  padding: 6px 13px;
+  border-color: #79674455;
+  background: #0c1214b8;
+  color: #a99b80;
+  font: 8px monospace;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.info-card #modalActions button:hover {
+  border-color: #b89a62;
+  color: #e2cfaa;
+  background: #161f1f;
+}
+
+@media (max-width: 760px), (max-height: 560px) {
+  .help-card {
+    width: 92%;
+    max-height: 92%;
+    padding: 16px 18px;
+  }
+
+  .help-grid {
+    gap: 6px;
+  }
+
+  .control-card {
+    min-height: 68px;
+    grid-template-columns: 30px 1fr;
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .control-icon {
+    width: 28px;
+    height: 28px;
+    font-size: 13px;
+  }
+
+  .control-card p {
+    font-size: 8px;
+  }
+
+  .credits-card {
+    width: min(430px, 70%);
+    padding: 24px 34px;
+  }
+}
