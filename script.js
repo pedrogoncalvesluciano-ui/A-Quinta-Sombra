@@ -5113,6 +5113,14 @@ prepareSystems = function () {
     state.squareManTalks = 0;
   }
 
+  if (typeof state.squareManReturnObserverPending !== "boolean") {
+    state.squareManReturnObserverPending = false;
+  }
+
+  if (!Number.isFinite(state.squareManReturnObserverSeenDay)) {
+    state.squareManReturnObserverSeenDay = -1;
+  }
+
   if (!state.dawnCollapse || typeof state.dawnCollapse !== "object") {
     state.dawnCollapse = {
       active: false,
@@ -7445,32 +7453,22 @@ updateHud = function() {
 // =========================================================
 
 const v0633SquareMan = {
-  x: 930,
-  y: 505
+  // Calçada da praça, no lado leste da cidade.
+  x: 950,
+  y: 500
 };
 
-const v0633CrypticLines = [
-  "Ele manipula tudo.",
-  "Ele vê tudo.",
-  "Você olha para ele. Ele já estava olhando para você.",
-  "Algumas portas só parecem trancadas.",
-  "Nem toda pessoa que volta para casa é quem saiu dela.",
-  "Quando alguém esquece, ele ganha espaço.",
-  "A cidade não dorme. Ela apenas fecha os olhos.",
-  "Não confie no silêncio. Às vezes ele está escutando.",
-  "Você acha que está procurando. Às vezes é você que está sendo procurado.",
-  "Ele não precisa entrar. Basta você acreditar que ele já entrou.",
-  "Há lugares que ficam mais perto quando ninguém está olhando.",
-  "A memória é uma porta. Ele sabe onde fica a maçaneta.",
-  "Crianças escutam coisas que adultos aprenderam a ignorar.",
-  "Você não perdeu tempo. Alguém o tirou de você.",
-  "Se acordar onde não lembra de ter ido, não pergunte primeiro como chegou.",
-  "O pior esconderijo é aquele que você atravessa todos os dias.",
-  "Ele gosta quando você procura longe.",
-  "Algumas respostas ficam debaixo da própria casa.",
-  "Não siga a voz só porque ela conhece o seu nome.",
-  "Quando a estática vier, não olhe para o lugar onde ele estava."
+const v0634SquareManVariants = [
+  "Ele não gosta quando você volta cedo. Seu irmão está seguro agora?",
+  "Seu irmão ainda escuta vozes?",
+  "Você já se perguntou por que acorda sempre no mesmo lugar?"
 ];
+
+let v0634StaticUntil = 0;
+let v0634ObserverUntil = 0;
+let v0634ObserverX = 0;
+let v0634ObserverY = 0;
+let v0634WasInSquareSide = false;
 
 function v0633DrawWheelchairMan() {
   if (!state || state.room !== "village" || state.stage === "prologue") {
@@ -7516,16 +7514,22 @@ function v0633TalkSquareMan() {
 
   if (talks === 0) {
     state.squareManTalks = 1;
+    state.squareManReturnObserverPending = true;
 
     say(
       [
-        ["Você", "O senhor viu meus pais? Eles foram ao mercado e não voltaram."],
-        ["Homem", "Eles estão onde você menos espera."],
-        ["Você", "Onde? O que isso quer dizer?"],
-        ["Homem", "Você está procurando longe demais."],
+        ["Você", "Onde estão os meus pais?"],
+        ["Homem", "Ele está no seu quarto."],
+        ["Homem", "Na sua escada."],
+        ["Homem", "Na sua casa."],
+        ["Homem", "Do lado de fora."],
+        ["Homem", "Perto da delegacia."],
+        ["Homem", "Está se aproximando..."],
+        ["Homem", "...Ele está aqui."],
+        ["Você", "Quê?? Eu estou perguntando dos meus pais."],
         ["Homem", "Ele manipula tudo."],
-        ["Você", "Quem?"],
-        ["Homem", "Ele vê tudo."]
+        ["Homem", "Ele vê tudo..."],
+        ["Homem", "Menos aqueles que ainda viveram pouco."]
       ],
       save
     );
@@ -7533,40 +7537,14 @@ function v0633TalkSquareMan() {
     return;
   }
 
-  // Em encontros posteriores ele parece falar sem sentido,
-  // mas as frases antecipam regras reais do Observador.
-  const first =
-    v0633CrypticLines[
-      Math.floor(Math.random() * v0633CrypticLines.length)
-    ];
-
-  let second = first;
-
-  while (second === first && v0633CrypticLines.length > 1) {
-    second =
-      v0633CrypticLines[
-        Math.floor(Math.random() * v0633CrypticLines.length)
-      ];
-  }
+  const index = (talks - 1) % v0634SquareManVariants.length;
+  const line = v0634SquareManVariants[index];
 
   state.squareManTalks += 1;
 
-  const openings = [
-    ["Você", "O senhor estava falando de quem?"],
-    ["Você", "O que o senhor sabe sobre essa cidade?"],
-    ["Você", "Por que o senhor fala como se soubesse o que está acontecendo?"],
-    ["Você", "O senhor sabe onde meus pais estão?"]
-  ];
-
-  const opening =
-    openings[(state.squareManTalks - 2) % openings.length];
-
   say(
     [
-      opening,
-      ["Homem", first],
-      ["Homem", second],
-      ["Você", "..."]
+      ["Homem", line]
     ],
     save
   );
@@ -7613,6 +7591,118 @@ drawWorld = function() {
   v0633DrawWheelchairMan();
 };
 
+// =========================================================
+// 0.6.34 — ESTÁTICA DO HOMEM DA PRAÇA E OBSERVADOR NA VOLTA
+// =========================================================
+
+const v0634RenderDialogBase = renderDialog;
+renderDialog = function() {
+  v0634RenderDialogBase();
+
+  if (
+    dialog &&
+    dialog.lines &&
+    dialog.lines[dialog.i] &&
+    dialog.lines[dialog.i][1] === "...Ele está aqui."
+  ) {
+    v0634StaticUntil = Math.max(v0634StaticUntil, elapsed + 0.85);
+  }
+};
+
+function v0634TriggerReturnObserver() {
+  if (
+    !state ||
+    state.room !== "village" ||
+    state.stage === "prologue" ||
+    !state.squareManReturnObserverPending
+  ) {
+    return;
+  }
+
+  state.squareManReturnObserverPending = false;
+  state.squareManReturnObserverSeenDay = state.day;
+
+  // Silhueta aparece alguns metros à frente, próxima da saída da praça.
+  v0634ObserverX = 790;
+  v0634ObserverY = 520;
+  v0634ObserverUntil = elapsed + 0.8;
+  v0634StaticUntil = elapsed + 1.05;
+
+  save();
+}
+
+const v0634UpdateBase = update;
+update = function(dt) {
+  v0634UpdateBase(dt);
+
+  if (!state || state.room !== "village" || state.stage === "prologue") {
+    v0634WasInSquareSide = false;
+    return;
+  }
+
+  if (state.x >= 860) {
+    v0634WasInSquareSide = true;
+  }
+
+  // Ao voltar da região da praça para a parte principal,
+  // o Observador aparece por um instante e some na estática.
+  if (
+    v0634WasInSquareSide &&
+    state.x <= 805 &&
+    state.squareManReturnObserverPending &&
+    !dialog &&
+    !transitionBusy
+  ) {
+    v0634WasInSquareSide = false;
+    v0634TriggerReturnObserver();
+  }
+};
+
+const v0634DrawWorldBase = drawWorld;
+drawWorld = function() {
+  v0634DrawWorldBase();
+
+  if (!state || state.room !== "village") return;
+
+  if (elapsed < v0634ObserverUntil) {
+    c.save();
+    c.translate(-Math.floor(camera.x), -Math.floor(camera.y));
+
+    const x = v0634ObserverX;
+    const y = v0634ObserverY;
+
+    rect(x - 6, y - 31, 12, 24, "#090b0d");
+    rect(x - 5, y - 42, 10, 11, "#07090b");
+    rect(x - 8, y - 26, 3, 18, "#080a0c");
+    rect(x + 5, y - 26, 3, 18, "#080a0c");
+
+    c.restore();
+  }
+
+  if (elapsed < v0634StaticUntil) {
+    const strength = Math.min(
+      1,
+      Math.max(v0634StaticUntil - elapsed, 0) / 0.85
+    );
+
+    for (let i = 0; i < 28; i++) {
+      const y = (i * 19 + Math.floor(elapsed * 700) % H) % H;
+      const h = 1 + (i % 3);
+      rect(
+        (i % 4) * -4,
+        y,
+        W + 16,
+        h,
+        `rgba(225,230,220,${0.04 + strength * 0.14})`
+      );
+    }
+
+    if (Math.floor(elapsed * 24) % 3 === 0) {
+      rect(0, 0, W, H, `rgba(215,220,215,${0.05 + strength * 0.12})`);
+    }
+  }
+};
+
 // Recupera um save que tenha ficado dentro de um móvel reposicionado.
 const roomUpdateBeforeFix=update;
 let roomPositionChecked=false;
@@ -7632,7 +7722,7 @@ update=function(dt) {
   roomUpdateBeforeFix(dt);
 };
 
-$("version").textContent = "PROTÓTIPO · 0.6.33";
+$("version").textContent = "PROTÓTIPO · 0.6.34";
   
   requestAnimationFrame(frame);
   showBootSplash();
