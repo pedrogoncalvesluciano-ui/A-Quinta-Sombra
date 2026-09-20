@@ -552,7 +552,7 @@ for (const kind of Object.keys(characterSpriteSheets)) {
     const image = new Image();
 
     image.src =
-      `assets/sprites/characters/${kind}/${animation}.png`;
+      `assets/sprites/characters/${kind}/${animation}.png?v=0.6.40`;
 
     characterSpriteSheets[kind][animation] = image;
   }
@@ -583,8 +583,19 @@ const playerRoomSprites = {};
 for (const [key, filename] of Object.entries(playerRoomSpriteNames)) {
   const image = new Image();
   image.src =
-    `assets/sprites/house/player-room/${filename}?v=0.6.7`;
+    `assets/sprites/house/player-room/${filename}?v=0.6.40`;
   playerRoomSprites[key] = image;
+}
+
+// Em alguns navegadores o cache antigo podia manter uma falha de imagem.
+// Ao concluir cada carregamento, o próximo frame já usa o sprite real.
+for (const image of [
+  ...Object.values(playerRoomSprites),
+  ...Object.values(characterSpriteSheets).flatMap(set => Object.values(set))
+]) {
+  image.addEventListener("load", () => {
+    roomPositionChecked = false;
+  }, { once: true });
 }
 
 function spriteReady(image) {
@@ -7784,6 +7795,22 @@ update = function(dt) {
 };
 
 // =========================================================
+// 0.6.40 — RECUPERAÇÃO DE SPRITES E CONTROLES
+// =========================================================
+
+function v0640RecoverInputLock() {
+  if (
+    transitionBusy &&
+    !$("transition").classList.contains("active") &&
+    $("overlay").hidden &&
+    !state?.dawnCollapse?.active &&
+    !state?.wakeUp?.active
+  ) {
+    transitionBusy = false;
+  }
+}
+
+// =========================================================
 // 0.6.39 — CORREÇÕES DE MAPA, SAÍDAS E AVISOS
 // =========================================================
 
@@ -7830,6 +7857,7 @@ function v0639FinishPrologueAtNorth() {
 
 const v0639UpdateBase = update;
 update = function(dt) {
+  v0640RecoverInputLock();
   v0639UpdateBase(dt);
 
   if (!state || mode !== "game") return;
@@ -7929,7 +7957,7 @@ update=function(dt) {
   roomUpdateBeforeFix(dt);
 };
 
-$("version").textContent = "PROTÓTIPO · 0.6.39";
+$("version").textContent = "PROTÓTIPO · 0.6.40";
   
   requestAnimationFrame(frame);
   showBootSplash();
