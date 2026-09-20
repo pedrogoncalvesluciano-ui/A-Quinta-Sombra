@@ -6195,24 +6195,24 @@ drawWorld = function () {
 // 0.6.18 — Uma referência para proporção visual e colisão do quarto.
 const roomItems = {
   // Cama preservada da 0.6.22.
-  bed: [2, 97, 96, 124, .14, .26, .72, .62],
+  bed: [255, 97, 96, 124, .14, .26, .72, .62],
 
   // Tapete DEITADO, parcialmente sob a metade inferior/esquerda da cama.
   rug: [188, 222, 182, 92],
 
   // Criado-mudo / luminária.
   nightstand: [374, 88, 40, 44, .14, .48, .72, .44],
-  lampOff: [380, 50, 28, 39],
-  lampOn: [380, 50, 28, 39],
+  lampOff: [360, 85, 28, 39],
+  lampOn: [360, 85, 28, 39],
 
   // Estante.
   shelf: [438, 78, 84, 102, .12, .70, .76, .24],
 
   // Escrivaninha maior e mais baixa: os pés chegam ao piso junto da parede.
-  desk: [520, 178, 60, 168, .34, .20, .58, .72],
+  desk: [480, 198, 60, 168, .34, .20, .58, .72],
 
   // Mochila junto à parede superior.
-  backpack: [216, 90, 24, 28, .18, .58, .64, .30],
+  backpack: [216, 101, 24, 28, .18, .58, .64, .30],
 
   // Chinelo perto do pé da cama.
   flipflops: [365, 248, 28, 20, .18, .34, .64, .42],
@@ -6221,10 +6221,10 @@ const roomItems = {
   trash: [492, 296, 28, 34, .18, .56, .64, .34],
 
   // Tênis perto da porta superior esquerda.
-  shoes: [150, 108, 34, 24, .14, .34, .72, .46],
+  shoes: [125, 128, 34, 24, .14, .34, .72, .46],
 
   // Roupa no canto inferior esquerdo, ainda sobre o piso.
-  clothes: [84, 292, 58, 40, .16, .38, .68, .42]
+  clothes: [84, 275, 58, 40, .16, .38, .68, .42]
 };
 function roomItemBounds(key) {
   const [x,y,w,h] = roomItems[key].map(housePoint);
