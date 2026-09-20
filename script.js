@@ -6198,10 +6198,10 @@ const roomItems = {
   bed: [255, 97, 96, 124, .14, .26, .72, .62],
 
   // Tapete DEITADO, parcialmente sob a metade inferior/esquerda da cama.
- rug: [224, 222, 182, 92],
+ rug: [212, 230, 182, 128],
 
   // Criado-mudo / luminária.
-nightstand: [374, 96, 40, 44, .14, .48, .72, .44],
+nightstand: [354, 108, 40, 44, .14, .48, .72, .44],
   lampOff: [360, 85, 28, 39],
   lampOn: [360, 85, 28, 39],
 
@@ -6335,7 +6335,7 @@ update=function(dt) {
   roomUpdateBeforeFix(dt);
 };
 
-$("version").textContent = "PROTÓTIPO · 0.6.23";
+$("version").textContent = "PROTÓTIPO · 0.6.24";
   
   requestAnimationFrame(frame);
   showBootSplash();
