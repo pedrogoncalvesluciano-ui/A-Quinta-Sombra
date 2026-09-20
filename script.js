@@ -6496,6 +6496,153 @@ update = function (dt) {
   }
 };
 
+// =========================================================
+// 0.6.28 — CONTROLES MOBILE DE TESTE
+// =========================================================
+
+const mobileControls = $("mobileControls");
+const mobilePointerKeys = new Map();
+
+function mobileControlsAvailable() {
+  return Boolean(
+    mobileControls &&
+    window.matchMedia &&
+    window.matchMedia("(hover: none) and (pointer: coarse)").matches
+  );
+}
+
+function refreshMobileControls() {
+  if (!mobileControls) return;
+
+  const active =
+    mobileControlsAvailable() &&
+    mode === "game" &&
+    state &&
+    !state.gameOver &&
+    $("overlay").hidden &&
+    !transitionBusy;
+
+  mobileControls.classList.toggle("mobile-active", Boolean(active));
+}
+
+function releaseMobilePointer(pointerId) {
+  const held = mobilePointerKeys.get(pointerId);
+  if (!held) return;
+
+  keys.delete(held.key);
+  held.button.classList.remove("is-pressed");
+  mobilePointerKeys.delete(pointerId);
+}
+
+function mobileTapKey(key, code = "") {
+  if (
+    mode !== "game" ||
+    !state ||
+    transitionBusy ||
+    !$("overlay").hidden
+  ) {
+    return;
+  }
+
+  window.dispatchEvent(
+    new KeyboardEvent("keydown", {
+      key,
+      code,
+      bubbles: true,
+      cancelable: true
+    })
+  );
+
+  window.dispatchEvent(
+    new KeyboardEvent("keyup", {
+      key,
+      code,
+      bubbles: true,
+      cancelable: true
+    })
+  );
+}
+
+if (mobileControls) {
+  mobileControls.addEventListener("contextmenu", event => {
+    event.preventDefault();
+  });
+
+  for (const button of mobileControls.querySelectorAll("[data-hold-key]")) {
+    const key = button.dataset.holdKey;
+
+    button.addEventListener("pointerdown", event => {
+      event.preventDefault();
+
+      if (
+        mode !== "game" ||
+        !state ||
+        dialog ||
+        transitionBusy ||
+        !$("overlay").hidden
+      ) {
+        return;
+      }
+
+      try {
+        button.setPointerCapture(event.pointerId);
+      } catch {}
+
+      keys.add(key);
+      button.classList.add("is-pressed");
+      mobilePointerKeys.set(event.pointerId, { key, button });
+    });
+
+    for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) {
+      button.addEventListener(type, event => {
+        event.preventDefault();
+        releaseMobilePointer(event.pointerId);
+      });
+    }
+  }
+
+  for (const button of mobileControls.querySelectorAll("[data-tap-key]")) {
+    button.addEventListener("pointerdown", event => {
+      event.preventDefault();
+      button.classList.add("is-pressed");
+
+      mobileTapKey(
+        button.dataset.tapKey,
+        button.dataset.tapCode || ""
+      );
+    });
+
+    for (const type of ["pointerup", "pointercancel", "pointerleave"]) {
+      button.addEventListener(type, event => {
+        event.preventDefault();
+        button.classList.remove("is-pressed");
+      });
+    }
+  }
+
+  window.addEventListener("blur", () => {
+    for (const pointerId of [...mobilePointerKeys.keys()]) {
+      releaseMobilePointer(pointerId);
+    }
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) return;
+
+    for (const pointerId of [...mobilePointerKeys.keys()]) {
+      releaseMobilePointer(pointerId);
+    }
+  });
+}
+
+// Mantém a visibilidade sincronizada com jogo/menu/pausa/transições.
+const mobileUpdateBase = update;
+update = function(dt) {
+  refreshMobileControls();
+  mobileUpdateBase(dt);
+  refreshMobileControls();
+};
+
 // 0.6.18 — Uma referência para proporção visual e colisão do quarto.
 const roomItems = {
   // Cama preservada da 0.6.22.
@@ -6639,7 +6786,7 @@ update=function(dt) {
   roomUpdateBeforeFix(dt);
 };
 
-$("version").textContent = "PROTÓTIPO · 0.6.27";
+$("version").textContent = "PROTÓTIPO · 0.6.28";
   
   requestAnimationFrame(frame);
   showBootSplash();
