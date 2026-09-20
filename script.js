@@ -2100,7 +2100,12 @@ function drawCharacterSprite(
   function modal(title, text, buttons) {
     keys.clear();
 
+    const modalCard = $("overlay").querySelector(".card");
+    modalCard.className = "card";
+    $("overlay").className = "";
+
     $("modalTitle").textContent = title;
+    $("modalText").replaceChildren();
     $("modalText").textContent = text;
     $("modalActions").replaceChildren();
 
@@ -2844,6 +2849,153 @@ function drawCharacterSprite(
   });
 
   // =========================================================
+  // TELAS VISUAIS — COMO JOGAR E CRÉDITOS
+  // =========================================================
+
+  function openHelpScreen() {
+    modal("Como jogar", "", [["Fechar", closeModal]]);
+
+    const card = $("overlay").querySelector(".card");
+    card.className = "card info-card help-card";
+    $("overlay").className = "info-overlay";
+
+    $("modalLabel").textContent = "REGISTROS DA CASA";
+    $("modalTitle").textContent = "COMO JOGAR";
+
+    $("modalText").innerHTML = `
+      <div class="info-art-slot help-art-slot" aria-hidden="true">
+        <span>ESPAÇO RESERVADO PARA ARTE / IMAGEM</span>
+      </div>
+
+      <div class="help-intro">
+        Explore com calma. Algumas ações já fazem parte do protótipo;
+        outras estão previstas para acompanhar a evolução do jogo.
+      </div>
+
+      <div class="help-grid">
+        <article class="control-card">
+          <span class="control-icon">◆</span>
+          <div>
+            <strong>ANDAR</strong>
+            <kbd>WASD</kbd> <kbd>SETAS</kbd>
+            <p>Mova-se pelos cômodos, pela casa e pela vila.</p>
+          </div>
+        </article>
+
+        <article class="control-card">
+          <span class="control-icon">◎</span>
+          <div>
+            <strong>INTERAGIR</strong>
+            <kbd>E</kbd>
+            <p>Fale, examine, colete itens e use portas ou objetos próximos.</p>
+          </div>
+        </article>
+
+        <article class="control-card">
+          <span class="control-icon">✦</span>
+          <div>
+            <strong>ATAQUE</strong>
+            <kbd>ESPAÇO</kbd>
+            <p>Execute o ataque básico quando houver uma ameaça próxima.</p>
+          </div>
+        </article>
+
+        <article class="control-card">
+          <span class="control-icon">»</span>
+          <div>
+            <strong>CORRER</strong>
+            <kbd>SHIFT</kbd>
+            <p>Acelere o movimento quando precisar atravessar uma área rapidamente.</p>
+          </div>
+        </article>
+
+        <article class="control-card">
+          <span class="control-icon">▱</span>
+          <div>
+            <strong>DIÁRIO</strong>
+            <kbd>J</kbd>
+            <p>Consulte pistas, registros e informações importantes da investigação.</p>
+          </div>
+        </article>
+
+        <article class="control-card">
+          <span class="control-icon">Ⅱ</span>
+          <div>
+            <strong>PAUSAR</strong>
+            <kbd>ESC</kbd>
+            <p>Pare o jogo e o relógio enquanto organiza o próximo passo.</p>
+          </div>
+        </article>
+
+        <article class="control-card planned">
+          <span class="control-icon">↝</span>
+          <div>
+            <strong>DASH <em>PLANEJADO</em></strong>
+            <kbd>Q</kbd>
+            <p>Um avanço rápido para fuga, exploração e situações de perigo.</p>
+          </div>
+        </article>
+
+        <article class="control-card planned">
+          <span class="control-icon">◌</span>
+          <div>
+            <strong>ESQUIVA / EMPURRÃO <em>PLANEJADO</em></strong>
+            <span class="control-key-muted">EM DESENVOLVIMENTO</span>
+            <p>Novas opções defensivas para sobreviver a encontros mais perigosos.</p>
+          </div>
+        </article>
+      </div>
+
+      <div class="help-future">
+        <span>AINDA VAI CRESCER</span>
+        <p>Inventário, lanterna, novas habilidades, escolhas com consequências,
+        mais interações com NPCs e novos eventos dentro e fora da casa.</p>
+      </div>
+
+      <blockquote class="info-quote">
+        “Observe. Escute. Nem tudo o que parece vazio está realmente em silêncio.”
+      </blockquote>
+    `;
+  }
+
+  function openCreditsScreen() {
+    modal("Créditos", "", [["Fechar", closeModal]]);
+
+    const card = $("overlay").querySelector(".card");
+    card.className = "card info-card credits-card";
+    $("overlay").className = "info-overlay credits-overlay";
+
+    $("modalLabel").textContent = "A QUINTA SOMBRA";
+    $("modalTitle").textContent = "CRÉDITOS";
+
+    $("modalText").innerHTML = `
+      <div class="info-art-slot credits-art-slot" aria-hidden="true">
+        <span>ESPAÇO RESERVADO PARA ARTE / IMAGEM</span>
+      </div>
+
+      <div class="credits-mark" aria-hidden="true">
+        <span></span><i>◇</i><span></span>
+      </div>
+
+      <div class="credit-entry">
+        <small>DESENVOLVIMENTO, DIREÇÃO E IDEIAS</small>
+        <strong>Pedro</strong>
+      </div>
+
+      <div class="credit-divider"></div>
+
+      <div class="credit-entry">
+        <small>AUXÍLIO DE PROGRAMAÇÃO</small>
+        <strong>ChatGPT</strong>
+      </div>
+
+      <blockquote class="info-quote credits-quote">
+        “Nem todo silêncio significa paz.”
+      </blockquote>
+    `;
+  }
+
+  // =========================================================
   // BOTÕES DO MENU
   // =========================================================
 
@@ -2924,17 +3076,8 @@ function drawCharacterSprite(
     }
   };
 
-  $("help").onclick = () => modal(
-    "Como jogar",
-    "WASD ou setas — caminhar\nShift — correr\nE — examinar, conversar e avançar diálogos\nEsc — pausar\n\nAproxime-se de portas e objetos até aparecer a indicação de interação. As portas só abrem ao pressionar E.\n\nO relógio começa na primeira saída. Uma hora leva três minutos reais. Ao amanhecer, procure abrigo.\n\nEsta é a abertura jogável: da saída dos pais à primeira busca de alimento. Combate e invasões serão adicionados depois.",
-    [["Voltar", closeModal]]
-  );
-
-  $("credits").onclick = () => modal(
-    "Créditos",
-    "A QUINTA SOMBRA\nConceito, história e desenhos de referência: criador do projeto.\nProgramação e arte provisória em Canvas: desenvolvidas com assistência do ChatGPT.\n\nSem imagens, fontes ou bibliotecas externas. Retrato, personagens e cenários ainda serão refinados juntos.\nVersão 0.1.0 — protótipo da abertura.",
-    [["Voltar", closeModal]]
-  );
+  $("help").onclick = openHelpScreen;
+  $("credits").onclick = openCreditsScreen;
 
   // =========================================================
   // CONTINUAÇÃO 0.2
@@ -6496,7 +6639,7 @@ update=function(dt) {
   roomUpdateBeforeFix(dt);
 };
 
-$("version").textContent = "PROTÓTIPO · 0.6.26";
+$("version").textContent = "PROTÓTIPO · 0.6.27";
   
   requestAnimationFrame(frame);
   showBootSplash();
