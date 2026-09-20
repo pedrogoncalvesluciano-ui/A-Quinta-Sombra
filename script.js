@@ -2684,15 +2684,14 @@ function drawCharacterSprite(
       const timeRate =
         state.minutes >= 360 ? 1.5 : 0.75;
 
-      state.minutes = Math.min(
-        840,
-        state.minutes + dt * timeRate
-      );
+      state.minutes += dt * timeRate;
 
+      // A primeira meia-noite depois do desaparecimento dos pais
+      // apenas arma o colapso das 07:00. O número do dia só muda
+      // quando o protagonista desmaia e acorda novamente às 00:00.
       if (state.minutes >= 1440) {
         state.minutes -= 1440;
-        state.day++;
-        state.rain = state.day % 3 === 0;
+        state.dawnCollapseArmed = true;
         save();
       }
 
@@ -5105,6 +5104,11 @@ prepareSystems = function () {
     state.dawnCollapseCount = 0;
   }
 
+  if (typeof state.dawnCollapseArmed !== "boolean") {
+    // Saves antigos que já passaram por um desmaio continuam armados.
+    state.dawnCollapseArmed = state.dawnCollapseCount > 0;
+  }
+
   if (!Number.isFinite(state.brotherDawnTalkCount)) {
     state.brotherDawnTalkCount = 0;
   }
@@ -7058,6 +7062,7 @@ interact = function (action) {
           () => {
             state.day = Math.max(1, state.day || 0);
             state.minutes = 1380;
+            state.dawnCollapseArmed = false;
             stage("parents");
             go("bedroom", 180, 235);
           }
@@ -7285,6 +7290,7 @@ function v0632WakeNextDay() {
   state.dawnCollapseCount += 1;
   state.day = Math.max(1, state.day || 0) + 1;
   state.minutes = 0;
+  state.dawnCollapseArmed = true;
   state.forcedSleepDue = false;
   state.sun = 0;
 
@@ -7350,6 +7356,7 @@ update = function(dt) {
     state &&
     state.stage !== "prologue" &&
     !state.gameOver &&
+    state.dawnCollapseArmed &&
     state.minutes >= 420 &&
     !state.dawnCollapse.active
   ) {
@@ -7447,7 +7454,7 @@ updateHud = function() {
     return;
   }
 
-  if (state.minutes >= 360) {
+  if (state.dawnCollapseArmed && state.minutes >= 360) {
     $("timeNote").textContent = "AMANHECER · ÀS 07:00 VOCÊ NÃO CONSEGUE CONTINUAR";
   }
 };
@@ -7727,7 +7734,7 @@ update=function(dt) {
   roomUpdateBeforeFix(dt);
 };
 
-$("version").textContent = "PROTÓTIPO · 0.6.35";
+$("version").textContent = "PROTÓTIPO · 0.6.36";
   
   requestAnimationFrame(frame);
   showBootSplash();
