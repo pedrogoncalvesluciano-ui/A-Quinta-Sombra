@@ -6198,10 +6198,10 @@ const roomItems = {
   bed: [255, 97, 96, 124, .14, .26, .72, .62],
 
   // Tapete DEITADO, parcialmente sob a metade inferior/esquerda da cama.
-  rug: [195, 210, 182, 92],
+ rug: [224, 222, 182, 92],
 
   // Criado-mudo / luminária.
-  nightstand: [360, 95, 40, 44, .14, .48, .72, .44],
+nightstand: [374, 96, 40, 44, .14, .48, .72, .44],
   lampOff: [360, 85, 28, 39],
   lampOn: [360, 85, 28, 39],
 
@@ -6209,7 +6209,7 @@ const roomItems = {
   shelf: [438, 78, 84, 102, .12, .70, .76, .24],
 
   // Escrivaninha maior e mais baixa: os pés chegam ao piso junto da parede.
-  desk: [520, 198, 60, 168, .34, .20, .58, .72],
+desk: [548, 160, 36, 132, .40, .18, .46, .74],
 
   // Mochila junto à parede superior.
   backpack: [216, 101, 24, 28, .18, .58, .64, .30],
