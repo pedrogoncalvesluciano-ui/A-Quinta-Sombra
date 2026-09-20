@@ -440,7 +440,7 @@
 
   maps.village = {
     w: 1280,
-    h: 1040,
+    h: 1380,
 
     objects: [
       // Quadra da família: casa, quintal e entrada externa do porão.
@@ -460,13 +460,8 @@
         "neighborDoor"
       ),
 
-      // Mercado: algumas quadras acima da casa.
-      obj(
-        735, 70, 205, 150,
-        "market",
-        "Examinar o mercado",
-        "marketDoor"
-      ),
+      // O mercado fica em uma área separada ao norte e será acessado depois.
+      // A passagem norte permanece visualmente livre.
 
       // Casas residenciais provisórias.
       obj(80, 115, 180, 135, "building"),
@@ -483,11 +478,10 @@
         "policeDoor"
       ),
       obj(120, 845, 180, 135, "building"),
-      obj(835, 845, 190, 135, "building"),
+      obj(835, 845, 190, 135, "building")
 
-      // Rotas laterais bloqueadas por recursos diferentes.
-      obj(5, 407, 80, 52, "gate", "Passagem oeste bloqueada", "westBarrier"),
-      obj(1195, 407, 80, 52, "gate", "Passagem leste escura", "eastBarrier")
+      // Oeste, leste e norte continuam como ruas normais, sem portões.
+      // O bloqueio é lógico e só exibe uma mensagem ao tentar atravessar.
     ],
 
     doors: [
@@ -920,7 +914,7 @@ function drawCharacterSprite(
 
     const wakeProgress = Math.max(
       0,
-      Math.min(0.999, state.wakeUp.time / 1.45)
+      Math.min(0.999, (state.wakeUp.time - 0.85) / 1.45)
     );
 
     // hurt.png tem 13 quadros. Ao contrário, a queda vira o player levantando.
@@ -1368,8 +1362,10 @@ function drawCharacterSprite(
         }
       }
 
-      // Rua principal vertical: casa -> mercado -> saída norte.
-      rect(610, 0, 78, 1040, "#706b5f");
+      // Rua principal vertical. Ao sul o asfalto vira estrada de terra,
+      // iniciando o caminho do velho.
+      rect(610, 0, 78, 1020, "#706b5f");
+      rect(610, 1020, 78, m.h - 1020, "#655442");
 
       // Cruzamento superior.
       rect(0, 385, 1280, 78, "#706b5f");
@@ -1425,10 +1421,7 @@ function drawCharacterSprite(
       }
 
       if (state.stage === "prologue") {
-               drawMother();
-      } else {
-        person(292, 692, "npcFemale", 0);
-        txt("VIZINHA", 274, 650, "#bac2a4", 7);
+        drawMother();
       }
     } else {
       if (state.room === "bedroom") {
@@ -3585,7 +3578,7 @@ function drawCharacterSprite(
             ],
             [
               "Tutorial",
-              "Ao sair novamente, observe a barra PERIGO NA CASA. Se alguém se aproximar, você pode voltar e interceptá-lo."
+              "Ao sair novamente, preste atenção aos avisos e aos sons ao redor da casa."
             ],
             [
               "Tutorial",
@@ -5917,8 +5910,36 @@ drawWorld = function () {
     photoScene.phase = photoPhase;
   }
 
-  // Vendedor no interior da venda.
+  // A vizinha fica dentro da própria casa.
   if (state.room === "shop") {
+    c.save();
+    c.translate(
+      -Math.floor(camera.x),
+      -Math.floor(camera.y)
+    );
+
+    person(
+      housePoint(355),
+      housePoint(128),
+      "npcFemale",
+      0,
+      "down",
+      0.9
+    );
+
+    txt(
+      "VIZINHA",
+      housePoint(330),
+      housePoint(82),
+      "#d7c49b",
+      7
+    );
+
+    c.restore();
+  }
+
+  // Policial visível atrás do balcão da delegacia.
+  if (state.room === "police") {
     c.save();
     c.translate(
       -Math.floor(camera.x),
@@ -5931,12 +5952,12 @@ drawWorld = function () {
       "npcMale",
       0,
       "down",
-      0.9
+      0.92
     );
 
     txt(
-      "VENDEDOR",
-      housePoint(326),
+      "POLICIAL",
+      housePoint(329),
       housePoint(82),
       "#d7c49b",
       7
@@ -5946,71 +5967,8 @@ drawWorld = function () {
   }
 
   if (state.stage !== "prologue") {
-    const d = state.danger;
-
-    const dangerStyles = {
-      safe: ["#7caf8b", 0.06],
-      yellow: ["#d5c264", 0.32],
-      orange: ["#dc964e", 0.60],
-      red: ["#d26b62", 0.84],
-      critical: ["#e55757", 1],
-      lost: ["#bd4848", 1]
-    };
-
-    const dangerData =
-      dangerStyles[d.phase] ||
-      dangerStyles.safe;
-
-    const dangerColor = dangerData[0];
-    const dangerFill = dangerData[1];
-
-    // PERIGO — vertical à esquerda.
-    const dangerX = 10;
-    const dangerY = 65;
-    const barH = 138;
-    const barW = 12;
-
-    rect(
-      dangerX - 5,
-      dangerY - 24,
-      52,
-      barH + 34,
-      "#09121adb"
-    );
-
-    txt(
-      "PERIGO",
-      dangerX - 2,
-      dangerY - 10,
-      "#c8c5b5",
-      7
-    );
-
-    rect(
-      dangerX,
-      dangerY,
-      barW,
-      barH,
-      "#30383c"
-    );
-
-    rect(
-      dangerX,
-      dangerY + barH - Math.round(barH * dangerFill),
-      barW,
-      Math.round(barH * dangerFill),
-      dangerColor
-    );
-
-    if (d.phase === "critical") {
-      txt(
-        Math.ceil(d.countdown) + "s",
-        dangerX + 18,
-        dangerY + 10,
-        dangerColor,
-        8
-      );
-    }
+    // A barra de perigo foi removida. O jogador recebe somente
+    // avisos diegéticos na tela quando a ameaça muda de estado.
 
     // ALIMENTAÇÃO — vertical à direita.
     const foodX = W - 22;
@@ -6104,7 +6062,7 @@ drawWorld = function () {
 
 $("help").onclick = () => modal(
   "Como jogar",
-  "WASD / setas: andar. Shift: correr. E: interagir. Esc: pausar. ESPAÇO: soco perto do invasor.\n\nA barra PERIGO fica à esquerda. A ALIMENTAÇÃO do irmão fica à direita: começa em 75%, perde 3 pontos por hora do jogo e cada porção recupera 25 pontos, até 100%.\n\nVocê carrega no máximo uma porção. A venda abre às 06:00, fecha à 01:00 e oferece duas porções gratuitas por ciclo, com reposição às 07:00.\n\nDepois das 07:00, a cama permite dormir até 00:00 do dia seguinte, desde que não exista uma invasão ativa. O consumo previsto de alimentação é mostrado antes de confirmar.",
+  "WASD / setas: andar. Shift: correr. E: interagir. Esc: pausar. ESPAÇO: soco perto de uma ameaça.\n\nNão existe mais uma barra de perigo: mudanças importantes são avisadas diretamente na tela. A ALIMENTAÇÃO do irmão continua à direita e pode piorar ao mesmo tempo em que outros eventos acontecem.\n\nVocê carrega no máximo uma porção. A vizinha pode ajudar no começo da história.\n\nÀs 07:00, depois da primeira meia-noite, o protagonista perde os sentidos e o ciclo avança.",
   [["Voltar", closeModal]]
 );
 
@@ -7001,8 +6959,8 @@ function v0630OpenPoliceTopics() {
   buttons.push(["Sair", closeModal]);
 
   modal(
-    "O que aconteceu?",
-    "O policial espera você explicar o motivo da visita.",
+    "Delegacia",
+    "",
     buttons
   );
 }
@@ -7160,7 +7118,7 @@ updateHud = function () {
 
   if (state.stage === "prologue" && state.room === "village") {
     $("objective").textContent =
-      "Siga pela rua principal até o mercado.";
+      "Siga pela rua principal para o norte.";
   } else if (state.stage === "supplies") {
     $("objective").textContent =
       "Bata na casa da vizinha e peça algo para seu irmão.";
@@ -7381,7 +7339,7 @@ update = function(dt) {
       state.dawnCollapse.time = 0;
     } else if (
       state.dawnCollapse.phase === "dayCard" &&
-      state.dawnCollapse.time >= 1.7
+      state.dawnCollapse.time >= 3.4
     ) {
       v0632WakeNextDay();
     }
@@ -7454,9 +7412,45 @@ drawWorld = function() {
   if (collapse.phase === "dayCard") {
     rect(0, 0, W, H, "#000");
 
-    const nextDay = Math.max(1, state.day || 0) + 1;
-    txt("DIA " + nextDay, W / 2 - 34, H / 2 - 4, "#d8d1bc", 14);
-    txt("00:00", W / 2 - 18, H / 2 + 18, "#9f9989", 9);
+    const previousDay = Math.max(1, state.day || 1);
+    const nextDay = previousDay + 1;
+    const t = collapse.time;
+
+    // O dia anterior desce devagar até o centro.
+    const drop = Math.min(1, t / 1.25);
+    const easedDrop = 1 - Math.pow(1 - drop, 3);
+    const titleY = -24 + (H / 2 + 20) * easedDrop;
+
+    // Primeiro mostra o dia anterior. Depois o número muda.
+    const shownDay = t < 1.45 ? previousDay : nextDay;
+
+    // Nos instantes finais, o texto desaparece suavemente.
+    const fadeOut = t < 2.55
+      ? 1
+      : Math.max(0, 1 - (t - 2.55) / 0.75);
+
+    c.save();
+    c.globalAlpha = fadeOut;
+
+    txt(
+      "DIA " + shownDay,
+      W / 2 - 34,
+      titleY,
+      "#d8d1bc",
+      14
+    );
+
+    if (t >= 1.45) {
+      txt(
+        "00:00",
+        W / 2 - 18,
+        titleY + 22,
+        "#9f9989",
+        9
+      );
+    }
+
+    c.restore();
   }
 };
 
@@ -7609,7 +7603,7 @@ const v0633Base = {
 
 getNear = function() {
   if (
-    state?.room === "village" &&
+    state?.room === "square" &&
     state.stage !== "prologue"
   ) {
     const distance = Math.hypot(
@@ -7663,7 +7657,7 @@ renderDialog = function() {
 function v0634TriggerReturnObserver() {
   if (
     !state ||
-    state.room !== "village" ||
+    state.room !== "square" ||
     state.stage === "prologue" ||
     !state.squareManReturnObserverPending
   ) {
@@ -7686,7 +7680,7 @@ const v0634UpdateBase = update;
 update = function(dt) {
   v0634UpdateBase(dt);
 
-  if (!state || state.room !== "village" || state.stage === "prologue") {
+  if (!state || state.room !== "square" || state.stage === "prologue") {
     v0634WasInSquareSide = false;
     return;
   }
@@ -7713,7 +7707,7 @@ const v0634DrawWorldBase = drawWorld;
 drawWorld = function() {
   v0634DrawWorldBase();
 
-  if (!state || state.room !== "village") return;
+  if (!state || state.room !== "square") return;
 
   if (elapsed < v0634ObserverUntil) {
     c.save();
@@ -7770,7 +7764,7 @@ update = function(dt) {
     state.wakeUp.time += dt;
     elapsed += dt;
 
-    if (state.wakeUp.time >= 1.45) {
+    if (state.wakeUp.time >= 2.3) {
       state.wakeUp.active = false;
       state.wakeUp.time = 0;
 
@@ -7787,6 +7781,133 @@ update = function(dt) {
   }
 
   v0637WakeUpdateBase(dt);
+};
+
+// =========================================================
+// 0.6.39 — CORREÇÕES DE MAPA, SAÍDAS E AVISOS
+// =========================================================
+
+let v0639LastDangerPhase = null;
+let v0639EdgeNoticeAt = -999;
+
+function v0639EdgeNotice(text) {
+  if (elapsed - v0639EdgeNoticeAt < 1.2) return;
+  v0639EdgeNoticeAt = elapsed;
+  v06Toast(text, 1.8);
+}
+
+function v0639FinishPrologueAtNorth() {
+  if (
+    !state ||
+    state.room !== "village" ||
+    state.stage !== "prologue" ||
+    dialog ||
+    transitionBusy
+  ) {
+    return;
+  }
+
+  keys.clear();
+
+  say(
+    [
+      ["Mãe", "É aqui. Vou pegar a lista."],
+      ["Pai", "Não deve demorar."]
+    ],
+    () => fade(
+      "Horas depois",
+      "23:00 · Seus pais ainda não voltaram.",
+      () => {
+        state.day = 0;
+        state.minutes = 1380;
+        state.dawnCollapseArmed = false;
+        stage("parents");
+        go("bedroom", 180, 235);
+      }
+    )
+  );
+}
+
+const v0639UpdateBase = update;
+update = function(dt) {
+  v0639UpdateBase(dt);
+
+  if (!state || mode !== "game") return;
+
+  // Fade preto saindo devagar antes da animação de levantar.
+  if (state.wakeUp?.active && state.wakeUp.time < 0.85) {
+    return;
+  }
+
+  if (
+    state.room === "village" &&
+    !dialog &&
+    !transitionBusy &&
+    $("overlay").hidden
+  ) {
+    const north = keys.has("w") || keys.has("arrowup");
+    const west = keys.has("a") || keys.has("arrowleft");
+    const east = keys.has("d") || keys.has("arrowright");
+
+    // Norte: mercado em outro mapa. No prólogo, chegar aqui conclui
+    // o trajeto dos pais; depois fica bloqueado por enquanto.
+    if (state.y <= 24 && north) {
+      state.y = 26;
+
+      if (state.stage === "prologue") {
+        v0639FinishPrologueAtNorth();
+      } else {
+        v0639EdgeNotice("Não preciso seguir aqui por agora.");
+      }
+    }
+
+    // Oeste: futura rua escura / lanterna.
+    if (state.x <= 24 && west) {
+      state.x = 26;
+      v0639EdgeNotice("Não preciso seguir aqui por agora.");
+    }
+
+    // Leste: futura praça.
+    if (state.x >= maps.village.w - 24 && east) {
+      state.x = maps.village.w - 26;
+      v0639EdgeNotice("Não preciso seguir aqui por agora.");
+    }
+
+    // Sul permanece livre dentro deste mapa e vira estrada de terra.
+  }
+
+  // Perigo sem barra: só avisos, podendo coexistir com fome e outros eventos.
+  const phase = state.danger?.phase || "safe";
+
+  if (v0639LastDangerPhase === null) {
+    v0639LastDangerPhase = phase;
+  } else if (phase !== v0639LastDangerPhase) {
+    const dangerMessages = {
+      yellow: "Tem alguma coisa estranha perto de casa.",
+      orange: "Ouvi movimento perto da entrada.",
+      red: "Alguém entrou. Meu irmão pode estar em perigo.",
+      critical: "Preciso voltar para casa agora.",
+      lost: "Cheguei tarde demais."
+    };
+
+    if (dangerMessages[phase]) {
+      v06Toast(dangerMessages[phase], phase === "critical" ? 2.4 : 2);
+    }
+
+    v0639LastDangerPhase = phase;
+  }
+};
+
+const v0639DrawWorldBase = drawWorld;
+drawWorld = function() {
+  v0639DrawWorldBase();
+
+  // Durante o despertar, o quarto já está atrás da tela preta.
+  // O preto some lentamente antes de o personagem começar a levantar.
+  if (state?.wakeUp?.active && state.wakeUp.time < 0.85) {
+    const alpha = Math.max(0, 1 - state.wakeUp.time / 0.85);
+    rect(0, 0, W, H, `rgba(0,0,0,${alpha})`);
+  }
 };
 
 // Recupera um save que tenha ficado dentro de um móvel reposicionado.
@@ -7808,7 +7929,7 @@ update=function(dt) {
   roomUpdateBeforeFix(dt);
 };
 
-$("version").textContent = "PROTÓTIPO · 0.6.38";
+$("version").textContent = "PROTÓTIPO · 0.6.39";
   
   requestAnimationFrame(frame);
   showBootSplash();
