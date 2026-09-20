@@ -7,9 +7,9 @@
   <title>A Quinta Sombra</title>
 
   <link rel="preload" as="image" href="assets/ui/logo.png" fetchpriority="high">
-  <link rel="stylesheet" href="style.css?v=0.6.27">
+  <link rel="stylesheet" href="style.css?v=0.6.28">
   <link rel="stylesheet" href="journal.css?v=0.5.0">
-<script src="script.js?v=0.6.27" defer></script>
+<script src="script.js?v=0.6.28" defer></script>
 </head>
 
 <body>
@@ -90,7 +90,32 @@
       <span id="transitionHint"></span>
     </div>
 
-  <span id="version">PROTÓTIPO · 0.6.27</span>
+    <section id="mobileControls" class="mobile-controls" aria-label="Controles para celular">
+      <div class="mobile-dpad" aria-label="Movimento">
+        <button class="mobile-control mobile-up" data-hold-key="w" aria-label="Mover para cima">▲</button>
+        <button class="mobile-control mobile-left" data-hold-key="a" aria-label="Mover para esquerda">◀</button>
+        <span class="mobile-dpad-center" aria-hidden="true"></span>
+        <button class="mobile-control mobile-right" data-hold-key="d" aria-label="Mover para direita">▶</button>
+        <button class="mobile-control mobile-down" data-hold-key="s" aria-label="Mover para baixo">▼</button>
+      </div>
+
+      <div class="mobile-actions" aria-label="Ações">
+        <button class="mobile-action mobile-interact" data-tap-key="e" aria-label="Interagir">
+          <strong>E</strong><span>INTERAGIR</span>
+        </button>
+        <button class="mobile-action mobile-punch" data-tap-key=" " data-tap-code="Space" aria-label="Soco">
+          <strong>✦</strong><span>SOCO</span>
+        </button>
+        <button class="mobile-action mobile-run" data-hold-key="shift" aria-label="Correr">
+          <strong>»</strong><span>CORRER</span>
+        </button>
+        <button class="mobile-action mobile-journal" data-tap-key="j" aria-label="Abrir diário">
+          <strong>J</strong><span>DIÁRIO</span>
+        </button>
+      </div>
+    </section>
+
+  <span id="version">PROTÓTIPO · 0.6.28</span>
   </main>
   <div id="bootSplash" role="status" aria-label="A Quinta Sombra — carregando">
     <img id="bootLogo" src="assets/ui/logo.png" alt="A Quinta Sombra"
