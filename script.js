@@ -2233,7 +2233,7 @@ function drawCharacterSprite(
       : objectives[state.stage];
     $("day").textContent =
       state.stage === "prologue"
-        ? "PRÓLOGO"
+        ? "PRÓLOGO · TARDE"
         : state.day
           ? "DIA " + state.day
           : "NOITE DO DESAPARECIMENTO";
@@ -5999,6 +5999,8 @@ drawWorld = function () {
     // avisos diegéticos na tela quando a ameaça muda de estado.
 
     // ALIMENTAÇÃO — vertical à direita.
+    const barW = 11;
+    const barH = 130;
     const foodX = W - 22;
     const foodY = 65;
     const foodFill = state.brotherFood / 100;
@@ -6110,6 +6112,9 @@ prepareSystems = function () {
   v061PrepareBase();
 
   if (!state) return;
+
+  // A saída dos pais acontece à tarde, inclusive em saves anteriores.
+  if (state.stage === "prologue") state.minutes = 14 * 60;
 
   if (!state.westMission) {
     state.westMission = {
@@ -8159,7 +8164,7 @@ update=function(dt) {
   roomUpdateBeforeFix(dt);
 };
 
-$("version").textContent = "PROTÓTIPO · 0.6.42";
+$("version").textContent = "PROTÓTIPO · 0.6.43";
   
   requestAnimationFrame(frame);
   showBootSplash();
