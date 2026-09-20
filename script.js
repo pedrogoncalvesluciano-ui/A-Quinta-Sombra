@@ -551,7 +551,7 @@ const characterSpriteSheets = {
 for (const kind of Object.keys(characterSpriteSheets)) {
   const animations =
     kind === "player"
-      ? ["idle", "walk", "thrust"]
+      ? ["idle", "walk", "thrust", "hurt"]
       : ["idle", "walk"];
 
   for (const animation of animations) {
@@ -898,6 +898,13 @@ function drawCharacterSprite(
 
   const moving = Math.abs(walk) > 0.01;
 
+  const wakingUp =
+    kind === "player" &&
+    state &&
+    state.wakeUp &&
+    state.wakeUp.active &&
+    sheets.hurt;
+
   const punching =
     kind === "player" &&
     state &&
@@ -908,7 +915,17 @@ function drawCharacterSprite(
   let animation = "idle";
   let frame = 0;
 
-  if (punching) {
+  if (wakingUp) {
+    animation = "hurt";
+
+    const wakeProgress = Math.max(
+      0,
+      Math.min(0.999, state.wakeUp.time / 1.45)
+    );
+
+    // hurt.png tem 13 quadros. Ao contrário, a queda vira o player levantando.
+    frame = 12 - Math.floor(wakeProgress * 13);
+  } else if (punching) {
     animation = "thrust";
 
     // O golpe dura 0,45 s no sistema atual.
@@ -5109,6 +5126,18 @@ prepareSystems = function () {
     state.dawnCollapseArmed = state.dawnCollapseCount > 0;
   }
 
+  if (!state.wakeUp || typeof state.wakeUp !== "object") {
+    state.wakeUp = { active: false, time: 0 };
+  }
+
+  if (typeof state.wakeUp.active !== "boolean") {
+    state.wakeUp.active = false;
+  }
+
+  if (!Number.isFinite(state.wakeUp.time)) {
+    state.wakeUp.time = 0;
+  }
+
   if (!Number.isFinite(state.brotherDawnTalkCount)) {
     state.brotherDawnTalkCount = 0;
   }
@@ -7310,15 +7339,14 @@ function v0632WakeNextDay() {
   state.dawnCollapse.phase = "idle";
   state.dawnCollapse.time = 0;
 
+  state.wakeUp.active = true;
+  state.wakeUp.time = 0;
+  keys.clear();
+  near = null;
+  $("prompt").hidden = true;
+
   updateHud();
   save();
-
-  const line =
-    state.dawnCollapseCount === 1
-      ? "Parece que eu desmaiei... e vim parar aqui no meu quarto."
-      : "Aconteceu de novo... o que está acontecendo?";
-
-  say([["Você", line]]);
 }
 
 update = function(dt) {
@@ -7715,6 +7743,41 @@ drawWorld = function() {
   }
 };
 
+// =========================================================
+// 0.6.37 — LEVANTAR DO CHÃO APÓS O DESMAIO
+// =========================================================
+
+const v0637WakeUpdateBase = update;
+update = function(dt) {
+  prepareSystems();
+
+  if (state?.wakeUp?.active) {
+    keys.clear();
+    near = null;
+    $("prompt").hidden = true;
+
+    state.wakeUp.time += dt;
+    elapsed += dt;
+
+    if (state.wakeUp.time >= 1.45) {
+      state.wakeUp.active = false;
+      state.wakeUp.time = 0;
+
+      const line =
+        state.dawnCollapseCount === 1
+          ? "Parece que eu desmaiei... e vim parar aqui no meu quarto."
+          : "Aconteceu de novo... o que está acontecendo?";
+
+      save();
+      say([["Você", line]]);
+    }
+
+    return;
+  }
+
+  v0637WakeUpdateBase(dt);
+};
+
 // Recupera um save que tenha ficado dentro de um móvel reposicionado.
 const roomUpdateBeforeFix=update;
 let roomPositionChecked=false;
@@ -7734,7 +7797,7 @@ update=function(dt) {
   roomUpdateBeforeFix(dt);
 };
 
-$("version").textContent = "PROTÓTIPO · 0.6.36";
+$("version").textContent = "PROTÓTIPO · 0.6.37";
   
   requestAnimationFrame(frame);
   showBootSplash();
