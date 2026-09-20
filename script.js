@@ -187,7 +187,7 @@
   $("continue").hidden = !saveAvailable;
 
   const objectives = {
-    prologue: "Siga com sua esposa até o portão norte.",
+    prologue: "Vá com sua esposa até o mercado da cidade.",
     parents: "Verifique o quarto dos seus pais.",
     meal: "Pegue a comida na cozinha.",
     feed: "Leve a comida ao seu irmão.",
@@ -197,9 +197,9 @@
     talk: "Converse com seu irmão.",
     key: "Procure a chave reserva no sótão.",
     exit: "Abra a porta de entrada.",
-    supplies: "Procure alimento na venda da vila.",
+    supplies: "Peça ajuda à vizinha para alimentar seu irmão.",
     return: "Leve o alimento para seu irmão.",
-    free: "Explore a vila. A abertura foi concluída."
+    free: "Explore o bairro e procure pistas sobre seus pais."
   };
 
   const roomNames = {
@@ -211,7 +211,7 @@
     kitchen: "Cozinha",
     living: "Sala",
     attic: "Sótão",
-    village: "Vila · exterior"
+    village: "Bairro residencial · interior da Alemanha"
   };
 
   function initial() {
@@ -392,7 +392,6 @@
     ],
     [
       door(260, 46, "kitchen", 310, 320, "Cozinha"),
-      door(480, 46, null, 0, 0, "Porta do porão", "basement"),
       door(45, 215, "living", 530, 210, "Sala"),
       door(175, 374, "parents", 485, 90, "Quarto dos pais"),
       door(595, 305, null, 0, 0, "Porta de entrada", "outside")
@@ -440,28 +439,54 @@
   );
 
   maps.village = {
-    w: 1000,
-    h: 840,
+    w: 1280,
+    h: 1040,
 
     objects: [
-      obj(375, 460, 250, 180, "house"),
-
+      // Quadra da família: casa, quintal e entrada externa do porão.
+      obj(325, 570, 235, 155, "house"),
       obj(
-        110, 230, 185, 150,
-        "shop",
-        "Examinar a caixa da venda",
-        "supply"
+        350, 505, 72, 44,
+        "yardBasement",
+        "Examinar a entrada do porão",
+        "yardBasement"
       ),
 
-      obj(715, 280, 180, 140, "building"),
-      obj(435, 235, 130, 65, "fountain"),
-      obj(90, 570, 180, 145, "building"),
-      obj(725, 590, 180, 130, "building"),
-      obj(410, 75, 180, 35, "gate", "Portão norte", "gate")
+      // Casa da vizinha: primeira fonte de alimento.
+      obj(
+        85, 555, 190, 145,
+        "neighborHouse",
+        "Bater na casa da vizinha",
+        "neighborDoor"
+      ),
+
+      // Mercado: algumas quadras acima da casa.
+      obj(
+        735, 70, 205, 150,
+        "market",
+        "Examinar o mercado",
+        "marketDoor"
+      ),
+
+      // Casas residenciais provisórias.
+      obj(80, 115, 180, 135, "building"),
+      obj(300, 115, 165, 135, "building"),
+      obj(790, 300, 180, 135, "building"),
+      obj(1015, 295, 175, 140, "building"),
+      obj(75, 300, 170, 130, "building"),
+      obj(290, 300, 165, 130, "building"),
+      obj(795, 555, 175, 145, "building"),
+      obj(1010, 560, 175, 140, "building"),
+      obj(120, 845, 180, 135, "building"),
+      obj(835, 845, 190, 135, "building"),
+
+      // Rotas laterais bloqueadas por recursos diferentes.
+      obj(5, 407, 80, 52, "gate", "Passagem oeste bloqueada", "westBarrier"),
+      obj(1195, 407, 80, 52, "gate", "Passagem leste escura", "eastBarrier")
     ],
 
     doors: [
-      door(500, 662, null, 0, 0, "Entrar em casa", "home")
+      door(442, 742, null, 0, 0, "Entrar em casa", "home")
     ]
   };
 
@@ -1206,13 +1231,22 @@ function drawCharacterSprite(
 
     if (type === "gate") {
       rect(x, y, w, 12, "#716850");
-      rect(x, y, 12, 70, "#484d48");
-      rect(x + w - 12, y, 12, 70, "#484d48");
+      rect(x, y, 12, Math.max(46, h), "#484d48");
+      rect(x + w - 12, y, 12, Math.max(46, h), "#484d48");
 
       for (let i = 20; i < w; i += 15) {
-        rect(x + i, y + 12, 4, 52, "#545650");
+        rect(x + i, y + 12, 4, Math.max(30, h - 12), "#545650");
       }
 
+      return;
+    }
+
+    if (type === "yardBasement") {
+      rect(x + 5, y + 8, w - 10, h - 8, "#171a19");
+      rect(x, y + 14, w, h - 14, "#3f443e");
+      rect(x + 6, y + 20, w - 12, h - 24, "#252925");
+      rect(x + 11, y + 23, w - 22, 4, "#716049");
+      rect(x + w - 17, y + 29, 5, 8, "#a88d5d");
       return;
     }
 
@@ -1258,10 +1292,15 @@ function drawCharacterSprite(
       rect(wx, y + 87, 28, 2, "#343732");
     }
 
-    if (type === "shop") {
+    if (type === "market") {
       rect(x + 20, y + 48, w - 40, 16, "#282f30");
-      txt("VENDA", x + 64, y + 60, "#d0ba85", 10);
+      txt("MARKT", x + 73, y + 60, "#d0ba85", 10);
       rect(x + w / 2 - 30, y + h + 2, 60, 22, "#85684a");
+    }
+
+    if (type === "neighborHouse") {
+      rect(x + 19, y + 49, w - 38, 11, "#42372f");
+      txt("Nº 8", x + w / 2 - 11, y + h - 55, "#bda77d", 7);
     }
   }
 
@@ -1301,13 +1340,29 @@ function drawCharacterSprite(
         }
       }
 
-      rect(466, 0, 68, 840, "#777260");
-      rect(0, 370, 1000, 62, "#777260");
-      rect(245, 360, 35, 125, "#777260");
+      // Rua principal vertical: casa -> mercado -> saída norte.
+      rect(610, 0, 78, 1040, "#706b5f");
 
-      for (let y = 0; y < 840; y += 14) {
-        for (let x = 469; x < 532; x += 13) {
-          rect(x, y, 10, 8, "#88816a");
+      // Cruzamento superior.
+      rect(0, 385, 1280, 78, "#706b5f");
+
+      // Rua inferior: livre desde a primeira saída.
+      rect(0, 755, 1280, 82, "#706b5f");
+
+      // Entrada curta da casa da família até a rua principal.
+      rect(420, 710, 190, 45, "#706b5f");
+
+      for (let y = 0; y < 1040; y += 16) {
+        for (let x = 614; x < 686; x += 14) {
+          rect(x, y, 10, 9, "#858071");
+        }
+      }
+
+      for (const roadY of [390, 760]) {
+        for (let x = 0; x < 1280; x += 16) {
+          rect(x, roadY + 8, 11, 8, "#858071");
+          rect(x + 7, roadY + 28, 11, 8, "#7b7669");
+          rect(x, roadY + 50, 11, 8, "#858071");
         }
       }
 
@@ -1323,8 +1378,9 @@ function drawCharacterSprite(
         );
 
         if (
-          Math.abs(x - 500) < 210 ||
-          Math.abs(y - 400) < 65 ||
+          Math.abs(x - 650) < 92 ||
+          Math.abs(y - 424) < 72 ||
+          Math.abs(y - 796) < 76 ||
           closeToBuilding
         ) {
           continue;
@@ -1343,8 +1399,8 @@ function drawCharacterSprite(
       if (state.stage === "prologue") {
                drawMother();
       } else {
-        person(325, 405, "npcFemale", 0);
-        txt("MORADORA", 303, 363, "#bac2a4", 7);
+        person(292, 692, "npcFemale", 0);
+        txt("VIZINHA", 274, 650, "#bac2a4", 7);
       }
     } else {
       if (state.room === "bedroom") {
@@ -2078,10 +2134,10 @@ function drawCharacterSprite(
     state.facing = "up";
     openingStaticUntil = elapsed + 1.8;
     say([
-      ["Pai", "Vamos buscar mantimentos. Cuide do seu irmão até voltarmos."],
-      ["Mãe", "Deixei a comida dele na cozinha. Fiquem dentro de casa."],
-      ["Você", "Pode deixar. Vocês vão demorar?"],
-      ["Pai", "Voltamos assim que conseguirmos o que falta."],
+      ["Pai", "Nós vamos até o mercado. Cuide do seu irmão até voltarmos."],
+      ["Mãe", "Deixei uma porção para ele na cozinha. Fiquem dentro de casa."],
+      ["Você", "Vocês vão demorar?"],
+      ["Pai", "É só comprar algumas coisas. Antes de escurecer estaremos de volta."],
       ["Irmão", "Eu vou esperar vocês aqui."]
     ], () => {
       state.familyFarewell = true;
@@ -2138,7 +2194,7 @@ function drawCharacterSprite(
     $("location").textContent = roomNames[state.room];
     $("objective").textContent = state.stage === "prologue"
       ? state.room === "village"
-        ? "Siga com sua esposa até o portão norte."
+        ? "Vá com sua esposa até o mercado da cidade."
         : state.familyFarewell
           ? "Saia de casa com sua esposa."
           : "Você controla o pai. Aproxime-se dos seus filhos no térreo."
@@ -2179,7 +2235,7 @@ function drawCharacterSprite(
           return say([["Pai", "Antes de sair, preciso falar com os meninos."]]);
         }
         openingStaticUntil = elapsed + 1.8;
-        go("village", 500, 694);
+        go("village", 442, 742);
         return;
       }
       if (!["gate", "home", "supply"].includes(action)) {
@@ -2422,22 +2478,22 @@ function drawCharacterSprite(
         } else if (!state.firstExit) {
           fade(
             "A primeira saída",
-            "Observe as caixas perto da venda. E para interagir.",
+            "A vizinha mora logo adiante. Talvez ela tenha alguma comida.",
             () => {
               state.firstExit = true;
-              go("village", 500, 694);
+              go("village", 442, 742);
               stage("supplies");
             }
           );
         } else {
-          go("village", 500, 694);
+          go("village", 442, 742);
         }
         break;
 
       case "home":
         if (state.stage === "prologue") {
           say([
-            ["Pai", "Precisamos seguir para o portão norte."]
+            ["Pai", "Precisamos chegar ao mercado antes que feche."]
           ]);
         } else {
           go("foyer", 550, 305);
@@ -2471,14 +2527,7 @@ function drawCharacterSprite(
 
       case "npc":
         say([
-          [
-            "Moradora",
-            "Você não devia estar sozinho a esta hora."
-          ],
-          [
-            "Moradora",
-            "Há alimento na caixa em frente à venda, a oeste. Pegue e volte para casa."
-          ]
+          ["Vizinha", "É melhor você voltar para casa."]
         ]);
         break;
     }
@@ -2518,16 +2567,8 @@ function drawCharacterSprite(
       });
     }
 
-    if (
-      state.room === "village" &&
-      state.stage !== "prologue"
-    ) {
-      choices.push({
-        label: "Conversar com a moradora",
-        action: "npc",
-        dist: Math.hypot(state.x - 325, state.y - 405)
-      });
-    }
+    // A vizinha agora pertence à própria casa; não existe mais
+    // uma NPC solta no cruzamento antigo.
 
     return choices
       .filter(item => item.dist < 44)
@@ -4825,18 +4866,14 @@ const v06Base = {
   drawWorld
 };
 
-roomNames.shop = "Venda";
+roomNames.shop = "Casa da vizinha";
 
 objectives.key = "A reserva ficou onde o tempo parou.";
-objectives.supplies = "Entre na venda e peça uma porção ao vendedor.";
+objectives.supplies = "Bata na casa da vizinha e peça ajuda.";
 objectives.return = "Leve a porção para seu irmão.";
 
 // Ajustes de cenário sem reescrever os mapas antigos.
-const v06VillageShop = maps.village.objects.find(o => o.type === "shop");
-if (v06VillageShop) {
-  v06VillageShop.label = "Entrar na venda";
-  v06VillageShop.action = "shopDoor";
-}
+const v06VillageShop = null;
 
 // Relógio parado na sala: nova posição da chave reserva.
 if (!maps.living.objects.some(o => o.action === "key")) {
@@ -4934,13 +4971,13 @@ if (!maps.shop) {
     "shop",
     [
       obj(110, 78, 120, 50, "shelf"),
-      obj(255, 95, 205, 62, "counter", "Falar com o vendedor", "vendor"),
+      obj(255, 95, 205, 62, "counter", "Falar com a vizinha", "vendor"),
       obj(95, 220, 85, 55, "crate"),
       obj(440, 230, 75, 50, "crate"),
       obj(250, 230, 120, 58, "table")
     ],
     [
-      door(310, 374, "village", 202, 430, "Sair da venda")
+      door(310, 374, "village", 292, 708, "Sair da casa da vizinha")
     ]
   );
 }
@@ -6643,6 +6680,186 @@ update = function(dt) {
   refreshMobileControls();
 };
 
+// =========================================================
+// 0.6.29 — PRIMEIRO BAIRRO E NOVA BASE DA HISTÓRIA
+// =========================================================
+
+const v0629Base = {
+  getNear,
+  interact,
+  updateHud
+};
+
+function v0629DistanceToObject(o) {
+  const px = Math.max(o.x, Math.min(state.x, o.x + o.w));
+  const py = Math.max(o.y, Math.min(state.y, o.y + o.h));
+  return Math.hypot(state.x - px, state.y - py);
+}
+
+getNear = function () {
+  if (state?.room === "village") {
+    const special = maps.village.objects
+      .filter(o => [
+        "neighborDoor",
+        "marketDoor",
+        "yardBasement",
+        "westBarrier",
+        "eastBarrier"
+      ].includes(o.action))
+      .map(o => ({ ...o, dist: v0629DistanceToObject(o) }))
+      .filter(o => o.dist < 48)
+      .sort((a, b) => a.dist - b.dist)[0];
+
+    if (special) return special;
+  }
+
+  return v0629Base.getNear();
+};
+
+interact = function (action) {
+  prepareSystems();
+
+  if (action === "neighborDoor") {
+    if (state.stage === "prologue") {
+      say([
+        ["Pai", "Não precisamos incomodar a vizinha. O mercado fica algumas quadras acima."]
+      ]);
+      return;
+    }
+
+    go("shop", 310, 330);
+    return;
+  }
+
+  if (action === "vendor") {
+    if (state.food >= 1) {
+      say([
+        ["Vizinha", "Você já está levando comida. Vá para casa antes que fique mais tarde."]
+      ]);
+      return;
+    }
+
+    if (state.stock <= 0) {
+      say([
+        ["Vizinha", "Eu queria ajudar mais, mas também estou com pouca coisa em casa."]
+      ]);
+      return;
+    }
+
+    const stockCycle = state.stockCycle;
+
+    say(
+      [
+        ["Vizinha", "Seus pais ainda não voltaram?"],
+        ["Você", "Eles foram ao mercado e não apareceram mais."],
+        ["Vizinha", "Leve isto para o seu irmão. Não é muito, mas deve ajudar."],
+        ["Vizinha", "E não fique andando sozinho pela rua por muito tempo."]
+      ],
+      () => {
+        prepareSystems();
+
+        if (
+          state.stockCycle !== stockCycle ||
+          state.stock <= 0 ||
+          state.food >= 1
+        ) {
+          return;
+        }
+
+        state.stock -= 1;
+        state.food = 1;
+
+        if (state.stage === "supplies") {
+          state.stage = "return";
+        }
+
+        updateHud();
+        save();
+      }
+    );
+
+    return;
+  }
+
+  if (action === "marketDoor") {
+    if (state.stage === "prologue") {
+      say(
+        [
+          ["Mãe", "É aqui. Vou pegar a lista."],
+          ["Pai", "Não deve demorar."]
+        ],
+        () => fade(
+          "Horas depois",
+          "23:00 · Seus pais ainda não voltaram.",
+          () => {
+            state.minutes = 1380;
+            stage("parents");
+            go("bedroom", 180, 235);
+          }
+        )
+      );
+      return;
+    }
+
+    if (["supplies", "return"].includes(state.stage)) {
+      say([
+        "O mercado está fechado.",
+        "Meus pais vieram para cá. Mas agora preciso levar comida para o meu irmão."
+      ]);
+      return;
+    }
+
+    say([
+      "Portas fechadas. Luzes apagadas.",
+      "Se meus pais chegaram até aqui, não há nenhum sinal deles agora."
+    ]);
+    return;
+  }
+
+  if (action === "yardBasement") {
+    say([
+      "A entrada do porão fica no quintal. Está trancada.",
+      "Meus pais nunca deixavam essa porta aberta."
+    ]);
+    return;
+  }
+
+  if (action === "westBarrier") {
+    say([
+      "A passagem oeste está presa por uma corrente velha.",
+      "Com alguma ferramenta eu provavelmente conseguiria abrir caminho."
+    ]);
+    return;
+  }
+
+  if (action === "eastBarrier") {
+    say([
+      "A rua leste desaparece entre árvores e casas sem iluminação.",
+      "Sem uma lanterna eu não vou entrar ali."
+    ]);
+    return;
+  }
+
+  v0629Base.interact(action);
+};
+
+updateHud = function () {
+  v0629Base.updateHud();
+
+  if (!state) return;
+
+  if (state.stage === "prologue" && state.room === "village") {
+    $("objective").textContent =
+      "Siga pela rua principal até o mercado.";
+  } else if (state.stage === "supplies") {
+    $("objective").textContent =
+      "Bata na casa da vizinha e peça algo para seu irmão.";
+  } else if (state.stage === "return") {
+    $("objective").textContent =
+      "Volte para casa e leve a comida ao seu irmão.";
+  }
+};
+
 // 0.6.18 — Uma referência para proporção visual e colisão do quarto.
 const roomItems = {
   // Cama preservada da 0.6.22.
@@ -6786,7 +7003,7 @@ update=function(dt) {
   roomUpdateBeforeFix(dt);
 };
 
-$("version").textContent = "PROTÓTIPO · 0.6.28";
+$("version").textContent = "PROTÓTIPO · 0.6.29";
   
   requestAnimationFrame(frame);
   showBootSplash();
