@@ -2151,7 +2151,11 @@ function drawCharacterSprite(
     $("time").textContent = hours + ":" + minutes;
 
     $("timeNote").textContent = state.firstExit
-      ? "1 HORA = 2 MINUTOS"
+      ? state.forcedSleepDue
+        ? "14:00 · VOCÊ PRECISA DORMIR"
+        : state.minutes >= 360
+          ? "DIA · TEMPO 2× · 1 HORA = 00:40"
+          : "NOITE · 1 HORA = 01:20"
       : "TEMPO PARADO · INTRODUÇÃO";
 
     $("inventory").textContent =
@@ -2616,9 +2620,17 @@ function drawCharacterSprite(
     if (state.firstExit) {
       const old = state.minutes;
 
-      // 3 segundos reais = 1 minuto do jogo.
-      // 3 minutos reais = 1 hora do jogo.
-      state.minutes += dt / 2;
+      // NOVO CICLO:
+      // 00:00–05:59 -> 1 hora do jogo = 1m20s reais.
+      // 06:00–14:00 -> tempo 2x mais rápido = 40s reais por hora.
+      // Às 14:00 o relógio para até o player dormir.
+      const timeRate =
+        state.minutes >= 360 ? 1.5 : 0.75;
+
+      state.minutes = Math.min(
+        840,
+        state.minutes + dt * timeRate
+      );
 
       if (state.minutes >= 1440) {
         state.minutes -= 1440;
@@ -4842,6 +4854,18 @@ prepareSystems = function () {
     ].includes(state.stage);
   }
 
+  // Marca o último dia em que o irmão recebeu uma porção.
+  // Saves antigos ganham tolerância no dia atual para não perderem
+  // imediatamente ao carregar a nova versão.
+  if (!Number.isFinite(state.lastBrotherFeedDay)) {
+    state.lastBrotherFeedDay =
+      state.firstBrotherMealDone ? state.day : -1;
+  }
+
+  if (typeof state.forcedSleepDue !== "boolean") {
+    state.forcedSleepDue = false;
+  }
+
   state.brotherFood = Math.max(
     0,
     Math.min(100, state.brotherFood)
@@ -4912,6 +4936,7 @@ function v06FeedBrother() {
     state.brotherFood + 25
   );
   state.foodClock = v06AbsoluteMinutes();
+  state.lastBrotherFeedDay = state.day;
 
   updateHud();
   save();
@@ -4942,6 +4967,7 @@ function v06RestoreCheckpoint() {
 
 showDefeat = function () {
   const hunger = state.defeatReason === "hunger";
+  const deadline = state.defeatReason === "deadline";
 
   const buttons = [];
 
@@ -4969,10 +4995,14 @@ showDefeat = function () {
   modal(
     hunger
       ? "Seu irmão ficou sem alimento"
-      : "Você não chegou a tempo",
+      : deadline
+        ? "Você deixou o tempo acabar"
+        : "Você não chegou a tempo",
     hunger
       ? "A alimentação do seu irmão chegou a 0%."
-      : "O invasor chegou ao seu irmão.",
+      : deadline
+        ? "Chegou 14:00 e você não tinha uma porção para o seu irmão. Agora está exausto demais para continuar."
+        : "O invasor chegou ao seu irmão.",
     buttons
   );
 };
@@ -5047,52 +5077,63 @@ function v06Sleep() {
     return;
   }
 
+  const forced = Boolean(state.forcedSleepDue);
   const minutesToMidnight = 1440 - state.minutes;
   const hours = minutesToMidnight / 60;
   const consumption = hours * 3;
   const after = Math.max(0, state.brotherFood - consumption);
 
+  const sleepNow = () => {
+    closeModal();
+
+    fade(
+      forced ? "Você não aguenta mais" : "Enquanto você dorme",
+      "00:00 · Um novo dia começa.",
+      () => {
+        state.brotherFood = after;
+        state.day += 1;
+        state.minutes = 0;
+        state.foodClock = v06AbsoluteMinutes();
+        state.forcedSleepDue = false;
+
+        if (state.stage === "sleep") {
+          state.stage = "check";
+        }
+
+        updateHud();
+
+        if (state.brotherFood <= 0) {
+          v06TriggerHungerDefeat();
+        } else {
+          save();
+        }
+      }
+    );
+  };
+
+  const buttons = [
+    ["Dormir", sleepNow]
+  ];
+
+  if (!forced) {
+    buttons.push(["Agora não", closeModal]);
+  }
+
   modal(
-    "Dormir até 00:00?",
+    forced
+      ? "Você precisa dormir"
+      : "Dormir até 00:00?",
     "Alimentação atual do irmão: " +
       Math.round(state.brotherFood) +
       "%\nConsumo previsto durante o sono: " +
       consumption.toFixed(1) +
       " pontos\nAo acordar: " +
       Math.round(after) +
-      "%",
-    [
-      [
-        "Dormir",
-        () => {
-          closeModal();
-
-          fade(
-            "Enquanto você dorme",
-            "00:00 · Um novo dia começa.",
-            () => {
-              state.brotherFood = after;
-              state.day += 1;
-              state.minutes = 0;
-              state.foodClock = v06AbsoluteMinutes();
-
-              if (state.stage === "sleep") {
-                state.stage = "check";
-              }
-
-              updateHud();
-
-              if (state.brotherFood <= 0) {
-                v06TriggerHungerDefeat();
-              } else {
-                save();
-              }
-            }
-          );
-        }
-      ],
-      ["Agora não", closeModal]
-    ]
+      "%" +
+      (forced
+        ? "\n\nSão 14:00. Você não consegue continuar sem descansar."
+        : ""),
+    buttons
   );
 }
 
@@ -6192,6 +6233,126 @@ drawWorld = function () {
   c.restore();
 };
 
+// =========================================================
+// 0.6.26 — CICLO DE DIA/NOITE E SONO OBRIGATÓRIO ÀS 14:00
+// =========================================================
+
+const v0626Base = {
+  interact,
+  update,
+  updateHud
+};
+
+function v0626TriggerDeadlineDefeat() {
+  if (!state || state.gameOver) return;
+
+  state.gameOver = true;
+  state.defeatReason = "deadline";
+  state.minutes = 840;
+  keys.clear();
+  save();
+  showDefeat();
+}
+
+interact = function (action) {
+  prepareSystems();
+
+  if (state && state.forcedSleepDue) {
+    const canNavigateHome = [
+      "home",
+      "up",
+      "down",
+      "bed"
+    ].includes(action);
+
+    const canFeedCarriedFood =
+      action === "brother" &&
+      state.food > 0 &&
+      state.lastBrotherFeedDay !== state.day;
+
+    if (!canNavigateHome && !canFeedCarriedFood) {
+      say([
+        state.lastBrotherFeedDay === state.day
+          ? "Não consigo fazer isso agora. Preciso voltar para a cama e dormir."
+          : "Não consigo fazer isso agora. Preciso levar esta comida ao meu irmão e dormir."
+      ]);
+      return;
+    }
+  }
+
+  v0626Base.interact(action);
+};
+
+updateHud = function () {
+  v0626Base.updateHud();
+
+  if (!state || !state.firstExit) return;
+
+  if (state.forcedSleepDue) {
+    $("objective").textContent =
+      state.lastBrotherFeedDay === state.day
+        ? "São 14:00. Volte para sua cama e durma."
+        : state.food > 0
+          ? "São 14:00. Leve a comida ao seu irmão e depois durma."
+          : "São 14:00. Você deixou a rotina para tarde demais.";
+
+    $("timeNote").textContent =
+      "14:00 · TEMPO PARADO · DURMA";
+  } else if (state.minutes >= 360) {
+    $("timeNote").textContent =
+      "DIA · TEMPO 2× · 1 HORA = 00:40";
+  } else {
+    $("timeNote").textContent =
+      "NOITE · 1 HORA = 01:20";
+  }
+};
+
+update = function (dt) {
+  v0626Base.update(dt);
+
+  if (
+    !state ||
+    mode !== "game" ||
+    dialog ||
+    transitionBusy ||
+    !$("overlay").hidden ||
+    state.gameOver ||
+    !state.firstExit
+  ) {
+    return;
+  }
+
+  if (state.minutes < 840) {
+    return;
+  }
+
+  state.minutes = 840;
+
+  // Se chegou 14:00 sem já ter alimentado o irmão hoje,
+  // ainda existe uma última chance SOMENTE se a porção já estiver
+  // no inventário. Se nem buscou a comida, o dia foi perdido.
+  if (
+    state.lastBrotherFeedDay !== state.day &&
+    state.food <= 0
+  ) {
+    v0626TriggerDeadlineDefeat();
+    return;
+  }
+
+  if (!state.forcedSleepDue) {
+    state.forcedSleepDue = true;
+    keys.clear();
+    updateHud();
+    save();
+
+    say([
+      state.lastBrotherFeedDay === state.day
+        ? "Já são 14:00. Estou exausto. Preciso voltar para o meu quarto e dormir."
+        : "Já são 14:00. Eu trouxe comida, mas preciso entregar ao meu irmão e ir dormir agora."
+    ]);
+  }
+};
+
 // 0.6.18 — Uma referência para proporção visual e colisão do quarto.
 const roomItems = {
   // Cama preservada da 0.6.22.
@@ -6335,7 +6496,7 @@ update=function(dt) {
   roomUpdateBeforeFix(dt);
 };
 
-$("version").textContent = "PROTÓTIPO · 0.6.25";
+$("version").textContent = "PROTÓTIPO · 0.6.26";
   
   requestAnimationFrame(frame);
   showBootSplash();
