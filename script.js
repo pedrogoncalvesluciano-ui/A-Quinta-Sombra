@@ -2706,25 +2706,10 @@ function drawCharacterSprite(
         ]);
       }
 
-      if (
-        state.room === "village" &&
-        state.minutes >= 360 &&
-        state.minutes < 1080
-      ) {
-        state.sun = (state.sun || 0) + dt;
-
-        if (state.sun > 18) {
-          state.sun = 0;
-
-          fade(
-            "Você perdeu os sentidos",
-            "Por enquanto, o protótipo retorna você à entrada de casa.",
-            () => go("foyer", 530, 305)
-          );
-        }
-      } else {
-        state.sun = 0;
-      }
+      // 0.6.32: o antigo colapso rápido ao amanhecer foi removido.
+      // Agora o jogador aguenta até 07:00 e então apaga automaticamente,
+      // avançando para o próximo dia às 00:00.
+      state.sun = 0;
 
       updateHud();
 
@@ -5116,6 +5101,22 @@ prepareSystems = function () {
     state.policeReportedEvents.parentsDay = -1;
   }
 
+  if (!Number.isFinite(state.dawnCollapseCount)) {
+    state.dawnCollapseCount = 0;
+  }
+
+  if (!Number.isFinite(state.brotherDawnTalkCount)) {
+    state.brotherDawnTalkCount = 0;
+  }
+
+  if (!state.dawnCollapse || typeof state.dawnCollapse !== "object") {
+    state.dawnCollapse = {
+      active: false,
+      phase: "idle",
+      time: 0
+    };
+  }
+
   state.brotherFood = Math.max(
     0,
     Math.min(100, state.brotherFood)
@@ -7039,6 +7040,7 @@ interact = function (action) {
           "Horas depois",
           "23:00 · Seus pais ainda não voltaram.",
           () => {
+            state.day = Math.max(1, state.day || 0);
             state.minutes = 1380;
             stage("parents");
             go("bedroom", 180, 235);
@@ -7231,6 +7233,209 @@ for (const [x,y,w,h] of [
 for (const key of ["clothes","shoes","flipflops","backpack","trash"]) {
   maps.bedroom.objects.push({type:"playerClutterBlock",roomItem:key});
 }
+// =========================================================
+// 0.6.32 — COLAPSO DAS 07:00 / NOVO DIA ÀS 00:00
+// =========================================================
+
+const v0632Base = {
+  update,
+  drawWorld,
+  interact,
+  updateHud
+};
+
+function v0632StartDawnCollapse() {
+  prepareSystems();
+
+  if (
+    !state ||
+    state.stage === "prologue" ||
+    state.gameOver ||
+    state.dawnCollapse.active
+  ) {
+    return;
+  }
+
+  state.dawnCollapse.active = true;
+  state.dawnCollapse.phase = "dizzy";
+  state.dawnCollapse.time = 0;
+
+  keys.clear();
+  near = null;
+  $("prompt").hidden = true;
+}
+
+function v0632WakeNextDay() {
+  state.dawnCollapseCount += 1;
+  state.day = Math.max(1, state.day || 0) + 1;
+  state.minutes = 0;
+  state.forcedSleepDue = false;
+  state.sun = 0;
+
+  // Volta ao quarto do protagonista.
+  state.room = "bedroom";
+  state.x = housePoint(180);
+  state.y = housePoint(235);
+  state.facing = "down";
+  state.walk = 0;
+
+  // Mantém o relógio alimentar coerente com o novo dia.
+  if (typeof v06AbsoluteMinutes === "function") {
+    state.foodClock = v06AbsoluteMinutes();
+  }
+
+  state.dawnCollapse.active = false;
+  state.dawnCollapse.phase = "idle";
+  state.dawnCollapse.time = 0;
+
+  updateHud();
+  save();
+
+  const line =
+    state.dawnCollapseCount === 1
+      ? "Parece que eu desmaiei... e vim parar aqui no meu quarto."
+      : "Aconteceu de novo... o que está acontecendo?";
+
+  say([["Você", line]]);
+}
+
+update = function(dt) {
+  prepareSystems();
+
+  if (state?.dawnCollapse?.active) {
+    state.dawnCollapse.time += dt;
+    elapsed += dt;
+
+    if (
+      state.dawnCollapse.phase === "dizzy" &&
+      state.dawnCollapse.time >= 2.2
+    ) {
+      state.dawnCollapse.phase = "black";
+      state.dawnCollapse.time = 0;
+    } else if (
+      state.dawnCollapse.phase === "black" &&
+      state.dawnCollapse.time >= 1.35
+    ) {
+      state.dawnCollapse.phase = "dayCard";
+      state.dawnCollapse.time = 0;
+    } else if (
+      state.dawnCollapse.phase === "dayCard" &&
+      state.dawnCollapse.time >= 1.7
+    ) {
+      v0632WakeNextDay();
+    }
+
+    return;
+  }
+
+  v0632Base.update(dt);
+
+  if (
+    state &&
+    state.stage !== "prologue" &&
+    !state.gameOver &&
+    state.minutes >= 420 &&
+    !state.dawnCollapse.active
+  ) {
+    v0632StartDawnCollapse();
+  }
+};
+
+drawWorld = function() {
+  v0632Base.drawWorld();
+
+  if (!state?.dawnCollapse?.active) return;
+
+  const collapse = state.dawnCollapse;
+
+  if (collapse.phase === "dizzy") {
+    const p = Math.min(1, collapse.time / 2.2);
+
+    // Escurecimento gradual.
+    rect(0, 0, W, H, `rgba(8,10,14,${0.12 + p * 0.56})`);
+
+    // Faixas deslocadas e estática para dar sensação de visão falhando.
+    for (let i = 0; i < 14; i++) {
+      const y = (i * 31 + Math.sin(elapsed * 7 + i) * 10 + H) % H;
+      const h = 3 + (i % 4) * 2;
+      const alpha = 0.03 + p * 0.11;
+
+      rect(
+        Math.sin(elapsed * 9 + i) * 9,
+        y,
+        W,
+        h,
+        `rgba(210,214,205,${alpha})`
+      );
+    }
+
+    const pulse = 0.08 + Math.abs(Math.sin(elapsed * 5)) * 0.16 * p;
+    rect(0, 0, W, H, `rgba(90,82,73,${pulse})`);
+
+    if (collapse.time > 0.55) {
+      txt(
+        collapse.time < 1.25
+          ? "Minha cabeça..."
+          : "Eu não estou conseguindo ficar em pé.",
+        24,
+        H - 28,
+        "#d7d0bd",
+        8
+      );
+    }
+  }
+
+  if (collapse.phase === "black") {
+    rect(0, 0, W, H, "#000");
+  }
+
+  if (collapse.phase === "dayCard") {
+    rect(0, 0, W, H, "#000");
+
+    const nextDay = Math.max(1, state.day || 0) + 1;
+    txt("DIA " + nextDay, W / 2 - 34, H / 2 - 4, "#d8d1bc", 14);
+    txt("00:00", W / 2 - 18, H / 2 + 18, "#9f9989", 9);
+  }
+};
+
+interact = function(action) {
+  prepareSystems();
+
+  if (
+    action === "brother" &&
+    state.dawnCollapseCount > state.brotherDawnTalkCount
+  ) {
+    state.brotherDawnTalkCount = state.dawnCollapseCount;
+
+    say(
+      [
+        ["Irmão", "Eu escutei passos..."],
+        ["Irmão", "Mas eu não saí do quarto para ver."]
+      ],
+      save
+    );
+
+    return;
+  }
+
+  v0632Base.interact(action);
+};
+
+updateHud = function() {
+  v0632Base.updateHud();
+
+  if (!state || state.stage === "prologue") return;
+
+  if (state.dawnCollapse?.active) {
+    $("timeNote").textContent = "VOCÊ ESTÁ PERDENDO OS SENTIDOS";
+    return;
+  }
+
+  if (state.minutes >= 360) {
+    $("timeNote").textContent = "AMANHECER · ÀS 07:00 VOCÊ NÃO CONSEGUE CONTINUAR";
+  }
+};
+
 // Recupera um save que tenha ficado dentro de um móvel reposicionado.
 const roomUpdateBeforeFix=update;
 let roomPositionChecked=false;
@@ -7250,7 +7455,7 @@ update=function(dt) {
   roomUpdateBeforeFix(dt);
 };
 
-$("version").textContent = "PROTÓTIPO · 0.6.31";
+$("version").textContent = "PROTÓTIPO · 0.6.32";
   
   requestAnimationFrame(frame);
   showBootSplash();
