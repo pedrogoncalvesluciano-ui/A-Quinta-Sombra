@@ -440,7 +440,7 @@
 
   maps.village = {
     w: 1280,
-    h: 1380,
+    h: 1900,
 
     objects: [
       // Quadra da família: casa, quintal e entrada externa do porão.
@@ -455,9 +455,7 @@
       // Casa da vizinha: primeira fonte de alimento.
       obj(
         85, 555, 190, 145,
-        "neighborHouse",
-        "Bater na casa da vizinha",
-        "neighborDoor"
+        "neighborHouse"
       ),
 
       // O mercado fica em uma área separada ao norte e será acessado depois.
@@ -466,26 +464,29 @@
       // Casas residenciais provisórias.
       obj(80, 115, 180, 135, "building"),
       obj(300, 115, 165, 135, "building"),
-      obj(790, 300, 180, 135, "building"),
-      obj(1015, 295, 175, 140, "building"),
-      obj(75, 300, 170, 130, "building"),
-      obj(290, 300, 165, 130, "building"),
+      obj(790, 245, 180, 120, "building"),
+      obj(1015, 240, 175, 125, "building"),
+      obj(75, 245, 170, 120, "building"),
+      obj(290, 245, 165, 120, "building"),
       obj(795, 555, 175, 145, "building"),
       obj(
         1010, 560, 175, 140,
-        "policeStation",
-        "Entrar na delegacia",
-        "policeDoor"
+        "policeStation"
       ),
-      obj(120, 845, 180, 135, "building"),
-      obj(835, 845, 190, 135, "building")
+      obj(120, 870, 180, 135, "building"),
+      obj(835, 870, 190, 135, "building"),
+
+      // Casa isolada ao sul: destino visual do caminho do velho.
+      obj(805, 1580, 205, 150, "oldHouse")
 
       // Oeste, leste e norte continuam como ruas normais, sem portões.
       // O bloqueio é lógico e só exibe uma mensagem ao tentar atravessar.
     ],
 
     doors: [
-      door(442, 742, null, 0, 0, "Entrar em casa", "home")
+      door(442, 742, null, 0, 0, "Entrar em casa", "home"),
+      door(180, 708, null, 0, 0, "Bater na casa da vizinha", "neighborDoor"),
+      door(1098, 708, null, 0, 0, "Entrar na delegacia", "policeDoor")
     ]
   };
 
@@ -1335,6 +1336,11 @@ function drawCharacterSprite(
       txt("POLIZEI", x + 59, y + 60, "#d1c9ad", 9);
       rect(x + w / 2 - 24, y + h + 2, 48, 18, "#555d5b");
     }
+
+    if (type === "oldHouse") {
+      rect(x + 18, y + 48, w - 36, 12, "#40362f");
+      txt("CASA", x + w / 2 - 16, y + 59, "#9f9276", 8);
+    }
   }
 
   // =========================================================
@@ -1373,10 +1379,13 @@ function drawCharacterSprite(
         }
       }
 
-      // Rua principal vertical. Ao sul o asfalto vira estrada de terra,
-      // iniciando o caminho do velho.
+      // Rua principal vertical. Ao sul o asfalto vira estrada de terra
+      // e segue de verdade até a região da casa do velho.
       rect(610, 0, 78, 1020, "#706b5f");
       rect(610, 1020, 78, m.h - 1020, "#655442");
+
+      // Pequena abertura de terra em direção à casa isolada.
+      rect(688, 1560, 160, 58, "#655442");
 
       // Cruzamento superior.
       rect(0, 385, 1280, 78, "#706b5f");
@@ -7548,7 +7557,7 @@ let v0634ObserverY = 0;
 let v0634WasInSquareSide = false;
 
 function v0633DrawWheelchairMan() {
-  if (!state || state.room !== "village" || state.stage === "prologue") {
+  if (!state || state.room !== "square" || state.stage === "prologue") {
     return;
   }
 
@@ -8164,7 +8173,7 @@ update=function(dt) {
   roomUpdateBeforeFix(dt);
 };
 
-$("version").textContent = "PROTÓTIPO · 0.6.43";
+$("version").textContent = "PROTÓTIPO · 0.6.44";
   
   requestAnimationFrame(frame);
   showBootSplash();
