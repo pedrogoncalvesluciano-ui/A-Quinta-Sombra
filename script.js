@@ -5100,6 +5100,22 @@ prepareSystems = function () {
     }
   }
 
+  if (!state.policeReportedEvents || typeof state.policeReportedEvents !== "object") {
+    state.policeReportedEvents = {};
+  }
+
+  if (!Number.isFinite(state.policeReportedEvents.vanSightings)) {
+    state.policeReportedEvents.vanSightings = 0;
+  }
+
+  if (!Number.isFinite(state.policeReportedEvents.oldManEncounters)) {
+    state.policeReportedEvents.oldManEncounters = 0;
+  }
+
+  if (!Number.isFinite(state.policeReportedEvents.parentsDay)) {
+    state.policeReportedEvents.parentsDay = -1;
+  }
+
   state.brotherFood = Math.max(
     0,
     Math.min(100, state.brotherFood)
@@ -6772,6 +6788,15 @@ getNear = function () {
 };
 
 function v0630PoliceParents() {
+  if (state.policeReportedEvents.parentsDay === state.day) {
+    say([
+      ["Policial", "Mas eu já te falei sobre isso."],
+      ["Policial", "Se surgir alguma novidade sobre seus pais, eu aviso."]
+    ]);
+    return;
+  }
+
+  state.policeReportedEvents.parentsDay = state.day;
   const count = state.policeReports.parents++;
 
   const lines =
@@ -6797,6 +6822,20 @@ function v0630PoliceParents() {
 }
 
 function v0630PoliceOldMan() {
+  if (
+    state.storyEvents.oldManEncounters <=
+    state.policeReportedEvents.oldManEncounters
+  ) {
+    say([
+      ["Policial", "Mas eu já te falei sobre isso."],
+      ["Policial", "Se ele fizer alguma coisa de novo, volte aqui."]
+    ]);
+    return;
+  }
+
+  state.policeReportedEvents.oldManEncounters =
+    state.storyEvents.oldManEncounters;
+
   const count = state.policeReports.oldMan++;
 
   const lines =
@@ -6823,6 +6862,20 @@ function v0630PoliceOldMan() {
 }
 
 function v0630PoliceVan() {
+  if (
+    state.storyEvents.vanSightings <=
+    state.policeReportedEvents.vanSightings
+  ) {
+    say([
+      ["Policial", "Mas eu já te falei sobre isso."],
+      ["Policial", "Se a van aparecer de novo, aí você volta e me conta."]
+    ]);
+    return;
+  }
+
+  state.policeReportedEvents.vanSightings =
+    state.storyEvents.vanSightings;
+
   const count = state.policeReports.van++;
 
   const lines =
@@ -7197,7 +7250,7 @@ update=function(dt) {
   roomUpdateBeforeFix(dt);
 };
 
-$("version").textContent = "PROTÓTIPO · 0.6.30";
+$("version").textContent = "PROTÓTIPO · 0.6.31";
   
   requestAnimationFrame(frame);
   showBootSplash();
