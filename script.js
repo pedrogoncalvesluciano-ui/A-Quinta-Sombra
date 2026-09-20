@@ -5113,6 +5113,10 @@ prepareSystems = function () {
     state.squareManTalks = 0;
   }
 
+  if (typeof state.squareManFirstSpeechDone !== "boolean") {
+    state.squareManFirstSpeechDone = state.squareManTalks > 0;
+  }
+
   if (typeof state.squareManReturnObserverPending !== "boolean") {
     state.squareManReturnObserverPending = false;
   }
@@ -7512,7 +7516,8 @@ function v0633TalkSquareMan() {
 
   const talks = state.squareManTalks || 0;
 
-  if (talks === 0) {
+  if (!state.squareManFirstSpeechDone) {
+    state.squareManFirstSpeechDone = true;
     state.squareManTalks = 1;
     state.squareManReturnObserverPending = true;
 
@@ -7722,7 +7727,7 @@ update=function(dt) {
   roomUpdateBeforeFix(dt);
 };
 
-$("version").textContent = "PROTÓTIPO · 0.6.34";
+$("version").textContent = "PROTÓTIPO · 0.6.35";
   
   requestAnimationFrame(frame);
   showBootSplash();
