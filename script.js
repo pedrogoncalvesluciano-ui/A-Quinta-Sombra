@@ -195,7 +195,7 @@
     check: "Procure seus pais novamente.",
     empty: "Verifique a comida na cozinha.",
     talk: "Converse com seu irmão.",
-    key: "Procure a chave reserva no sótão.",
+    key: "Procure a chave reserva no relógio parado da sala.",
     exit: "Abra a porta de entrada.",
     supplies: "Peça ajuda à vizinha para alimentar seu irmão.",
     return: "Leve o alimento para seu irmão.",
@@ -2227,7 +2227,12 @@ function drawCharacterSprite(
           ? "Saia de casa com sua esposa."
           : "Você controla o pai. Aproxime-se dos seus filhos no térreo."
       : objectives[state.stage];
-    $("day").textContent = state.day ? "DIA " + state.day : "PRÓLOGO";
+    $("day").textContent =
+      state.stage === "prologue"
+        ? "PRÓLOGO"
+        : state.day
+          ? "DIA " + state.day
+          : "NOITE DO DESAPARECIMENTO";
 
     const hours = String(
       Math.floor(state.minutes / 60) % 24
@@ -2368,7 +2373,7 @@ function drawCharacterSprite(
               ["Irmão", "Mas a porta está trancada."],
               [
                 "Você",
-                "Tem uma chave reserva. Lembro de um baú no sótão."
+                "Tem uma chave reserva. Acho que o pai escondia ela atrás do relógio parado da sala."
               ]
             ],
             () => stage("key")
@@ -2401,7 +2406,7 @@ function drawCharacterSprite(
             [
               "Irmão",
               state.stage === "key"
-                ? "Toma cuidado no sótão."
+                ? "Acho que esse relógio fica na sala."
                 : "Você fica comigo um pouco?"
             ]
           ]);
@@ -2411,11 +2416,12 @@ function drawCharacterSprite(
       case "bed":
         if (state.stage === "sleep") {
           fade(
-            "9 horas depois",
-            "00:00 · Faz 34 horas que eles saíram.",
+            "1 hora depois",
+            "00:00 · DIA 1",
             () => {
               state.minutes = 0;
               state.day = 1;
+              state.dawnCollapseArmed = true;
               stage("check");
             }
           );
@@ -2708,6 +2714,11 @@ function drawCharacterSprite(
       // quando o protagonista desmaia e acorda novamente às 00:00.
       if (state.minutes >= 1440) {
         state.minutes -= 1440;
+
+        if (state.day === 0) {
+          state.day = 1;
+        }
+
         state.dawnCollapseArmed = true;
         save();
       }
@@ -4880,7 +4891,7 @@ const v06Base = {
 
 roomNames.shop = "Casa da vizinha";
 
-objectives.key = "A reserva ficou onde o tempo parou.";
+objectives.key = "Procure a chave reserva no relógio parado da sala.";
 objectives.supplies = "Bata na casa da vizinha e peça ajuda.";
 objectives.return = "Leve a porção para seu irmão.";
 
@@ -7089,7 +7100,7 @@ interact = function (action) {
           "Horas depois",
           "23:00 · Seus pais ainda não voltaram.",
           () => {
-            state.day = Math.max(1, state.day || 0);
+            state.day = 0;
             state.minutes = 1380;
             state.dawnCollapseArmed = false;
             stage("parents");
@@ -7797,7 +7808,7 @@ update=function(dt) {
   roomUpdateBeforeFix(dt);
 };
 
-$("version").textContent = "PROTÓTIPO · 0.6.37";
+$("version").textContent = "PROTÓTIPO · 0.6.38";
   
   requestAnimationFrame(frame);
   showBootSplash();
