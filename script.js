@@ -825,7 +825,7 @@ function drawPlayerRoomBackground(m) {
 function drawPlayerRoomForeground(m) {
   if (!spriteReady(playerRoomSprites.walls)) return;
 
-  const foregroundY = housePoint(338);
+  const foregroundY = housePoint(316);
 
   c.save();
   c.beginPath();
@@ -6198,7 +6198,7 @@ const roomItems = {
   bed: [255, 97, 96, 124, .14, .26, .72, .62],
 
   // Tapete DEITADO, parcialmente sob a metade inferior/esquerda da cama.
- rug: [212, 230, 182, 128],
+ rug: [212, 236, 182, 132],
 
   // Criado-mudo / luminária.
 nightstand: [354, 108, 40, 44, .14, .48, .72, .44],
@@ -6209,7 +6209,7 @@ nightstand: [354, 108, 40, 44, .14, .48, .72, .44],
   shelf: [438, 78, 84, 102, .12, .70, .76, .24],
 
   // Escrivaninha maior e mais baixa: os pés chegam ao piso junto da parede.
-desk: [548, 160, 36, 132, .40, .18, .46, .74],
+desk: [536, 172, 48, 146, .32, .18, .58, .74],
 
   // Mochila junto à parede superior.
   backpack: [216, 101, 24, 28, .18, .58, .64, .30],
@@ -6335,7 +6335,7 @@ update=function(dt) {
   roomUpdateBeforeFix(dt);
 };
 
-$("version").textContent = "PROTÓTIPO · 0.6.24";
+$("version").textContent = "PROTÓTIPO · 0.6.25";
   
   requestAnimationFrame(frame);
   showBootSplash();
