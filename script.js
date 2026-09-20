@@ -7799,16 +7799,62 @@ update = function(dt) {
 // =========================================================
 
 function v0640RecoverInputLock() {
+  if (!state || mode !== "game") return;
+
+  const transitionEl = $("transition");
+  const dialogEl = $("dialog");
+
+  const transitionVisible =
+    transitionEl.classList.contains("active") &&
+    Number.parseFloat(getComputedStyle(transitionEl).opacity || "0") > 0.05;
+
+  const dialogVisible =
+    !dialogEl.hidden &&
+    Number.parseFloat(getComputedStyle(dialogEl).opacity || "1") > 0.05;
+
+  // Se não existe nenhuma interface realmente visível bloqueando o jogo,
+  // nenhum lock antigo pode impedir o movimento.
   if (
-    transitionBusy &&
-    !$("transition").classList.contains("active") &&
     $("overlay").hidden &&
-    !state?.dawnCollapse?.active &&
-    !state?.wakeUp?.active
+    !transitionVisible &&
+    !dialogVisible &&
+    !state.dawnCollapse?.active &&
+    !state.wakeUp?.active
   ) {
     transitionBusy = false;
+
+    if (dialog && dialogEl.hidden) {
+      dialog = null;
+    }
   }
 }
+
+// Em captura, limpa locks fantasmas ANTES do listener antigo de teclado.
+// Isso evita o caso em que a tela já voltou ao jogo, mas transitionBusy/dialog
+// ainda ficaram presos e impedem WASD/setas de entrar no Set de teclas.
+window.addEventListener("keydown", event => {
+  if (!state || mode !== "game") return;
+
+  v0640RecoverInputLock();
+
+  const key = event.key.toLowerCase();
+  const movementKeys = [
+    "w", "a", "s", "d",
+    "arrowup", "arrowdown", "arrowleft", "arrowright",
+    "shift"
+  ];
+
+  if (
+    movementKeys.includes(key) &&
+    $("overlay").hidden &&
+    !$("transition").classList.contains("active") &&
+    $("dialog").hidden &&
+    !state.dawnCollapse?.active &&
+    !state.wakeUp?.active
+  ) {
+    keys.add(key);
+  }
+}, true);
 
 // =========================================================
 // 0.6.39 — CORREÇÕES DE MAPA, SAÍDAS E AVISOS
@@ -7848,6 +7894,18 @@ function v0639FinishPrologueAtNorth() {
         state.day = 0;
         state.minutes = 1380;
         state.dawnCollapseArmed = false;
+
+        if (state.dawnCollapse) {
+          state.dawnCollapse.active = false;
+          state.dawnCollapse.phase = "idle";
+          state.dawnCollapse.time = 0;
+        }
+
+        if (state.wakeUp) {
+          state.wakeUp.active = false;
+          state.wakeUp.time = 0;
+        }
+
         stage("parents");
         go("bedroom", 180, 235);
       }
@@ -7957,7 +8015,7 @@ update=function(dt) {
   roomUpdateBeforeFix(dt);
 };
 
-$("version").textContent = "PROTÓTIPO · 0.6.40";
+$("version").textContent = "PROTÓTIPO · 0.6.41";
   
   requestAnimationFrame(frame);
   showBootSplash();
