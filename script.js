@@ -476,7 +476,12 @@
       obj(75, 300, 170, 130, "building"),
       obj(290, 300, 165, 130, "building"),
       obj(795, 555, 175, 145, "building"),
-      obj(1010, 560, 175, 140, "building"),
+      obj(
+        1010, 560, 175, 140,
+        "policeStation",
+        "Entrar na delegacia",
+        "policeDoor"
+      ),
       obj(120, 845, 180, 135, "building"),
       obj(835, 845, 190, 135, "building"),
 
@@ -1301,6 +1306,12 @@ function drawCharacterSprite(
     if (type === "neighborHouse") {
       rect(x + 19, y + 49, w - 38, 11, "#42372f");
       txt("Nº 8", x + w / 2 - 11, y + h - 55, "#bda77d", 7);
+    }
+
+    if (type === "policeStation") {
+      rect(x + 22, y + 48, w - 44, 17, "#26323a");
+      txt("POLIZEI", x + 59, y + 60, "#d1c9ad", 9);
+      rect(x + w / 2 - 24, y + h + 2, 48, 18, "#555d5b");
     }
   }
 
@@ -4965,6 +4976,24 @@ furnishing = function (o) {
   );
 };
 
+// Interior provisório da delegacia.
+roomNames.police = "Delegacia";
+
+if (!maps.police) {
+  room(
+    "police",
+    [
+      obj(95, 80, 135, 48, "shelf"),
+      obj(235, 105, 230, 58, "counter", "Falar com o policial", "policeOfficer"),
+      obj(100, 245, 105, 48, "table"),
+      obj(420, 235, 85, 55, "shelf")
+    ],
+    [
+      door(310, 374, "village", 1095, 715, "Sair da delegacia")
+    ]
+  );
+}
+
 // Interior compacto da venda.
 if (!maps.shop) {
   room(
@@ -5044,6 +5073,31 @@ prepareSystems = function () {
 
   if (typeof state.forcedSleepDue !== "boolean") {
     state.forcedSleepDue = false;
+  }
+
+  // Eventos de história e quantas vezes cada assunto já foi relatado
+  // na delegacia. Os eventos do idoso e da van serão ativados
+  // quando essas sequências forem implementadas.
+  if (!state.storyEvents || typeof state.storyEvents !== "object") {
+    state.storyEvents = {};
+  }
+
+  if (!Number.isFinite(state.storyEvents.oldManEncounters)) {
+    state.storyEvents.oldManEncounters = 0;
+  }
+
+  if (!Number.isFinite(state.storyEvents.vanSightings)) {
+    state.storyEvents.vanSightings = 0;
+  }
+
+  if (!state.policeReports || typeof state.policeReports !== "object") {
+    state.policeReports = {};
+  }
+
+  for (const topic of ["parents", "oldMan", "van"]) {
+    if (!Number.isFinite(state.policeReports[topic])) {
+      state.policeReports[topic] = 0;
+    }
   }
 
   state.brotherFood = Math.max(
@@ -6704,7 +6758,8 @@ getNear = function () {
         "marketDoor",
         "yardBasement",
         "westBarrier",
-        "eastBarrier"
+        "eastBarrier",
+        "policeDoor"
       ].includes(o.action))
       .map(o => ({ ...o, dist: v0629DistanceToObject(o) }))
       .filter(o => o.dist < 48)
@@ -6716,8 +6771,147 @@ getNear = function () {
   return v0629Base.getNear();
 };
 
+function v0630PoliceParents() {
+  const count = state.policeReports.parents++;
+
+  const lines =
+    count === 0
+      ? [
+          ["Policial", "Certo. Desde quando seus pais estão desaparecidos?"],
+          ["Você", "Eles foram ao mercado e não voltaram."],
+          ["Policial", "Vou registrar. Se soubermos de alguma coisa, avisamos."]
+        ]
+      : count === 1
+        ? [
+            ["Você", "Eles ainda não voltaram."],
+            ["Policial", "Eu lembro do seu relato."],
+            ["Policial", "Já perguntamos na região do mercado. Até agora não surgiu nada que ajude."]
+          ]
+        : [
+            ["Você", "Ainda não encontraram meus pais?"],
+            ["Policial", "Não. O caso continua registrado."],
+            ["Policial", "Se aparecer alguma informação concreta, vamos verificar."]
+          ];
+
+  say(lines, save);
+}
+
+function v0630PoliceOldMan() {
+  const count = state.policeReports.oldMan++;
+
+  const lines =
+    count === 0
+      ? [
+          ["Você", "Tinha um homem idoso me perseguindo."],
+          ["Policial", "O senhor que mora no fim da estrada de terra?"],
+          ["Você", "Ele me chamou para entrar e depois veio atrás de mim."],
+          ["Policial", "Vamos anotar. Por enquanto, não volte lá sozinho."]
+        ]
+      : count === 1
+        ? [
+            ["Você", "Estou falando daquele idoso de novo."],
+            ["Policial", "Nós sabemos quem ele é."],
+            ["Policial", "Ele vive naquela casa há muito tempo. Ainda não temos nada que justifique uma abordagem."]
+          ]
+        : [
+            ["Você", "Ele continua me preocupando."],
+            ["Policial", "Entendi."],
+            ["Policial", "Evite aquela estrada. Se houver algo verificável, nós iremos até lá."]
+          ];
+
+  say(lines, save);
+}
+
+function v0630PoliceVan() {
+  const count = state.policeReports.van++;
+
+  const lines =
+    count === 0
+      ? [
+          ["Você", "Tinha uma van estranha parada na minha rua."],
+          ["Policial", "Você conseguiu ver a placa ou quem estava dentro?"],
+          ["Você", "Não. Ela ficou perto da minha casa por um tempo."],
+          ["Policial", "Se aparecer de novo, entre em casa e não se aproxime."]
+        ]
+      : count === 1
+        ? [
+            ["Você", "A van apareceu de novo."],
+            ["Policial", "A mesma van?"],
+            ["Você", "Tenho quase certeza."],
+            ["Policial", "Certo. Vou pedir para verificarem essa descrição."]
+          ]
+        : [
+            ["Você", "E aquela van?"],
+            ["Policial", "Averiguamos aquela van."],
+            ["Policial", "Eles disseram que estavam procurando um mercado e que não apareceriam mais por aqui."],
+            ["Você", "E vocês acreditaram?"],
+            ["Policial", "Não há nenhuma ocorrência registrada contra eles. Por enquanto, é só isso que temos."]
+          ];
+
+  say(lines, save);
+}
+
+function v0630OpenPoliceTopics() {
+  prepareSystems();
+
+  const buttons = [];
+
+  buttons.push([
+    "Falar dos pais",
+    () => {
+      closeModal();
+      v0630PoliceParents();
+    }
+  ]);
+
+  if (state.storyEvents.oldManEncounters > 0) {
+    buttons.push([
+      "Falar do idoso",
+      () => {
+        closeModal();
+        v0630PoliceOldMan();
+      }
+    ]);
+  }
+
+  if (state.storyEvents.vanSightings > 0) {
+    buttons.push([
+      "Falar da van",
+      () => {
+        closeModal();
+        v0630PoliceVan();
+      }
+    ]);
+  }
+
+  buttons.push(["Sair", closeModal]);
+
+  modal(
+    "O que aconteceu?",
+    "O policial espera você explicar o motivo da visita.",
+    buttons
+  );
+}
+
 interact = function (action) {
   prepareSystems();
+
+  if (action === "policeDoor") {
+    if (state.stage === "prologue") {
+      say([
+        ["Pai", "Não precisamos passar na delegacia agora. O mercado fica mais adiante."]
+      ]);
+      return;
+    }
+
+    go("police", 310, 330);
+    return;
+  }
+
+  if (action === "policeOfficer") {
+    v0630OpenPoliceTopics();
+    return;
+  }
 
   if (action === "neighborDoor") {
     if (state.stage === "prologue") {
@@ -7003,7 +7197,7 @@ update=function(dt) {
   roomUpdateBeforeFix(dt);
 };
 
-$("version").textContent = "PROTÓTIPO · 0.6.29";
+$("version").textContent = "PROTÓTIPO · 0.6.30";
   
   requestAnimationFrame(frame);
   showBootSplash();
