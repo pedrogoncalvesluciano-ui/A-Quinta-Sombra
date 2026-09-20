@@ -6198,10 +6198,10 @@ const roomItems = {
   bed: [255, 97, 96, 124, .14, .26, .72, .62],
 
   // Tapete DEITADO, parcialmente sob a metade inferior/esquerda da cama.
-  rug: [188, 222, 182, 92],
+  rug: [195, 210, 182, 92],
 
   // Criado-mudo / luminária.
-  nightstand: [374, 88, 40, 44, .14, .48, .72, .44],
+  nightstand: [360, 95, 40, 44, .14, .48, .72, .44],
   lampOff: [360, 85, 28, 39],
   lampOn: [360, 85, 28, 39],
 
@@ -6209,7 +6209,7 @@ const roomItems = {
   shelf: [438, 78, 84, 102, .12, .70, .76, .24],
 
   // Escrivaninha maior e mais baixa: os pés chegam ao piso junto da parede.
-  desk: [480, 198, 60, 168, .34, .20, .58, .72],
+  desk: [520, 198, 60, 168, .34, .20, .58, .72],
 
   // Mochila junto à parede superior.
   backpack: [216, 101, 24, 28, .18, .58, .64, .30],
@@ -6224,7 +6224,7 @@ const roomItems = {
   shoes: [125, 128, 34, 24, .14, .34, .72, .46],
 
   // Roupa no canto inferior esquerdo, ainda sobre o piso.
-  clothes: [84, 275, 58, 40, .16, .38, .68, .42]
+  clothes: [70, 275, 58, 40, .16, .38, .68, .42]
 };
 function roomItemBounds(key) {
   const [x,y,w,h] = roomItems[key].map(housePoint);
