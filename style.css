@@ -908,3 +908,181 @@ h2 {
     padding: 24px 34px;
   }
 }
+
+
+/* =========================================================
+   0.6.28 — CONTROLES MOBILE DE TESTE
+   Só aparecem em telas com toque/ponteiro coarse.
+   ========================================================= */
+
+.mobile-controls {
+  display: none;
+  position: absolute;
+  inset: 0;
+  z-index: 38;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.mobile-dpad,
+.mobile-actions {
+  pointer-events: auto;
+}
+
+.mobile-control,
+.mobile-action {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+  appearance: none;
+  border: 1px solid #a88c5b66;
+  background:
+    radial-gradient(circle at 50% 35%, #263033dc, #0d1418e8 72%);
+  color: #e7dcc4;
+  box-shadow:
+    0 7px 20px #0009,
+    inset 0 1px #ffffff12,
+    inset 0 0 18px #c09d5710;
+}
+
+.mobile-control:active,
+.mobile-action:active,
+.mobile-control.is-pressed,
+.mobile-action.is-pressed {
+  transform: translateY(1px) scale(.95);
+  border-color: #d2ae69b8;
+  background:
+    radial-gradient(circle at 50% 35%, #3b4039ee, #151b1ddd 72%);
+  color: #ffe6ad;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .mobile-controls.mobile-active {
+    display: block;
+  }
+
+  .mobile-dpad {
+    position: absolute;
+    left: max(12px, 2.5vw);
+    bottom: max(16px, 4.5vh);
+    width: clamp(124px, 27vw, 178px);
+    aspect-ratio: 1 / 1;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    gap: 5px;
+  }
+
+  .mobile-control {
+    min-width: 0;
+    min-height: 0;
+    border-radius: 18%;
+    font: 700 clamp(14px, 3.4vw, 22px)/1 system-ui, sans-serif;
+  }
+
+  .mobile-up { grid-column: 2; grid-row: 1; }
+  .mobile-left { grid-column: 1; grid-row: 2; }
+  .mobile-dpad-center {
+    grid-column: 2;
+    grid-row: 2;
+    border-radius: 24%;
+    border: 1px solid #7b684840;
+    background: #0b1115a8;
+    box-shadow: inset 0 0 18px #0009;
+  }
+  .mobile-right { grid-column: 3; grid-row: 2; }
+  .mobile-down { grid-column: 2; grid-row: 3; }
+
+  .mobile-actions {
+    position: absolute;
+    right: max(12px, 2.5vw);
+    bottom: max(18px, 4.5vh);
+    width: clamp(142px, 31vw, 210px);
+    height: clamp(128px, 28vw, 190px);
+  }
+
+  .mobile-action {
+    position: absolute;
+    width: clamp(48px, 10.5vw, 68px);
+    aspect-ratio: 1 / 1;
+    border-radius: 50%;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 2px;
+    padding: 0;
+  }
+
+  .mobile-action strong {
+    color: #ecd59f;
+    font: 700 clamp(14px, 3.4vw, 22px)/1 Georgia, serif;
+  }
+
+  .mobile-action span {
+    color: #aaa590;
+    font: 600 clamp(5px, 1.35vw, 8px)/1 monospace;
+    letter-spacing: .05em;
+  }
+
+  .mobile-interact {
+    right: 0;
+    bottom: 39%;
+    width: clamp(58px, 12vw, 78px);
+    border-color: #c3a15f88;
+  }
+
+  .mobile-punch {
+    right: 28%;
+    bottom: 0;
+  }
+
+  .mobile-run {
+    right: 58%;
+    bottom: 24%;
+  }
+
+  .mobile-journal {
+    right: 27%;
+    bottom: 61%;
+    width: clamp(42px, 9vw, 58px);
+    opacity: .88;
+  }
+
+  /* Em celular, libera o rodapé para não brigar com os botões. */
+  #hud .bottom > span:last-child {
+    display: none;
+  }
+
+  #hud .bottom {
+    bottom: 2%;
+    left: 36%;
+    right: 36%;
+    justify-content: center;
+    text-align: center;
+  }
+
+  #prompt {
+    bottom: 23%;
+    font-size: 9px;
+    padding: 7px 10px;
+  }
+}
+
+/* Portrait: o jogo continua 16:9, mas os controles ficam maiores para toque. */
+@media (hover: none) and (pointer: coarse) and (orientation: portrait) {
+  .mobile-dpad {
+    left: 10px;
+    bottom: 13px;
+  }
+
+  .mobile-actions {
+    right: 10px;
+    bottom: 14px;
+  }
+
+  .mobile-control,
+  .mobile-action {
+    backdrop-filter: blur(2px);
+  }
+}
