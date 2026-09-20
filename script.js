@@ -3107,6 +3107,23 @@ function drawCharacterSprite(
 
       migrateHouseSave(saved);
       state = saved;
+
+      // Corrige saves das versões 0.6.39–0.6.41 que podiam ficar
+      // presos no limite norte depois do desaparecimento dos pais.
+      if (
+        state.stage !== "prologue" &&
+        state.day === 0 &&
+        state.minutes >= 1380 &&
+        state.minutes < 1440 &&
+        state.room === "village"
+      ) {
+        state.room = "bedroom";
+        state.x = housePoint(180);
+        state.y = housePoint(235);
+        state.facing = "down";
+        state.walk = 0;
+      }
+
       // O corpo mantém seu tamanho: afasta saves antigos das bordas dos móveis.
       if (solid(state.x, state.y)) {
         const origin = { x: state.x, y: state.y };
@@ -7906,8 +7923,20 @@ function v0639FinishPrologueAtNorth() {
           state.wakeUp.time = 0;
         }
 
-        stage("parents");
-        go("bedroom", 180, 235);
+        state.stage = "parents";
+        state.room = "bedroom";
+        state.x = housePoint(180);
+        state.y = housePoint(235);
+        state.facing = "down";
+        state.walk = 0;
+        delete state.mother;
+
+        keys.clear();
+        near = null;
+        transitionBusy = false;
+
+        updateHud();
+        save();
       }
     )
   );
@@ -7996,6 +8025,121 @@ drawWorld = function() {
   }
 };
 
+// =========================================================
+// 0.6.42 — RECUPERA SPAWN PÓS-PRÓLOGO E MOVIMENTO
+// =========================================================
+
+let v0642PostPrologueRepairDone = false;
+
+function v0642RepairBrokenPostPrologueState() {
+  if (!state || mode !== "game") return;
+
+  const shouldBeInBedroom =
+    state.stage !== "prologue" &&
+    state.day === 0 &&
+    state.minutes >= 1380 &&
+    state.minutes < 1440 &&
+    state.room === "village";
+
+  if (shouldBeInBedroom) {
+    state.room = "bedroom";
+    state.x = housePoint(180);
+    state.y = housePoint(235);
+    state.facing = "down";
+    state.walk = 0;
+
+    if (state.dawnCollapse) {
+      state.dawnCollapse.active = false;
+      state.dawnCollapse.phase = "idle";
+      state.dawnCollapse.time = 0;
+    }
+
+    if (state.wakeUp) {
+      state.wakeUp.active = false;
+      state.wakeUp.time = 0;
+    }
+
+    transitionBusy = false;
+    dialog = null;
+    $("dialog").hidden = true;
+    $("overlay").hidden = true;
+    $("transition").classList.remove("active");
+    $("transition").style.opacity = "";
+
+    keys.clear();
+    near = null;
+
+    updateHud();
+    save();
+  }
+
+  v0642PostPrologueRepairDone = true;
+}
+
+const v0642MovementBase = update;
+update = function(dt) {
+  v0642RepairBrokenPostPrologueState();
+
+  if (!state) {
+    v0642MovementBase(dt);
+    return;
+  }
+
+  const beforeX = state.x;
+  const beforeY = state.y;
+
+  const left = keys.has("a") || keys.has("arrowleft");
+  const right = keys.has("d") || keys.has("arrowright");
+  const up = keys.has("w") || keys.has("arrowup");
+  const down = keys.has("s") || keys.has("arrowdown");
+
+  const wantedDx = (right ? 1 : 0) - (left ? 1 : 0);
+  const wantedDy = (down ? 1 : 0) - (up ? 1 : 0);
+
+  v0642MovementBase(dt);
+
+  if (
+    mode !== "game" ||
+    dialog ||
+    transitionBusy ||
+    !$("overlay").hidden ||
+    state.gameOver ||
+    state.dawnCollapse?.active ||
+    state.wakeUp?.active
+  ) {
+    return;
+  }
+
+  // Se o pipeline antigo não moveu o personagem apesar de existir
+  // uma tecla direcional pressionada, aplica o deslocamento aqui.
+  if (
+    (wantedDx || wantedDy) &&
+    Math.abs(state.x - beforeX) < 0.001 &&
+    Math.abs(state.y - beforeY) < 0.001
+  ) {
+    const len = Math.hypot(wantedDx, wantedDy) || 1;
+    const speed = keys.has("shift") ? 130 : 90;
+    const dx = wantedDx / len * speed * dt;
+    const dy = wantedDy / len * speed * dt;
+
+    if (!solid(state.x + dx, state.y)) {
+      state.x += dx;
+    }
+
+    if (!solid(state.x, state.y + dy)) {
+      state.y += dy;
+    }
+
+    if (Math.abs(state.x - beforeX) > 0.001 || Math.abs(state.y - beforeY) > 0.001) {
+      state.walk += dt * 13;
+      state.facing =
+        Math.abs(wantedDx) > Math.abs(wantedDy)
+          ? (wantedDx > 0 ? "right" : "left")
+          : (wantedDy > 0 ? "down" : "up");
+    }
+  }
+};
+
 // Recupera um save que tenha ficado dentro de um móvel reposicionado.
 const roomUpdateBeforeFix=update;
 let roomPositionChecked=false;
@@ -8015,7 +8159,7 @@ update=function(dt) {
   roomUpdateBeforeFix(dt);
 };
 
-$("version").textContent = "PROTÓTIPO · 0.6.41";
+$("version").textContent = "PROTÓTIPO · 0.6.42";
   
   requestAnimationFrame(frame);
   showBootSplash();
