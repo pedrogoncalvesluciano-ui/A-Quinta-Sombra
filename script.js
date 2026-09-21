@@ -9027,51 +9027,22 @@ function v0646StartOldManChoice() {
   );
 }
 
+// Compatibilidade defensiva com saves muito antigos que ainda tragam
+// o estado "chase". Raimundo não persegue mais Estevão.
 function v0646OldManCaught() {
-  const event = state.oldManEvent;
+  prepareSystems();
 
-  if (event.caught) return;
+  state.oldManEvent.phase = "helped";
+  state.oldManEvent.caught = false;
+  state.oldManEvent.runUnlocked = true;
 
-  event.caught = true;
-  keys.clear();
+  if (!state.storyFlags || typeof state.storyFlags !== "object") {
+    state.storyFlags = {};
+  }
+  state.storyFlags.raimundoMet = true;
 
-  modal(
-    "Ele te alcançou",
-    "Você não conseguiu voltar para o bairro a tempo.",
-    [
-      [
-        "Tentar novamente",
-        () => {
-          closeModal();
-
-          event.phase = "chase";
-          event.caught = false;
-          event.x = 625;
-          event.y = 785;
-          state.x = 540;
-          state.y = 755;
-          state.facing = "up";
-          state.walk = 0;
-
-          keys.clear();
-          v06Toast(
-            "Segure F para correr e volte pelo caminho.",
-            2.5
-          );
-        }
-      ],
-      [
-        "Voltar para o bairro",
-        () => {
-          closeModal();
-
-          event.phase = "escaped";
-          event.caught = false;
-          v0646ReturnVillage(false);
-        }
-      ]
-    ]
-  );
+  updateHud();
+  save();
 }
 
 const v0646GetNearBase = getNear;
@@ -9100,15 +9071,13 @@ getNear = function() {
       state.x <= 535
     ) {
       return {
-        label: state.oldManEvent.phase === "chase"
-          ? "Escapar para o bairro"
-          : "Voltar para o bairro",
+        label: "Voltar para o bairro",
         action: "oldRoadBack"
       };
     }
 
     if (
-      ["waiting", "refused"].includes(state.oldManEvent.phase) &&
+      state.oldManEvent.phase === "waiting" &&
       Math.hypot(
         state.x - 625,
         state.y - 785
@@ -9134,10 +9103,7 @@ interact = function(action) {
   }
 
   if (action === "oldRoadBack") {
-    const escaped =
-      state.oldManEvent.phase === "chase";
-
-    v0646ReturnVillage(escaped);
+    v0646ReturnVillage(false);
     return;
   }
 
@@ -9146,7 +9112,7 @@ interact = function(action) {
       v0646StartOldManChoice();
     } else {
       say([
-        ["Velho", "Você ainda está aqui? Achei que fosse voltar para casa."]
+        ["Raimundo", "Se for continuar por aqui, não saia da estrada sem uma luz."]
       ]);
     }
 
@@ -9261,47 +9227,27 @@ function v0646DrawOldRoad() {
     }
   }
 
-  // Velho do lado de fora até a perseguição começar.
-  if (
-    !["escaped"].includes(state.oldManEvent.phase)
-  ) {
-    const ox =
-      state.oldManEvent.phase === "chase"
-        ? state.oldManEvent.x
-        : 625;
-
-    const oy =
-      state.oldManEvent.phase === "chase"
-        ? state.oldManEvent.y
-        : 785;
+  // Raimundo permanece perto da casa. A versão atual não usa perseguição.
+  {
+    const ox = 625;
+    const oy = 785;
 
     person(
       ox,
       oy,
       "npcMale",
-      state.oldManEvent.phase === "chase"
-        ? elapsed * 10
-        : 0,
-      state.oldManEvent.phase === "chase"
-        ? (
-            Math.abs(state.x - ox) >
-            Math.abs(state.y - oy)
-              ? (state.x > ox ? "right" : "left")
-              : (state.y > oy ? "down" : "up")
-          )
-        : "left",
+      0,
+      "left",
       0.92
     );
 
-    if (state.oldManEvent.phase !== "chase") {
-      txt(
-        state.oldManEvent.phase === "waiting" ? "SENHOR" : "RAIMUNDO",
-        ox - (state.oldManEvent.phase === "waiting" ? 21 : 31),
-        oy - 37,
-        "#b8aa8d",
-        7
-      );
-    }
+    txt(
+      state.oldManEvent.phase === "waiting" ? "SENHOR" : "RAIMUNDO",
+      ox - (state.oldManEvent.phase === "waiting" ? 21 : 31),
+      oy - 37,
+      "#b8aa8d",
+      7
+    );
   }
 
   // Entrada externa da antiga mina, parcialmente soterrada.
@@ -9370,45 +9316,13 @@ drawWorld = function() {
 const v0646UpdateBase = update;
 update = function(dt) {
   v0646UpdateBase(dt);
-
-  if (
-    !state ||
-    mode !== "game" ||
-    state.room !== "oldRoad" ||
-    dialog ||
-    transitionBusy ||
-    !$("overlay").hidden ||
-    state.gameOver
-  ) {
-    return;
-  }
-
-  const event = state.oldManEvent;
-
-  if (event.phase !== "chase" || event.caught) {
-    return;
-  }
-
-  const dx = state.x - event.x;
-  const dy = state.y - event.y;
-  const distance = Math.hypot(dx, dy);
-
-  if (distance < 20) {
-    v0646OldManCaught();
-    return;
-  }
-
-  const step = Math.min(distance, 102 * dt);
-
-  event.x += dx / distance * step;
-  event.y += dy / distance * step;
 };
 
 const v0646DevCommandBase = v0645RunDevCommand;
 v0645RunDevCommand = function(raw) {
   const command = String(raw || "").trim().toLowerCase();
 
-  if (command === "velho") {
+  if (command === "raimundo" || command === "velho") {
     prepareSystems();
 
     state.stage =
@@ -9432,7 +9346,7 @@ v0645RunDevCommand = function(raw) {
     v0645ResetTransientState();
     updateHud();
     save();
-    v06Toast("TESTE: estrada do velho", 2);
+    v06Toast("TESTE: estrada de Raimundo", 2);
     return;
   }
 
@@ -9447,9 +9361,9 @@ v0645OpenDevPanel = function() {
   const root = $("modalText");
   const pre = root.querySelector("pre");
 
-  if (pre && !pre.textContent.includes("velho")) {
+  if (pre && !pre.textContent.includes("raimundo")) {
     pre.textContent +=
-      "\nvelho       → vai direto para a estrada do velho";
+      "\nraimundo    → vai direto para a estrada de Raimundo";
   }
 };
 
