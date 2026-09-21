@@ -211,7 +211,7 @@
     kitchen: "Cozinha",
     living: "Sala",
     attic: "Sótão",
-    village: "Bairro residencial · interior da Alemanha"
+    village: "Forgotten · bairro residencial"
   };
 
   function initial() {
@@ -1326,7 +1326,7 @@ function drawCharacterSprite(
 
     if (type === "market") {
       rect(x + 20, y + 48, w - 40, 16, "#282f30");
-      txt("MARKT", x + 73, y + 60, "#d0ba85", 10);
+      txt("MERCADO", x + 57, y + 60, "#d0ba85", 9);
       rect(x + w / 2 - 30, y + h + 2, 60, 22, "#85684a");
     }
 
@@ -1337,7 +1337,7 @@ function drawCharacterSprite(
 
     if (type === "policeStation") {
       rect(x + 22, y + 48, w - 44, 17, "#26323a");
-      txt("POLIZEI", x + 59, y + 60, "#d1c9ad", 9);
+      txt("POLÍCIA", x + 59, y + 60, "#d1c9ad", 9);
       rect(x + w / 2 - 24, y + h + 2, 48, 18, "#555d5b");
     }
 
@@ -2242,7 +2242,7 @@ function drawCharacterSprite(
       ["Pai", "Nós vamos até o mercado. Cuide do seu irmão até voltarmos."],
       ["Mãe", "Deixei uma porção para ele na cozinha. Fiquem dentro de casa."],
       ["Você", "Vocês vão demorar?"],
-      ["Pai", "É só comprar algumas coisas. Antes de escurecer estaremos de volta."],
+      ["Pai", "Vamos comprar as coisas rápido e já voltar."],
       ["Irmão", "Eu vou esperar vocês aqui."]
     ], () => {
       state.familyFarewell = true;
@@ -4181,14 +4181,14 @@ const chapterBase = {
 const clueText = {
   list:
     "Pão, feijão, sal, óleo e ataduras. " +
-    "Alguns itens foram riscados e reescritos.",
+    "Na margem, quase escondido: “perguntar sobre o poço”.",
 
   photo:
-    "Uma fotografia antiga da família perto da escada.",
+    "Uma fotografia do aniversário de Estevão, tirada perto da escada. " +
+    "O pai aparece de manga curta.",
 
   note:
-    "Se voltarmos diferentes, compare a fotografia. " +
-    "Não confie na primeira lembrança."
+    "Se voltarmos diferentes, compare a fotografia."
 };
 
 const clueSpots = [
@@ -8028,8 +8028,10 @@ update = function(dt) {
 
       if (state.stage === "prologue") {
         v0639FinishPrologueAtNorth();
+      } else if (v0648Chapter2Unlocked()) {
+        v0648GoMarket();
       } else {
-        v0639EdgeNotice("Não preciso seguir aqui por agora.");
+        v0639EdgeNotice("Ainda preciso resolver o que aconteceu perto de casa.");
       }
     }
 
@@ -8039,10 +8041,15 @@ update = function(dt) {
       v0639EdgeNotice("Não preciso seguir aqui por agora.");
     }
 
-    // Leste: futura praça.
+    // Leste: praça central, liberada no Capítulo 2.
     if (state.x >= maps.village.w - 24 && east) {
       state.x = maps.village.w - 26;
-      v0639EdgeNotice("Não preciso seguir aqui por agora.");
+
+      if (v0648Chapter2Unlocked()) {
+        v0648GoSquare();
+      } else {
+        v0639EdgeNotice("Ainda preciso resolver o que aconteceu perto de casa.");
+      }
     }
 
     // Sul permanece livre dentro deste mapa e vira estrada de terra.
@@ -8893,7 +8900,7 @@ drawWorld = function() {
 
 $("help").onclick = () => modal(
   "Como jogar",
-  "WASD / setas: andar. Shift: correr. E: interagir. I: inventário. Esc: pausar. ESPAÇO: soco perto de uma ameaça.\n\nA fome do irmão começa a cair depois da primeira saída e perde 5 pontos por minuto real de jogo ativo. A vizinha só entrega outra porção quando a fome estiver abaixo de 60%.\n\nSair de casa pode gerar acontecimentos diferentes. Nem todos são ataques; observe os avisos e converse com seu irmão depois.\n\nÀs 07:00, depois da primeira meia-noite, o protagonista perde os sentidos.",
+  "WASD / setas: andar. Shift/F: correr quando disponível. E: interagir. I: inventário. Esc: pausar. ESPAÇO: soco perto de uma ameaça.\n\nA fome do irmão começa a cair depois da primeira saída e perde 5 pontos por minuto real de jogo ativo. A vizinha só entrega outra porção quando a fome estiver abaixo de 60%.\n\nSair de casa pode gerar acontecimentos diferentes. Nem todos são ataques; observe os avisos e converse com seu irmão depois.\n\nÀs 07:00, depois da primeira meia-noite, o protagonista perde os sentidos.",
   [["Voltar", closeModal]]
 );
 
@@ -9279,9 +9286,11 @@ function v0646DrawOldRoad() {
     rect(baseX - 13, y - 34, 34, 31, "#2c4a38");
   }
 
-  // Casa isolada.
+  // Casa isolada. O gatilho da mina tem desenho próprio.
   for (const o of m.objects) {
-    building(o);
+    if (o.type !== "mineTrigger") {
+      building(o);
+    }
   }
 
   // Velho do lado de fora até a perseguição começar.
@@ -9318,14 +9327,40 @@ function v0646DrawOldRoad() {
 
     if (state.oldManEvent.phase !== "chase") {
       txt(
-        "SENHOR",
-        ox - 21,
+        state.oldManEvent.phase === "waiting" ? "SENHOR" : "RAIMUNDO",
+        ox - (state.oldManEvent.phase === "waiting" ? 21 : 31),
         oy - 37,
         "#b8aa8d",
         7
       );
     }
   }
+
+  // Entrada externa da antiga mina, parcialmente soterrada.
+  // O interior continua inacessível nesta fase da história.
+  const mineX = 135;
+  const mineY = 760;
+
+  rect(280, 780, 180, 30, "#5d4c3d");
+  rect(205, 770, 90, 38, "#5d4c3d");
+  rect(mineX - 24, mineY - 28, 210, 120, "#223329");
+  rect(mineX, mineY, 170, 88, "#3c413c");
+  rect(mineX + 18, mineY + 18, 134, 62, "#0b0d0e");
+
+  // Estruturas e destroços do colapso.
+  rect(mineX + 9, mineY + 4, 9, 82, "#4a3c31");
+  rect(mineX + 151, mineY + 4, 9, 82, "#4a3c31");
+  rect(mineX + 6, mineY + 6, 157, 9, "#59483a");
+  rect(mineX + 46, mineY + 56, 82, 12, "#4b443b");
+  rect(mineX + 72, mineY + 35, 16, 47, "#51473d");
+
+  for (let i = 0; i < 10; i++) {
+    const rx = mineX - 10 + hash(i, 71) * 190;
+    const ry = mineY + 62 + hash(i, 72) * 35;
+    rect(rx, ry, 14 + hash(i, 73) * 18, 8 + hash(i, 74) * 10, "#57554a");
+  }
+
+  txt("MINA DESATIVADA", mineX + 18, mineY - 10, "#a69b80", 8);
 
   // Player.
   person(
@@ -9551,7 +9586,632 @@ update=function(dt) {
   roomUpdateBeforeFix(dt);
 };
 
-$("version").textContent = "PROTÓTIPO · 0.6.47";
+
+// =========================================================
+// 0.6.48 — ORDEM DOS CAPÍTULOS, MERCADO/PRAÇA E RAIMUNDO
+// =========================================================
+
+// Capítulo 2: mercado ao norte. Reaproveita a base interna já existente.
+if (!maps.market) {
+  room(
+    "market",
+    [
+      obj(78, 86, 120, 48, "shelf"),
+      obj(78, 164, 120, 48, "shelf"),
+      obj(438, 86, 92, 48, "shelf"),
+      obj(438, 164, 92, 48, "shelf"),
+      obj(
+        248, 104, 170, 58,
+        "counter",
+        "Falar com o funcionário",
+        "marketClerk"
+      )
+    ],
+    [
+      door(
+        310, 374,
+        "village", 650, 88,
+        "Sair do mercado"
+      )
+    ]
+  );
+}
+roomNames.market = "Mercado de Forgotten";
+
+// Capítulo 2: praça central. É uma área externa própria, não um cômodo.
+if (!maps.square) {
+  maps.square = {
+    w: 1100,
+    h: 760,
+    objects: [
+      obj(410, 250, 150, 150, "fountain"),
+      obj(90, 85, 205, 135, "building"),
+      obj(760, 80, 220, 140, "building"),
+      obj(110, 535, 220, 135, "building"),
+      obj(735, 535, 235, 135, "building")
+    ],
+    doors: []
+  };
+}
+roomNames.square = "Praça central · Forgotten";
+
+// A entrada externa da mina já pode ser vista no Capítulo 3,
+// mas nunca permite acesso ao interior.
+if (
+  maps.oldRoad &&
+  !maps.oldRoad.objects.some(o => o.type === "mineTrigger")
+) {
+  maps.oldRoad.objects.push(
+    obj(
+      120, 750, 185, 105,
+      "mineTrigger",
+      "Examinar a entrada da mina",
+      "mineExterior"
+    )
+  );
+}
+
+function v0648Chapter2Unlocked() {
+  return Boolean(
+    state &&
+    state.stage !== "prologue" &&
+    state.finished &&
+    state.day >= 2
+  );
+}
+
+function v0648Chapter3Unlocked() {
+  return Boolean(
+    v0648Chapter2Unlocked() &&
+    state.day >= 4 &&
+    state.storyFlags?.marketParentsConfirmed &&
+    state.squareManFirstSpeechDone
+  );
+}
+
+function v0648GoMarket() {
+  if (
+    !state ||
+    transitionBusy ||
+    dialog ||
+    !v0648Chapter2Unlocked()
+  ) {
+    return;
+  }
+
+  fade(
+    "Mercado",
+    "Norte de Forgotten",
+    () => {
+      go("market", 310, 330);
+    }
+  );
+}
+
+function v0648GoSquare() {
+  if (
+    !state ||
+    transitionBusy ||
+    dialog ||
+    !v0648Chapter2Unlocked()
+  ) {
+    return;
+  }
+
+  fade(
+    "Praça central",
+    "Leste de Forgotten",
+    () => {
+      state.room = "square";
+      state.x = 82;
+      state.y = 500;
+      state.facing = "right";
+      state.walk = 0;
+      keys.clear();
+      near = null;
+      updateHud();
+    }
+  );
+}
+
+function v0648ReturnFromSquare() {
+  if (!state || transitionBusy || dialog) return;
+
+  fade(
+    "",
+    "",
+    () => {
+      state.room = "village";
+      state.x = maps.village.w - 58;
+      state.y = 424;
+      state.facing = "left";
+      state.walk = 0;
+      keys.clear();
+      near = null;
+      updateHud();
+    }
+  );
+}
+
+const v0648PrepareBase = prepareSystems;
+prepareSystems = function() {
+  v0648PrepareBase();
+
+  if (!state) return;
+
+  if (!state.storyFlags || typeof state.storyFlags !== "object") {
+    state.storyFlags = {};
+  }
+
+  if (typeof state.storyFlags.marketParentsConfirmed !== "boolean") {
+    state.storyFlags.marketParentsConfirmed = false;
+  }
+
+  if (typeof state.storyFlags.mineExteriorSeen !== "boolean") {
+    state.storyFlags.mineExteriorSeen = false;
+  }
+
+  if (typeof state.storyFlags.raimundoMet !== "boolean") {
+    state.storyFlags.raimundoMet = false;
+  }
+
+  // A Bíblia atual coloca as três pistas no Dia 1.
+  // Remove o antigo gatilho que exigia uma invasão antes da investigação.
+  const q = chapter();
+
+  if (
+    state.stage !== "prologue" &&
+    state.day >= 1 &&
+    ["waiting", "brother"].includes(q.phase)
+  ) {
+    q.phase = "clues";
+  }
+
+  if (q.phase === "cluesDone") {
+    q.phase = "complete";
+  }
+
+  // Migração: saves antigos podem ter Raimundo no papel hostil.
+  // A decisão mais recente o torna um aliado desconfiado, não um perseguidor.
+  if (
+    state.oldManEvent &&
+    ["chase", "escaped", "refused"].includes(state.oldManEvent.phase)
+  ) {
+    state.oldManEvent.phase = "helped";
+    state.oldManEvent.caught = false;
+    state.oldManEvent.runUnlocked = true;
+    state.storyFlags.raimundoMet = true;
+  }
+};
+
+v0646StartOldManChoice = function() {
+  prepareSystems();
+
+  say(
+    [
+      ["Raimundo", "Tá tarde para um garoto andar sozinho por esta estrada."],
+      ["Você", "O senhor conhece meus pais?"],
+      ["Raimundo", "Conheço o suficiente. Seu sobrenome já diz bastante, pra quem sabe ouvir."],
+      ["Você", "Como assim?"],
+      ["Raimundo", "Não vou te encher a cabeça com coisa que eu mesmo não sei explicar."],
+      ["Raimundo", "Só não entre na mata sem luz. E, se vir alguma coisa parada onde não devia estar, corre. Não chega perto."]
+    ],
+    () => {
+      state.oldManEvent.phase = "helped";
+      state.oldManEvent.runUnlocked = true;
+      state.oldManEvent.caught = false;
+      state.storyFlags.raimundoMet = true;
+
+      v0646CountOldManEncounter();
+
+      v06Toast(
+        "Corrida liberada · segure Shift ou F",
+        3
+      );
+
+      updateHud();
+      save();
+    }
+  );
+};
+
+// O assunto na delegacia deixa de tratar Raimundo como agressor.
+v0630PoliceOldMan = function() {
+  prepareSystems();
+
+  if (
+    state.storyEvents.oldManEncounters <=
+    state.policeReportedEvents.oldManEncounters
+  ) {
+    say([
+      ["Policial", "Sim, eu sei quem é o Raimundo."],
+      ["Policial", "Ele mora naquela estrada há muito tempo."]
+    ]);
+    return;
+  }
+
+  state.policeReportedEvents.oldManEncounters =
+    state.storyEvents.oldManEncounters;
+
+  state.policeReports.oldMan += 1;
+
+  say(
+    [
+      ["Você", "Encontrei um homem chamado Raimundo na estrada do sul."],
+      ["Policial", "Raimundo? Ele trabalhou na antiga mina quando era mais novo."],
+      ["Você", "Ele disse que conhece minha família."],
+      ["Policial", "Ele conhece muita história antiga da cidade. Se ele falou da mina, escute com cuidado, mas não entre naquele lugar."]
+    ],
+    save
+  );
+};
+
+const v0648GetNearBase = getNear;
+getNear = function() {
+  prepareSystems();
+
+  if (state?.room === "oldRoad") {
+    if (
+      state.oldManEvent?.phase === "helped" &&
+      Math.hypot(state.x - 625, state.y - 785) < 50
+    ) {
+      return {
+        label: "Falar com Raimundo",
+        action: "oldManTalk"
+      };
+    }
+
+    const mine = maps.oldRoad.objects.find(
+      o => o.type === "mineTrigger"
+    );
+
+    if (mine) {
+      const px = Math.max(
+        mine.x,
+        Math.min(state.x, mine.x + mine.w)
+      );
+      const py = Math.max(
+        mine.y,
+        Math.min(state.y, mine.y + mine.h)
+      );
+
+      if (Math.hypot(state.x - px, state.y - py) < 48) {
+        return {
+          ...mine,
+          dist: 0
+        };
+      }
+    }
+  }
+
+  return v0648GetNearBase();
+};
+
+const v0648InteractBase = interact;
+interact = function(action) {
+  prepareSystems();
+
+  if (action === "marketClerk") {
+    if (!state.storyFlags.marketParentsConfirmed) {
+      say(
+        [
+          ["Funcionário", "Você é o filho dos Lancaster, não é?"],
+          ["Você", "Meus pais estiveram aqui?"],
+          ["Funcionário", "Estiveram. Os dois. Compraram algumas coisas e saíram juntos."],
+          ["Você", "Tem certeza?"],
+          ["Funcionário", "Tenho. Seu pai ainda perguntou uma coisa sobre a estrada do sul antes de ir embora. Achei estranho, só isso."]
+        ],
+        () => {
+          state.storyFlags.marketParentsConfirmed = true;
+          v06Toast(
+            "Pista confirmada: seus pais chegaram ao mercado.",
+            2.8
+          );
+          updateHud();
+          save();
+        }
+      );
+    } else {
+      say([
+        ["Funcionário", "Já te falei o que lembro. Eles vieram juntos e saíram juntos."],
+        ["Funcionário", "Depois disso, eu não vi mais nenhum dos dois."]
+      ]);
+    }
+
+    return;
+  }
+
+  if (action === "mineExterior") {
+    state.storyFlags.mineExteriorSeen = true;
+
+    say(
+      [
+        "Uma antiga mineração, fechada depois de um grave acidente há cerca de 40 anos.",
+        "A entrada está parcialmente soterrada. Não há como passar por aqui."
+      ],
+      save
+    );
+
+    return;
+  }
+
+  if (
+    action === "oldManTalk" &&
+    state.oldManEvent?.phase === "helped"
+  ) {
+    say([
+      ["Raimundo", "Aquela mina não é lugar para curiosidade."],
+      ["Você", "O que aconteceu lá?"],
+      ["Raimundo", "Um desabamento. Quarenta anos atrás. Gente demais ficou debaixo daquela pedra."],
+      ["Raimundo", "Se está procurando seus pais, presta atenção no que encontra. Não inventa resposta só porque precisa de uma."]
+    ]);
+    return;
+  }
+
+  v0648InteractBase(action);
+};
+
+function v0648DrawMarketClerk() {
+  c.save();
+  c.translate(
+    -Math.floor(camera.x),
+    -Math.floor(camera.y)
+  );
+
+  person(
+    housePoint(335),
+    housePoint(142),
+    "npcMale",
+    0,
+    "down",
+    0.9
+  );
+
+  txt(
+    "FUNCIONÁRIO",
+    housePoint(292),
+    housePoint(98),
+    "#b8aa8d",
+    7
+  );
+
+  c.restore();
+}
+
+function v0648DrawSquare() {
+  const m = maps.square;
+
+  camera.x = Math.max(
+    0,
+    Math.min(m.w - W, state.x - W / 2)
+  );
+
+  camera.y = Math.max(
+    0,
+    Math.min(m.h - H, state.y - H / 2)
+  );
+
+  c.save();
+  c.translate(
+    -Math.floor(camera.x),
+    -Math.floor(camera.y)
+  );
+
+  rect(0, 0, m.w, m.h, "#31483b");
+
+  // Calçamento central e caminhos.
+  rect(330, 185, 330, 390, "#77746a");
+  rect(0, 430, m.w, 86, "#77746a");
+  rect(490, 0, 86, m.h, "#77746a");
+
+  for (let y = 195; y < 565; y += 20) {
+    for (let x = 340; x < 650; x += 24) {
+      const offset = (Math.floor(y / 20) % 2) * 10;
+      rect(x + offset, y, 16, 10, "#858177");
+    }
+  }
+
+  // Árvores e bancos deixam a praça legível como lugar público.
+  for (const [tx, ty] of [
+    [345, 135], [650, 145], [340, 610], [660, 610],
+    [70, 360], [1010, 350]
+  ]) {
+    rect(tx, ty, 8, 30, "#493f31");
+    rect(tx - 17, ty - 19, 42, 30, "#244438");
+    rect(tx - 10, ty - 30, 29, 26, "#315441");
+  }
+
+  for (const [bx, by] of [
+    [370, 420], [600, 420], [425, 545], [570, 545]
+  ]) {
+    rect(bx, by, 60, 8, "#5d4a38");
+    rect(bx + 7, by + 8, 5, 12, "#3f342b");
+    rect(bx + 48, by + 8, 5, 12, "#3f342b");
+  }
+
+  for (const o of m.objects) {
+    building(o);
+  }
+
+  v0633DrawWheelchairMan();
+
+  person(
+    state.x,
+    state.y,
+    "player",
+    state.walk,
+    state.facing
+  );
+
+  // Aparição do Observador: massa baixa, sem anatomia humana legível.
+  if (elapsed < v0634ObserverUntil) {
+    const x = v0634ObserverX;
+    const y = v0634ObserverY;
+
+    rect(x - 17, y - 17, 34, 14, "#060708");
+    rect(x - 12, y - 27, 22, 17, "#050607");
+    rect(x - 21, y - 9, 12, 7, "#050607");
+    rect(x + 10, y - 11, 15, 8, "#050607");
+    rect(x - 14, y - 4, 7, 12, "#050607");
+    rect(x + 8, y - 5, 7, 13, "#050607");
+  }
+
+  c.restore();
+
+  v0646ApplyOutdoorLight();
+
+  if (elapsed < v0634StaticUntil) {
+    const strength = Math.min(
+      1,
+      Math.max(v0634StaticUntil - elapsed, 0) / 0.85
+    );
+
+    for (let i = 0; i < 28; i++) {
+      const y =
+        (i * 19 + Math.floor(elapsed * 700) % H) % H;
+      const h = 1 + (i % 3);
+
+      rect(
+        (i % 4) * -4,
+        y,
+        W + 16,
+        h,
+        "rgba(225,230,220," +
+        (0.04 + strength * 0.14) +
+        ")"
+      );
+    }
+  }
+}
+
+const v0648DrawWorldBase = drawWorld;
+drawWorld = function() {
+  if (state?.room === "square") {
+    v0648DrawSquare();
+    return;
+  }
+
+  v0648DrawWorldBase();
+
+  if (state?.room === "market") {
+    v0648DrawMarketClerk();
+  }
+};
+
+const v0648UpdateBase = update;
+update = function(dt) {
+  prepareSystems();
+  v0648UpdateBase(dt);
+
+  if (
+    !state ||
+    mode !== "game" ||
+    dialog ||
+    transitionBusy ||
+    !$("overlay").hidden ||
+    state.gameOver ||
+    state.dawnCollapse?.active ||
+    state.wakeUp?.active
+  ) {
+    return;
+  }
+
+  const left =
+    keys.has("a") ||
+    keys.has("arrowleft");
+
+  const down =
+    keys.has("s") ||
+    keys.has("arrowdown");
+
+  if (
+    state.room === "square" &&
+    state.x <= 44 &&
+    left
+  ) {
+    state.x = 44;
+    v0648ReturnFromSquare();
+    return;
+  }
+
+  // Antes do Capítulo 3, o extremo sul continua visível,
+  // mas Estevão ainda não tem motivo narrativo para seguir.
+  if (
+    state.room === "village" &&
+    state.y >= maps.village.h - 28 &&
+    down &&
+    !v0648Chapter3Unlocked()
+  ) {
+    state.y = maps.village.h - 30;
+    v0639EdgeNotice(
+      state.day < 4
+        ? "Ainda preciso procurar meus pais nas áreas mais próximas."
+        : "Antes de ir tão longe, preciso confirmar o que aconteceu no mercado e na praça."
+    );
+  }
+};
+
+const v0648UpdateHudBase = updateHud;
+updateHud = function() {
+  v0648UpdateHudBase();
+
+  if (!state || state.stage === "prologue") return;
+
+  const q = chapter();
+
+  if (
+    state.day >= 1 &&
+    q.phase === "clues"
+  ) {
+    $("objective").textContent =
+      "Investigue o quarto dos seus pais: " +
+      q.clues.length +
+      "/3 pistas.";
+    return;
+  }
+
+  if (
+    state.stage === "free" &&
+    v0648Chapter2Unlocked() &&
+    !state.storyFlags?.marketParentsConfirmed
+  ) {
+    $("objective").textContent =
+      "Vá ao norte e confirme se seus pais chegaram ao mercado.";
+    return;
+  }
+
+  if (
+    state.stage === "free" &&
+    v0648Chapter2Unlocked() &&
+    state.storyFlags?.marketParentsConfirmed &&
+    !state.squareManFirstSpeechDone
+  ) {
+    $("objective").textContent =
+      "Explore a praça a leste e converse com os moradores.";
+    return;
+  }
+
+  if (
+    state.stage === "free" &&
+    v0648Chapter3Unlocked() &&
+    !state.storyFlags?.raimundoMet
+  ) {
+    $("objective").textContent =
+      "Explore a estrada de terra ao sul.";
+    return;
+  }
+
+  if (
+    state.stage === "free" &&
+    state.storyFlags?.raimundoMet &&
+    !state.storyFlags?.mineExteriorSeen
+  ) {
+    $("objective").textContent =
+      "Examine os arredores da casa de Raimundo.";
+  }
+};
+
+$("version").textContent = "PROTÓTIPO · 0.6.48";
   
   requestAnimationFrame(frame);
   showBootSplash();
