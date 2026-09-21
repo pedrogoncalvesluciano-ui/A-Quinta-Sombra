@@ -2,7 +2,7 @@
 "use strict";
 
 /*
-  A QUINTA SOMBRA — 0.7.2
+  A QUINTA SOMBRA — 0.7.3
 
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
@@ -7970,61 +7970,73 @@ function v0639FinishPrologueAtNorth() {
 
   keys.clear();
 
-  // Pai e mãe param juntos no fim da rua antes de desaparecerem.
-  state.x = 636;
-  state.y = 58;
-  state.facing = "down";
-  state.walk = 0;
+  // A chegada ao portão usa um fade antes de reposicionar os pais.
+  // Isso evita o corte seco e transforma o fim do trajeto em uma cena.
+  fade(
+    "",
+    "",
+    () => {
+      // O pai mantém a posição que já funcionava, olhando para baixo.
+      state.x = 636;
+      state.y = 58;
+      state.facing = "down";
+      state.walk = 0;
 
-  prepareMother();
-  state.mother.x = 672;
-  state.mother.y = 58;
-  state.mother.facing = "down";
-  state.mother.walk = 0;
-  state.mother.targetX = 672;
-  state.mother.targetY = 58;
+      // A mãe fica logo abaixo dele, olhando diretamente para o pai.
+      prepareMother();
+      state.mother.x = 636;
+      state.mother.y = 104;
+      state.mother.facing = "up";
+      state.mother.walk = 0;
+      state.mother.targetX = 636;
+      state.mother.targetY = 104;
+      state.mother.think = 999;
+      state.mother.pause = 999;
+      state.mother.lastFatherX = state.x;
+      state.mother.lastFatherY = state.y;
 
-  say(
-    [
-      ["Pai", "Vamos comprar as coisas rápido e já voltar."],
-      ["Mãe", "Vamos. Não deve demorar."]
-    ],
-    () => fade(
-      "",
-      "",
-      () => {
-        // A troca ocorre com a tela preta para o jogador não ver o teleporte.
-        state.day = 0;
-        state.minutes = 1380;
-        state.dawnCollapseArmed = false;
+      say(
+        [
+          ["Pai", "Vamos comprar as coisas rápido e já voltar."],
+          ["Mãe", "Vamos. Não deve demorar."]
+        ],
+        () => fade(
+          "",
+          "",
+          () => {
+            // A passagem para 23:00 também ocorre com a tela preta.
+            state.day = 0;
+            state.minutes = 1380;
+            state.dawnCollapseArmed = false;
 
-        if (state.dawnCollapse) {
-          state.dawnCollapse.active = false;
-          state.dawnCollapse.phase = "idle";
-          state.dawnCollapse.time = 0;
-        }
+            if (state.dawnCollapse) {
+              state.dawnCollapse.active = false;
+              state.dawnCollapse.phase = "idle";
+              state.dawnCollapse.time = 0;
+            }
 
-        if (state.wakeUp) {
-          state.wakeUp.active = false;
-          state.wakeUp.time = 0;
-        }
+            if (state.wakeUp) {
+              state.wakeUp.active = false;
+              state.wakeUp.time = 0;
+            }
 
-        state.stage = "parents";
-        state.room = "bedroom";
-        state.x = housePoint(180);
-        state.y = housePoint(235);
-        state.facing = "down";
-        state.walk = 0;
-        delete state.mother;
+            state.stage = "parents";
+            state.room = "bedroom";
+            state.x = housePoint(180);
+            state.y = housePoint(235);
+            state.facing = "down";
+            state.walk = 0;
+            delete state.mother;
 
-        keys.clear();
-        near = null;
+            keys.clear();
+            near = null;
 
-        updateHud();
-      }
-    )
+            updateHud();
+          }
+        )
+      );
+    }
   );
-
 }
 
 const v0639UpdateBase = update;
@@ -16901,7 +16913,7 @@ $("help").onclick = () => modal(
   [["Voltar", closeModal]]
 );
 
-$("version").textContent = "PROTÓTIPO · 0.7.2";
+$("version").textContent = "PROTÓTIPO · 0.7.3";
   
   requestAnimationFrame(frame);
   showBootSplash();
