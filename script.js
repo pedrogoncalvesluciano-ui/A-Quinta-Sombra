@@ -7583,7 +7583,12 @@ let v0634ObserverY = 0;
 let v0634WasInSquareSide = false;
 
 function v0633DrawWheelchairMan() {
-  if (!state || state.room !== "square" || state.stage === "prologue") {
+  if (
+    !state ||
+    state.room !== "square" ||
+    state.stage === "prologue" ||
+    state.storyFlags?.wheelchairGone
+  ) {
     return;
   }
 
@@ -13311,6 +13316,7 @@ const V070_RANDOM_EVENT_WEIGHTS = [
   { id: "blackout", weight: 10, minDay: 2 },
   { id: "windowLight", weight: 10, minDay: 3 },
   { id: "brotherEcho", weight: 7, minDay: 4 },
+  { id: "foundFood", weight: 3, minDay: 2 },
   { id: "burntSmell", weight: 8, minDay: 6 },
   { id: "invasion", weight: 8, minDay: 5, needsFinished: true }
 ];
@@ -13402,7 +13408,24 @@ function v070EnsureFinalSystems() {
   if (!state.homeAtmosphere || typeof state.homeAtmosphere !== "object") {
     state.homeAtmosphere = {
       pendingRadio: false,
+      pendingKnock: false,
       timer: 0
+    };
+  }
+
+  if (typeof state.homeAtmosphere.pendingRadio !== "boolean") {
+    state.homeAtmosphere.pendingRadio = false;
+  }
+
+  if (typeof state.homeAtmosphere.pendingKnock !== "boolean") {
+    state.homeAtmosphere.pendingKnock = false;
+  }
+
+  if (!state.smallEventState || typeof state.smallEventState !== "object") {
+    state.smallEventState = {
+      pending: false,
+      timer: 0,
+      type: null
     };
   }
 }
@@ -13878,11 +13901,65 @@ function v070WeightedEvent() {
 v0645ScheduleOutingEvent = function() {
   prepareSystems();
 
+  const majorPool = [
+    "van",
+    "voices",
+    "knock",
+    "blackout"
+  ];
+
+  if (state.finished) {
+    majorPool.push("invasion");
+  }
+
   state.randomEventState.pending = true;
   state.randomEventState.timer =
     7 + Math.random() * 9;
   state.randomEventState.type =
-    v070WeightedEvent();
+    majorPool[
+      Math.floor(
+        Math.random() * majorPool.length
+      )
+    ];
+
+  const smallCandidates =
+    V070_RANDOM_EVENT_WEIGHTS.filter(item =>
+      ["windowLight", "brotherEcho", "foundFood", "burntSmell"].includes(item.id) &&
+      state.day >= item.minDay
+    );
+
+  if (
+    smallCandidates.length &&
+    Math.random() < 0.56
+  ) {
+    const total = smallCandidates.reduce(
+      (sum, item) => sum + item.weight,
+      0
+    );
+
+    let roll =
+      Math.random() * total;
+
+    let selected =
+      smallCandidates[0].id;
+
+    for (const item of smallCandidates) {
+      roll -= item.weight;
+
+      if (roll <= 0) {
+        selected = item.id;
+        break;
+      }
+    }
+
+    state.smallEventState.pending = true;
+    state.smallEventState.timer =
+      4 + Math.random() * 9;
+    state.smallEventState.type =
+      selected;
+  } else {
+    state.smallEventState.pending = false;
+  }
 
   save();
 };
@@ -13935,6 +14012,27 @@ v0645TriggerRandomEvent = function() {
     return;
   }
 
+  if (event.type === "foundFood") {
+    event.pending = false;
+
+    if (state.food <= 0) {
+      state.food = 1;
+
+      v06Toast(
+        "Uma embalagem lacrada ficou esquecida perto de uma caixa. Ainda está própria para levar.",
+        2.8
+      );
+    } else {
+      v06Toast(
+        "Há uma embalagem de comida esquecida aqui, mas você já carrega uma porção.",
+        2.6
+      );
+    }
+
+    save();
+    return;
+  }
+
   v070TriggerRandomBase();
 };
 
@@ -13965,11 +14063,20 @@ go = function(nextRoom, x, y) {
 
   if (
     comingHome &&
-    Math.random() < 0.22
+    Math.random() < 0.28
   ) {
     prepareSystems();
-    state.homeAtmosphere.pendingRadio = true;
-    state.homeAtmosphere.timer = 1.8 + Math.random() * 1.8;
+
+    const knock =
+      state.day >= 2 &&
+      Math.random() < 0.35;
+
+    state.homeAtmosphere.pendingRadio =
+      !knock;
+    state.homeAtmosphere.pendingKnock =
+      knock;
+    state.homeAtmosphere.timer =
+      1.8 + Math.random() * 1.8;
   }
 };
 
@@ -14161,6 +14268,65 @@ v0645OpenInventory = function() {
   }
 };
 
+
+function v070TriggerHomeKnock() {
+  prepareSystems();
+
+  state.homeAtmosphere.pendingKnock = false;
+  state.homeAtmosphere.timer = 0;
+
+  modal(
+    "TOC. TOC.",
+    "Duas batidas secas na porta. Não há voz do outro lado.",
+    [
+      [
+        "Abrir a porta",
+        () => {
+          closeModal();
+
+          say([
+            "O corredor está vazio.",
+            "No chão há apenas marcas de barro que terminam antes da rua."
+          ]);
+        }
+      ],
+      [
+        "Não abrir",
+        () => {
+          closeModal();
+
+          say([
+            "As batidas não se repetem.",
+            "Depois de alguns segundos, o irmão volta a respirar normalmente."
+          ]);
+        }
+      ]
+    ]
+  );
+}
+
+function v070TriggerSmallOutingEvent() {
+  prepareSystems();
+
+  if (!state.smallEventState?.pending) return;
+
+  const small = {
+    pending: true,
+    type: state.smallEventState.type
+  };
+
+  state.smallEventState.pending = false;
+
+  const original =
+    state.randomEventState;
+
+  state.randomEventState = small;
+  v0645TriggerRandomEvent();
+  state.randomEventState = original;
+
+  save();
+}
+
 const v070UpdateBase = update;
 update = function(dt) {
   prepareSystems();
@@ -14180,13 +14346,31 @@ update = function(dt) {
   }
 
   if (
-    state.homeAtmosphere?.pendingRadio &&
+    state.smallEventState?.pending &&
+    state.room === "village" &&
+    state.danger?.phase === "safe"
+  ) {
+    state.smallEventState.timer -= dt;
+
+    if (state.smallEventState.timer <= 0) {
+      v070TriggerSmallOutingEvent();
+    }
+  }
+
+  if (
+    (state.homeAtmosphere?.pendingRadio ||
+      state.homeAtmosphere?.pendingKnock) &&
     !["village", "square", "oldRoad", "westRoad", "market", "police"].includes(state.room)
   ) {
     state.homeAtmosphere.timer -= dt;
 
     if (state.homeAtmosphere.timer <= 0) {
-      v070TriggerHomeRadio();
+      if (state.homeAtmosphere.pendingKnock) {
+        v070TriggerHomeKnock();
+      } else {
+        v070TriggerHomeRadio();
+      }
+
       return;
     }
   }
@@ -14634,7 +14818,16 @@ function v070MotherMemoryChoice() {
           state.chapter9.motherChoiceMade = true;
           state.chapter9.motherStability += 2;
 
-          v070MotherFatherQuestion();
+          say(
+            [
+              ["Mãe", "Foi isso que eu fiz comigo."],
+              ["Mãe", "Parei de contar os dias. Parei de repetir a sequência das coisas."],
+              ["Mãe", "Quando uma lembrança vinha inteira, eu soltava antes de encaixar a próxima."],
+              ["Você", "Você fez isso de propósito?"],
+              ["Mãe", "No começo, não. Depois eu percebi que ele me perdia quando eu parava de sustentar uma história inteira sobre quem eu era."]
+            ],
+            v070MotherFatherQuestion
+          );
         }
       ],
       [
@@ -15057,6 +15250,9 @@ function v070FinishGame(result) {
   state.ending.complete = true;
   state.finished = true;
 
+  state.storyFlags.wheelchairGone = true;
+  state.storyFlags.policeCaseArchived = true;
+
   state.flashlight.on = false;
 
   if (result === "good") {
@@ -15253,6 +15449,26 @@ interact = function(action) {
   prepareSystems();
 
   if (
+    action === "squareMan" &&
+    v070Chapter9Unlocked() &&
+    !state.chapter9.entered &&
+    !state.storyFlags?.squareManDescentWarning
+  ) {
+    say(
+      [
+        ["Homem", "Ela se escondeu do jeito que só quem já foi criança sabe fazer."],
+        ["Você", "Você está falando da minha mãe?"],
+        ["Homem", "Espero que ela ainda lembre de você quando você chegar."]
+      ],
+      () => {
+        state.storyFlags.squareManDescentWarning = true;
+        save();
+      }
+    );
+    return;
+  }
+
+  if (
     action === "brother" &&
     v070Chapter9Unlocked() &&
     !state.chapter9.brotherPrepared
@@ -15374,6 +15590,21 @@ function v070DrawTunnelWorld() {
   c.restore();
 
   v070DrawDeepDarkness();
+
+  if (elapsed < v070DeepStaticUntil) {
+    for (let i = 0; i < 20; i++) {
+      const y =
+        (i * 18 + Math.floor(elapsed * 760) % H) % H;
+
+      rect(
+        0,
+        y,
+        W,
+        1,
+        "rgba(230,233,225,0.08)"
+      );
+    }
+  }
 }
 
 function v070DrawMineWorld() {
@@ -15763,7 +15994,44 @@ update = function(dt) {
     return;
   }
 
+  const finalExploration =
+    state &&
+    ["undergroundPassage", "mineDeep"].includes(state.room);
+
+  let savedClock = null;
+
+  if (finalExploration) {
+    savedClock = {
+      day: state.day,
+      minutes: state.minutes,
+      firstExit: state.firstExit,
+      dawnCollapseArmed: state.dawnCollapseArmed
+    };
+
+    // Movimento continua pelo pipeline normal, mas o clímax não pode
+    // ser interrompido por 07:00, fome ou evento de rua.
+    state.day = 0;
+    state.minutes = 0;
+    state.firstExit = false;
+    state.dawnCollapseArmed = false;
+  }
+
   v070FinalUpdateBase(dt);
+
+  if (savedClock && state) {
+    state.day = savedClock.day;
+    state.minutes = savedClock.minutes;
+    state.firstExit = savedClock.firstExit;
+    state.dawnCollapseArmed = savedClock.dawnCollapseArmed;
+
+    if (state.dawnCollapse) {
+      state.dawnCollapse.active = false;
+      state.dawnCollapse.phase = "idle";
+      state.dawnCollapse.time = 0;
+    }
+
+    updateHud();
+  }
 
   if (
     !state ||
@@ -15901,7 +16169,13 @@ window.addEventListener(
   true
 );
 
-$("version").textContent = "PROTÓTIPO · 0.6.51";
+$("help").onclick = () => modal(
+  "Como jogar",
+  "WASD / setas: andar. Shift/F: correr. E: interagir. I: inventário. J: diário. L: ligar/desligar a lanterna. Esc: pausar. ESPAÇO: soco apenas contra ameaças físicas compatíveis.\n\nAs contradições importantes ficam registradas sem mostrar pontuação de final. Cuidar do seu irmão, conferir pistas físicas e não aceitar memórias fáceis altera o que Estevão consegue defender no clímax.\n\nA partir da descida para a mina, o relógio para: o confronto final não é interrompido pelas 07:00.",
+  [["Voltar", closeModal]]
+);
+
+$("version").textContent = "PROTÓTIPO · 0.7.0";
   
   requestAnimationFrame(frame);
   showBootSplash();
