@@ -9652,11 +9652,15 @@ if (
 }
 
 function v0648Chapter2Unlocked() {
+  const q = state ? chapter() : null;
+
   return Boolean(
     state &&
     state.stage !== "prologue" &&
     state.finished &&
-    state.day >= 2
+    state.day >= 2 &&
+    q &&
+    q.clues.length >= 3
   );
 }
 
