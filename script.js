@@ -14297,6 +14297,1610 @@ updateHud = function() {
   }
 };
 
+
+// =========================================================
+// 0.7.0 — PARTE FINAL
+// CAPÍTULO 9 "A DESCIDA" + CAPÍTULO 10 "CASA DA MEMÓRIA" + 3 FINAIS
+// =========================================================
+
+if (!maps.undergroundPassage) {
+  maps.undergroundPassage = {
+    w: 2480,
+    h: 460,
+    objects: [
+      obj(520, 95, 74, 82, "rock"),
+      obj(815, 286, 95, 74, "rock"),
+      obj(1145, 92, 88, 78, "rock"),
+      obj(1515, 270, 110, 82, "rock"),
+      obj(1915, 105, 82, 80, "rock")
+    ],
+    doors: []
+  };
+}
+roomNames.undergroundPassage =
+  "Passagem sob a casa";
+
+if (!maps.mineDeep) {
+  maps.mineDeep = {
+    w: 1180,
+    h: 760,
+    objects: [
+      obj(185, 120, 80, 95, "rock"),
+      obj(365, 515, 120, 82, "rock"),
+      obj(570, 125, 95, 78, "rock"),
+      obj(780, 535, 110, 88, "rock"),
+      obj(985, 140, 88, 105, "rock")
+    ],
+    doors: []
+  };
+}
+roomNames.mineDeep =
+  "Interior da antiga mina";
+
+const V070_MOTHER_POS = {
+  x: 735,
+  y: 405
+};
+
+const V070_MINE_ANCHOR = {
+  x: 960,
+  y: 365
+};
+
+let v070DeepStaticUntil = 0;
+let v070DeepObserverUntil = 0;
+let v070MemoryStaticUntil = 0;
+
+function v070Chapter9Unlocked() {
+  return Boolean(
+    state &&
+    state.stage !== "prologue" &&
+    state.day >= 20 &&
+    state.chapter8?.complete
+  );
+}
+
+const v070FinalPrepareBase = prepareSystems;
+prepareSystems = function() {
+  v070FinalPrepareBase();
+
+  if (!state) return;
+
+  v070EnsureFinalSystems();
+
+  if (!state.chapter9 || typeof state.chapter9 !== "object") {
+    state.chapter9 = {
+      phase: "waiting",
+      brotherPrepared: false,
+      entered: false,
+      tunnelSeen: false,
+      motherMet: false,
+      motherChoiceMade: false,
+      motherStability: 0,
+      observerSeen: false,
+      memoryStarted: false,
+      complete: false
+    };
+  }
+
+  for (const key of [
+    "brotherPrepared",
+    "entered",
+    "tunnelSeen",
+    "motherMet",
+    "motherChoiceMade",
+    "observerSeen",
+    "memoryStarted",
+    "complete"
+  ]) {
+    if (typeof state.chapter9[key] !== "boolean") {
+      state.chapter9[key] = false;
+    }
+  }
+
+  if (!Number.isFinite(state.chapter9.motherStability)) {
+    state.chapter9.motherStability = 0;
+  }
+
+  if (
+    v070Chapter9Unlocked() &&
+    state.chapter9.phase === "waiting"
+  ) {
+    state.chapter9.phase = "ready";
+  }
+
+  if (!state.memoryHouse || typeof state.memoryHouse !== "object") {
+    state.memoryHouse = {
+      active: false,
+      phase: "idle",
+      errors: 0,
+      brotherLost: false,
+      fatherAccepted: false,
+      result: null,
+      finished: false
+    };
+  }
+
+  if (!Number.isFinite(state.memoryHouse.errors)) {
+    state.memoryHouse.errors = 0;
+  }
+
+  for (const key of [
+    "active",
+    "brotherLost",
+    "fatherAccepted",
+    "finished"
+  ]) {
+    if (typeof state.memoryHouse[key] !== "boolean") {
+      state.memoryHouse[key] = false;
+    }
+  }
+
+  if (typeof state.memoryHouse.phase !== "string") {
+    state.memoryHouse.phase = "idle";
+  }
+
+  if (!state.ending || typeof state.ending !== "object") {
+    state.ending = {
+      id: null,
+      complete: false,
+      epilogueSeen: false
+    };
+  }
+
+  if (typeof state.ending.complete !== "boolean") {
+    state.ending.complete = false;
+  }
+
+  if (typeof state.ending.epilogueSeen !== "boolean") {
+    state.ending.epilogueSeen = false;
+  }
+
+  if (state.ending.complete) {
+    state.memoryHouse.active = false;
+  }
+};
+
+function v070PrepareBrotherForDescent() {
+  prepareSystems();
+
+  if (state.chapter9.brotherPrepared) {
+    say([
+      ["Irmão", "Eu vou ficar aqui. A Florinda sabe que você desceu."],
+      ["Irmão", "Só volta."]
+    ]);
+    return;
+  }
+
+  say(
+    [
+      ["Você", "Eu achei uma passagem atrás do armário."],
+      ["Irmão", "Você vai entrar?"],
+      ["Você", "Vou. Mas você não vem comigo."],
+      ["Irmão", "Eu não quero ficar sozinho."],
+      ["Você", "A Florinda tem a chave. Se eu não voltar antes de clarear, vai para a casa dela."],
+      ["Irmão", "Você promete que volta?"],
+      ["Você", "Eu prometo que vou tentar."],
+      ["Irmão", "...Não esquece de mim lá embaixo."]
+    ],
+    () => {
+      state.chapter9.brotherPrepared = true;
+      state.relationship.brotherTrust += 1;
+      updateHud();
+      save();
+    }
+  );
+}
+
+function v070EnterUnderground() {
+  prepareSystems();
+
+  if (!state.chapter9.brotherPrepared) {
+    say([
+      "Não vou desaparecer por um buraco sem dizer ao meu irmão onde estou indo."
+    ]);
+    return;
+  }
+
+  if (
+    !state.flashlight?.owned
+  ) {
+    say([
+      "Está escuro demais. Eu não vou entrar sem uma lanterna."
+    ]);
+    return;
+  }
+
+  if (
+    state.flashlight.battery < 20
+  ) {
+    say([
+      "A bateria está baixa demais para uma passagem dessas.",
+      "Preciso trocar as pilhas antes de descer."
+    ]);
+    return;
+  }
+
+  state.chapter9.entered = true;
+  state.chapter9.phase = "tunnel";
+  state.flashlight.on = true;
+  state.flashlight.emptyWarned = false;
+
+  fade(
+    "A Descida",
+    "O ar fica mais frio depois dos primeiros metros.",
+    () => {
+      state.room = "undergroundPassage";
+      state.x = 85;
+      state.y = 230;
+      state.facing = "right";
+      state.walk = 0;
+
+      keys.clear();
+      near = null;
+      updateHud();
+      save();
+    }
+  );
+}
+
+function v070ReturnFromTunnel() {
+  state.flashlight.on = false;
+
+  fade(
+    "",
+    "",
+    () => {
+      state.room = "basement";
+      state.x = housePoint(475);
+      state.y = housePoint(175);
+      state.facing = "left";
+      state.walk = 0;
+
+      keys.clear();
+      near = null;
+      updateHud();
+      save();
+    }
+  );
+}
+
+function v070EnterMineDeep() {
+  state.chapter9.tunnelSeen = true;
+  state.chapter9.phase = "mine";
+  state.flashlight.on = true;
+
+  fade(
+    "Interior da mina",
+    "A parede de tijolos termina. Restam pedra, vigas e trilhos enferrujados.",
+    () => {
+      state.room = "mineDeep";
+      state.x = 105;
+      state.y = 390;
+      state.facing = "right";
+      state.walk = 0;
+
+      keys.clear();
+      near = null;
+
+      v070DeepStaticUntil =
+        elapsed + 0.55;
+
+      updateHud();
+      save();
+    }
+  );
+}
+
+function v070MotherFirstConversation() {
+  prepareSystems();
+
+  if (state.chapter9.motherMet) {
+    say([
+      ["Mãe", "Eu lembro do seu rosto agora."],
+      ["Mãe", "O resto vem e vai."]
+    ]);
+    return;
+  }
+
+  say(
+    [
+      ["Você", "Mãe...?"],
+      ["Mãe", "..."],
+      ["Você", "Mãe, sou eu."],
+      ["Mãe", "Não chega perto."],
+      ["Você", "Sou eu. Estevão."],
+      ["Mãe", "Estevão..."],
+      ["Mãe", "Filho?"],
+      ["Você", "Eu te encontrei."],
+      ["Mãe", "Você me encontrou..."],
+      ["Mãe", "Meu Deus. Você me encontrou."],
+      ["Mãe", "Me desculpa. Me desculpa por deixar você e seu irmão sozinhos esse tempo todo."]
+    ],
+    v070MotherMemoryChoice
+  );
+}
+
+function v070MotherMemoryChoice() {
+  modal(
+    "Ela está tentando se lembrar",
+    "A respiração dela acelera quando tenta organizar os últimos dias numa sequência.",
+    [
+      [
+        "“Não precisa lembrar de tudo agora.”",
+        () => {
+          closeModal();
+
+          state.chapter9.motherChoiceMade = true;
+          state.chapter9.motherStability += 2;
+
+          v070MotherFatherQuestion();
+        }
+      ],
+      [
+        "“Você é minha mãe. Tenta lembrar.”",
+        () => {
+          closeModal();
+
+          state.chapter9.motherChoiceMade = true;
+          state.chapter9.motherStability -= 1;
+
+          say(
+            [
+              ["Mãe", "Não. Se eu junto tudo... ele encontra o caminho de volta."],
+              ["Você", "Quem?"],
+              ["Mãe", "Eu não consigo manter uma história inteira na cabeça. Foi assim que eu fiquei escondida."]
+            ],
+            v070MotherFatherQuestion
+          );
+        }
+      ]
+    ]
+  );
+}
+
+function v070MotherFatherQuestion() {
+  say(
+    [
+      ["Você", "Cadê o pai?"],
+      ["Mãe", "Eu... não sei."],
+      ["Mãe", "A última coisa que eu lembro direito é dele comigo."],
+      ["Mãe", "Depois eu acordei aqui."],
+      ["Mãe", "Seu pai não estava aqui. Ele sumiu."],
+      "...",
+      "A lâmpada da lanterna chia.",
+      ["Mãe", "Não olha para o poço."]
+    ],
+    () => {
+      state.chapter9.motherMet = true;
+      state.chapter9.phase = "anchor";
+      state.chapter9.observerSeen = true;
+
+      v070DeepObserverUntil =
+        elapsed + 2.3;
+      v070DeepStaticUntil =
+        elapsed + 1.45;
+
+      keys.clear();
+      updateHud();
+      save();
+    }
+  );
+}
+
+function v070ApproachMineAnchor() {
+  prepareSystems();
+
+  if (!state.chapter9.motherMet) {
+    say([
+      "O ar perto do poço parece vibrar. Não vou chegar mais perto sozinho."
+    ]);
+    return;
+  }
+
+  if (state.chapter9.memoryStarted) {
+    return;
+  }
+
+  say(
+    [
+      "O trilho termina diante do poço.",
+      "A estática não vem só da lanterna. Vem das vigas, do metal e de dentro da minha cabeça.",
+      ["Mãe", "Não tenta entender tudo de uma vez."],
+      ["Mãe", "É assim que ele entra."],
+      "A escuridão ao redor do poço parece se mover sem sair do lugar."
+    ],
+    () => {
+      state.chapter9.memoryStarted = true;
+      state.chapter9.phase = "memory";
+      v070StartMemoryHouse();
+    }
+  );
+}
+
+function v070MemorySetPhase(phase) {
+  state.memoryHouse.phase = phase;
+  v070MemoryStaticUntil =
+    elapsed + 0.65;
+  keys.clear();
+}
+
+function v070StartMemoryHouse() {
+  prepareSystems();
+
+  state.memoryHouse.active = true;
+  state.memoryHouse.phase = "v1";
+  state.memoryHouse.errors = 0;
+  state.memoryHouse.brotherLost = false;
+  state.memoryHouse.fatherAccepted = false;
+  state.memoryHouse.result = null;
+  state.memoryHouse.finished = false;
+
+  keys.clear();
+  near = null;
+
+  v070MemoryStaticUntil =
+    elapsed + 0.85;
+
+  v070MemoryVersion1();
+}
+
+function v070MemoryVersion1() {
+  v070MemorySetPhase("v1");
+
+  modal(
+    "Casa da Memória · I",
+    "A sala parece normal. Quase. A cadeira do seu pai está do lado errado da mesa. O relógio da sala está parado exatamente em 07:00.\n\nEstevão: “Isso... não tá certo.”",
+    [
+      [
+        "Continuar",
+        () => {
+          closeModal();
+          v070MemoryVersion2();
+        }
+      ]
+    ]
+  );
+}
+
+function v070MemoryVersion2() {
+  v070MemorySetPhase("v2");
+
+  const hasFlorinda =
+    Boolean(
+      state.investigationLog?.keyClues?.florindaConfession
+    );
+
+  const buttons = [];
+
+  if (hasFlorinda) {
+    buttons.push([
+      "“Não. Foi a Florinda quem me contou.”",
+      () => {
+        closeModal();
+        v070MemoryVersion3();
+      }
+    ]);
+  } else {
+    buttons.push([
+      "“Isso não parece certo.”",
+      () => {
+        closeModal();
+        state.memoryHouse.errors += 1;
+        v070MemoryVersion3();
+      }
+    ]);
+  }
+
+  buttons.push([
+    "“Foi o Anísio... eu acho.”",
+    () => {
+      closeModal();
+      state.memoryHouse.errors += 1;
+      v070MemoryVersion3();
+    }
+  ]);
+
+  modal(
+    "Casa da Memória · II",
+    "Uma voz neutra fala como se estivesse lendo uma lembrança:\n\n“Foi o Sargento Anísio quem explicou por que você sempre acordava em casa às 00:00. Você lembra.”",
+    buttons
+  );
+}
+
+function v070MemoryVersion3() {
+  v070MemorySetPhase("v3");
+
+  const hasNotebook =
+    Boolean(
+      state.investigationLog?.keyClues?.fatherNotebook
+    );
+
+  const buttons = [];
+
+  if (hasNotebook) {
+    buttons.push([
+      "“Eu li o caderno. Ele existia.”",
+      () => {
+        closeModal();
+        v070MemoryVersion4();
+      }
+    ]);
+  } else {
+    buttons.push([
+      "“Eu encontrei alguma coisa aqui. Eu sei disso.”",
+      () => {
+        closeModal();
+        state.memoryHouse.errors += 1;
+        v070MemoryVersion4();
+      }
+    ]);
+  }
+
+  buttons.push([
+    "“Talvez eu só quisesse encontrar uma resposta.”",
+    () => {
+      closeModal();
+      state.memoryHouse.errors += 1;
+      v070MemoryVersion4();
+    }
+  ]);
+
+  modal(
+    "Casa da Memória · III",
+    "O quarto dos pais está limpo demais. A mesa está vazia. Não existe fotografia. Não existe caderno.\n\nA voz diz: “Você nunca encontrou nada aqui. Você só queria encontrar.”",
+    buttons
+  );
+}
+
+function v070MemoryVersion4() {
+  v070MemorySetPhase("v4");
+
+  const bond =
+    v070BrotherBond();
+
+  const buttons = [];
+
+  if (bond >= 3) {
+    buttons.push([
+      "“Eu cuidei dele. Eu ouvi os passos. Eu levei ele comigo quando a cópia entrou em casa.”",
+      () => {
+        closeModal();
+        state.relationship.brotherTrust += 1;
+        v070MemoryVersion5();
+      }
+    ]);
+  } else {
+    buttons.push([
+      "“Eu lembro de cuidar de alguém. Essa lembrança é minha.”",
+      () => {
+        closeModal();
+        state.memoryHouse.errors += 1;
+        v070MemoryVersion5();
+      }
+    ]);
+  }
+
+  buttons.push([
+    "“Talvez eu nunca tenha tido um irmão.”",
+    () => {
+      closeModal();
+      state.memoryHouse.errors += 2;
+      state.memoryHouse.brotherLost = true;
+      v070MemoryVersion5();
+    }
+  ]);
+
+  modal(
+    "Casa da Memória · IV",
+    "O quarto do seu irmão não tem cama pequena, brinquedos, roupas ou desenhos. É só um cômodo vazio.\n\nObservador: “Você nunca teve um irmão.”",
+    buttons
+  );
+}
+
+function v070MemoryVersion5() {
+  v070MemorySetPhase("v5");
+
+  const photoUsed =
+    Boolean(
+      state.investigationLog?.keyClues?.photoCopy
+    );
+
+  const buttons = [];
+
+  if (photoUsed) {
+    buttons.push([
+      "“Essa tatuagem... você nunca teve isso.”",
+      () => {
+        closeModal();
+        v070RejectFalseFather(true);
+      }
+    ]);
+  } else {
+    buttons.push([
+      "“Você não é meu pai.”",
+      () => {
+        closeModal();
+        state.memoryHouse.errors += 1;
+        v070RejectFalseFather(false);
+      }
+    ]);
+  }
+
+  buttons.push([
+    "Sentar com ele.",
+    () => {
+      closeModal();
+      state.memoryHouse.fatherAccepted = true;
+      v070ResolveMemoryHouse();
+    }
+  ]);
+
+  modal(
+    "Casa da Memória · V",
+    "A sala fica quente, iluminada como uma tarde comum. Seu pai está na cadeira de sempre.\n\nPai: “Estevão. Vem cá, filho. Já passou. Você deve estar cansado de procurar.”\n\nQuando ele estende o braço para puxar uma cadeira, a manga sobe. Há uma tatuagem no antebraço.",
+    buttons
+  );
+}
+
+function v070RejectFalseFather(withPhoto) {
+  v070MemorySetPhase("v5break");
+
+  if (withPhoto) {
+    modal(
+      "A imagem racha",
+      "Pai: “...Isso importa agora?”\n\nEstevão: “Importa. Porque você não é ele.”\n\nA estática rasga o rosto conhecido. Por baixo existe outro homem — parecido o bastante para ser família, mas não o pai de Estevão.\n\nObservador: “Você poderia ter ficado.”\n\nEstevão: “Eu sei o que eu perdi. Não preciso que você finja que devolveu.”",
+      [
+        [
+          "Continuar",
+          () => {
+            closeModal();
+            state.storyFlags.norbertoBodySeen = true;
+            v070MemoryTrueVersion();
+          }
+        ]
+      ]
+    );
+  } else {
+    modal(
+      "A imagem hesita",
+      "A figura insiste que é seu pai. Você não tem a lembrança física certa para desmontar a mentira de imediato, mas recusa o convite.\n\nA sala racha em estática.",
+      [
+        [
+          "Continuar",
+          () => {
+            closeModal();
+            v070MemoryTrueVersion();
+          }
+        ]
+      ]
+    );
+  }
+}
+
+function v070MemoryTrueVersion() {
+  v070MemorySetPhase("true");
+
+  const splitKnown =
+    Boolean(
+      state.investigationLog?.keyClues?.splitReveal
+    );
+
+  const originLine = splitKnown
+    ? "As vozes da mina se sobrepõem. Entre elas, o nome Split Lancaster volta como um peso: o capataz que ignorou as rachaduras morreu com os homens que tentou controlar."
+    : "As vozes da mina se sobrepõem. Um capataz mandando os homens continuarem, rachaduras sendo ignoradas, pedra cedendo. Algo ficou preso naquele instante.";
+
+  modal(
+    "A versão verdadeira",
+    "A casa volta ao lugar por alguns segundos.\n\n" +
+    originLine +
+    "\n\nEstevão entende que aquilo não é um fantasma dos mortos. É o padrão que ficou quando várias identidades foram esmagadas juntas — uma coisa que aprendeu a existir dentro da diferença entre lembrança e fato.\n\nE entende as 07h: ele não conseguiu substituir Estevão de uma vez. Então repetiu um horário, noite após noite, até o corpo começar a obedecer.",
+    [
+      [
+        "Continuar",
+        () => {
+          closeModal();
+          v070ResolveMemoryHouse();
+        }
+      ]
+    ]
+  );
+}
+
+function v070ResolveMemoryHouse() {
+  prepareSystems();
+
+  const memory =
+    state.memoryHouse;
+
+  const keyCount =
+    v070KeyClueCount();
+
+  const bond =
+    v070BrotherBond();
+
+  let result = "leftBehind";
+
+  if (memory.fatherAccepted) {
+    result = "leftBehind";
+  } else if (
+    memory.brotherLost ||
+    bond < 2
+  ) {
+    result = "whoRemained";
+  } else if (
+    keyCount >= 5 &&
+    state.chapter9.motherStability >= 1 &&
+    memory.errors <= 1
+  ) {
+    result = "good";
+  } else if (
+    memory.errors >= 2 ||
+    keyCount <= 4
+  ) {
+    result = "leftBehind";
+  } else {
+    result = "whoRemained";
+  }
+
+  memory.result = result;
+  memory.finished = true;
+
+  v070FinishGame(result);
+}
+
+function v070FinishGame(result) {
+  state.memoryHouse.active = false;
+  state.chapter9.complete = true;
+  state.chapter9.phase = "complete";
+  state.ending.id = result;
+  state.ending.complete = true;
+  state.finished = true;
+
+  state.flashlight.on = false;
+
+  if (result === "good") {
+    state.storyFlags.motherRescued = true;
+    state.storyFlags.fatherPermanentlyLost = true;
+
+    v070EndingGood();
+    return;
+  }
+
+  if (result === "whoRemained") {
+    state.storyFlags.brotherLost = true;
+
+    v070EndingWhoRemained();
+    return;
+  }
+
+  state.storyFlags.estevaoLost = true;
+
+  v070EndingLeftBehind();
+}
+
+function v070EndingGood() {
+  modal(
+    "A Casa que Restou",
+    "A estática recua até virar apenas um chiado distante.\n\nA mãe reconhece o homem que apareceu sob o rosto do pai: Norberto Lancaster, irmão dele. O Observador usou um corpo da própria família para sustentar a cópia.\n\nO pai verdadeiro não volta. Não existe despedida escondida, cura ou segunda chance. O que resta é a certeza de que a voz usada na Casa da Memória não era dele.",
+    [
+      [
+        "Continuar",
+        () => {
+          closeModal();
+
+          modal(
+            "Alguns dias depois",
+            "Estevão, o irmão e a mãe deixam a passagem. Ela ainda perde pedaços de sequência e precisa reaprender a confiar nas próprias lembranças.\n\nO relógio parado da sala volta a funcionar depois que o irmão insiste em consertá-lo.\n\nNa praça, a cadeira do homem que sabia demais está vazia. Ninguém sabe para onde ele foi.\n\nAnísio arquiva o caso com uma explicação oficial que não combina totalmente com o que aconteceu.",
+            [
+              [
+                "Continuar",
+                () => {
+                  closeModal();
+
+                  modal(
+                    "A Casa que Restou",
+                    "O irmão observa a janela antes de dormir.\n\nIrmão: “Acha que ele ainda está olhando?”\n\nEstevão não responde.\n\nEm outra rua de Forgotten, uma família discute sobre uma lembrança pequena que nenhum dos dois consegue provar.",
+                    [
+                      [
+                        "Encerrar",
+                        () => {
+                          state.ending.epilogueSeen = true;
+                          v070ReturnToMenu();
+                        }
+                      ]
+                    ]
+                  );
+                }
+              ]
+            ]
+          );
+        }
+      ]
+    ]
+  );
+}
+
+function v070EndingWhoRemained() {
+  modal(
+    "Quem Restou",
+    "A Casa da Memória volta ao lugar, mas um cômodo continua errado.\n\nQuando Estevão tenta dizer o nome do irmão, a palavra não encontra nada onde deveria se apoiar.\n\nA mãe pergunta de quem ele está falando.",
+    [
+      [
+        "Continuar",
+        () => {
+          closeModal();
+
+          modal(
+            "Dias depois",
+            "O quarto pequeno parece ter pertencido a outra coisa. Nenhuma fotografia prova o contrário com clareza suficiente.\n\nEstevão sabe que falta alguém. Às vezes lembra de uma voz, de um carrinho, de passos no corredor. As lembranças não encaixam mais umas nas outras.\n\nO Observador não matou uma criança diante dele. Fez algo pior: tornou a ausência plausível.",
+            [
+              [
+                "Encerrar",
+                () => {
+                  state.ending.epilogueSeen = true;
+                  v070ReturnToMenu();
+                }
+              ]
+            ]
+          );
+        }
+      ]
+    ]
+  );
+}
+
+function v070EndingLeftBehind() {
+  modal(
+    "O Que Ficou Para Trás",
+    "A sala quente parece mais fácil do que a verdade.\n\nPor alguns segundos, Estevão aceita uma versão que gostaria que fosse real.\n\nA estática para.",
+    [
+      [
+        "Continuar",
+        () => {
+          closeModal();
+
+          modal(
+            "Depois",
+            "A mãe e o irmão são encontrados, mas Estevão não está com eles.\n\nNão há corpo. Não há trilha de saída. Os registros da cidade discordam até sobre a última vez em que alguém o viu.\n\nEm alguns documentos, ele nunca chegou a entrar na mina.\n\nEm outros, o nome Estevão Lancaster aparece numa linha antiga demais para ser possível.",
+            [
+              [
+                "Encerrar",
+                () => {
+                  state.ending.epilogueSeen = true;
+                  v070ReturnToMenu();
+                }
+              ]
+            ]
+          );
+        }
+      ]
+    ]
+  );
+}
+
+function v070ReturnToMenu() {
+  save();
+  closeModal();
+
+  mode = "menu";
+
+  $("menu").hidden = false;
+  $("hud").hidden = true;
+  $("prompt").hidden = true;
+
+  keys.clear();
+}
+
+const v070FinalGetNearBase = getNear;
+getNear = function() {
+  prepareSystems();
+
+  if (
+    state.room === "undergroundPassage"
+  ) {
+    if (state.x < 105) {
+      return {
+        label: "Voltar ao porão",
+        action: "undergroundBack"
+      };
+    }
+
+    if (state.x > 2335) {
+      return {
+        label: "Seguir para a mina",
+        action: "undergroundMine"
+      };
+    }
+  }
+
+  if (
+    state.room === "mineDeep"
+  ) {
+    if (
+      !state.chapter9.motherMet &&
+      Math.hypot(
+        state.x - V070_MOTHER_POS.x,
+        state.y - V070_MOTHER_POS.y
+      ) < 55
+    ) {
+      return {
+        label: "Falar com sua mãe",
+        action: "mineMother"
+      };
+    }
+
+    if (
+      state.chapter9.motherMet &&
+      !state.chapter9.memoryStarted &&
+      Math.hypot(
+        state.x - V070_MINE_ANCHOR.x,
+        state.y - V070_MINE_ANCHOR.y
+      ) < 78
+    ) {
+      return {
+        label: "Aproximar-se do poço",
+        action: "mineAnchor"
+      };
+    }
+  }
+
+  return v070FinalGetNearBase();
+};
+
+const v070FinalInteractBase = interact;
+interact = function(action) {
+  prepareSystems();
+
+  if (
+    action === "brother" &&
+    v070Chapter9Unlocked() &&
+    !state.chapter9.brotherPrepared
+  ) {
+    v070PrepareBrotherForDescent();
+    return;
+  }
+
+  if (
+    action === "basementHole" &&
+    v070Chapter9Unlocked() &&
+    !state.chapter9.entered
+  ) {
+    v070EnterUnderground();
+    return;
+  }
+
+  if (action === "undergroundBack") {
+    v070ReturnFromTunnel();
+    return;
+  }
+
+  if (action === "undergroundMine") {
+    v070EnterMineDeep();
+    return;
+  }
+
+  if (action === "mineMother") {
+    v070MotherFirstConversation();
+    return;
+  }
+
+  if (action === "mineAnchor") {
+    v070ApproachMineAnchor();
+    return;
+  }
+
+  v070FinalInteractBase(action);
+};
+
+function v070DrawTunnelWorld() {
+  const m = maps.undergroundPassage;
+
+  camera.x = Math.max(
+    0,
+    Math.min(
+      m.w - W,
+      state.x - W / 2
+    )
+  );
+
+  camera.y = Math.max(
+    0,
+    Math.min(
+      m.h - H,
+      state.y - H / 2
+    )
+  );
+
+  c.save();
+  c.translate(
+    -Math.floor(camera.x),
+    -Math.floor(camera.y)
+  );
+
+  rect(0, 0, m.w, m.h, "#111315");
+  rect(0, 85, m.w, 290, "#292724");
+  rect(0, 375, m.w, 85, "#161718");
+
+  // A passagem começa como fundação doméstica e vira mina aos poucos.
+  for (let x = 0; x < 650; x += 36) {
+    rect(x, 92, 2, 275, "#4a4038");
+    rect(x, 92, 34, 3, "#5a4b40");
+  }
+
+  for (let x = 660; x < 1500; x += 95) {
+    rect(x, 95, 9, 270, "#4a3f32");
+    rect(x - 6, 98, 108, 8, "#584a38");
+  }
+
+  for (let x = 1510; x < m.w; x += 82) {
+    rect(x, 115, 7, 250, "#3d342b");
+    rect(x - 5, 112, 92, 7, "#4a3c30");
+  }
+
+  // Trilhos surgem perto do meio e seguem até a mina.
+  for (let x = 1020; x < m.w; x += 34) {
+    rect(x, 285, 24, 3, "#4f4b45");
+  }
+
+  rect(1000, 270, m.w - 1000, 4, "#66615a");
+  rect(1000, 305, m.w - 1000, 4, "#66615a");
+
+  for (const o of m.objects) {
+    rect(o.x, o.y, o.w, o.h, "#363433");
+    rect(o.x + 7, o.y + 8, Math.max(8, o.w - 14), Math.max(8, o.h - 16), "#242526");
+  }
+
+  txt(
+    state.x < 700
+      ? "FUNDAÇÃO ANTIGA"
+      : state.x < 1550
+        ? "GALERIA DE SERVIÇO"
+        : "MINA",
+    Math.max(28, state.x - 145),
+    68,
+    "#8d8678",
+    7
+  );
+
+  person(
+    state.x,
+    state.y,
+    "player",
+    state.walk,
+    state.facing
+  );
+
+  c.restore();
+
+  v070DrawDeepDarkness();
+}
+
+function v070DrawMineWorld() {
+  const m = maps.mineDeep;
+
+  camera.x = Math.max(
+    0,
+    Math.min(
+      m.w - W,
+      state.x - W / 2
+    )
+  );
+
+  camera.y = Math.max(
+    0,
+    Math.min(
+      m.h - H,
+      state.y - H / 2
+    )
+  );
+
+  c.save();
+  c.translate(
+    -Math.floor(camera.x),
+    -Math.floor(camera.y)
+  );
+
+  rect(0, 0, m.w, m.h, "#0f1112");
+
+  for (let y = 50; y < m.h; y += 48) {
+    for (let x = 35; x < m.w; x += 58) {
+      const h = hash(x, y);
+
+      rect(
+        x,
+        y,
+        22 + h * 28,
+        5 + h * 6,
+        h > 0.55 ? "#2f2e2c" : "#242526"
+      );
+    }
+  }
+
+  // Galeria principal.
+  rect(55, 300, 1030, 205, "#292827");
+
+  // Vigas de contenção.
+  for (let x = 120; x < 1040; x += 135) {
+    rect(x, 250, 10, 300, "#4a3d2f");
+    rect(x - 10, 248, 145, 9, "#554535");
+  }
+
+  // Trilhos e dormentes.
+  rect(70, 385, 930, 4, "#625e58");
+  rect(70, 420, 930, 4, "#625e58");
+
+  for (let x = 80; x < 1010; x += 38) {
+    rect(x, 377, 26, 54, "#3e342b");
+  }
+
+  for (const o of m.objects) {
+    rect(o.x, o.y, o.w, o.h, "#343231");
+  }
+
+  // Poço / ponto de ancoragem.
+  c.beginPath();
+  c.fillStyle = "#020304";
+  c.arc(
+    V070_MINE_ANCHOR.x,
+    V070_MINE_ANCHOR.y,
+    72,
+    0,
+    Math.PI * 2
+  );
+  c.fill();
+
+  c.beginPath();
+  c.strokeStyle = "#4d4840";
+  c.lineWidth = 8;
+  c.arc(
+    V070_MINE_ANCHOR.x,
+    V070_MINE_ANCHOR.y,
+    78,
+    0,
+    Math.PI * 2
+  );
+  c.stroke();
+
+  // Mãe permanece fisicamente na mina; não existe pai real aqui.
+  if (!state.ending?.complete) {
+    person(
+      V070_MOTHER_POS.x,
+      V070_MOTHER_POS.y,
+      "mother",
+      0,
+      state.x < V070_MOTHER_POS.x
+        ? "left"
+        : "right",
+      0.96
+    );
+  }
+
+  if (
+    state.chapter9?.observerSeen &&
+    elapsed < v070DeepObserverUntil
+  ) {
+    const x = 925;
+    const y = 325;
+    const jitter =
+      Math.sin(elapsed * 49) * 2;
+
+    rect(x - 25 + jitter, y - 18, 43, 13, "#010203");
+    rect(x - 12 - jitter, y - 33, 28, 19, "#010203");
+    rect(x - 31, y - 9, 19, 8, "#010203");
+    rect(x + 11, y - 13, 22, 9, "#010203");
+    rect(x - 17, y - 5, 8, 17, "#010203");
+    rect(x + 8, y - 6, 9, 18, "#010203");
+  }
+
+  person(
+    state.x,
+    state.y,
+    "player",
+    state.walk,
+    state.facing
+  );
+
+  c.restore();
+
+  v070DrawDeepDarkness();
+
+  if (elapsed < v070DeepStaticUntil) {
+    for (let i = 0; i < 28; i++) {
+      const y =
+        (i * 15 + Math.floor(elapsed * 830) % H) % H;
+
+      rect(
+        0,
+        y,
+        W,
+        1 + (i % 4 === 0 ? 1 : 0),
+        "rgba(230,233,225,0.11)"
+      );
+    }
+  }
+}
+
+function v070DrawDeepDarkness() {
+  const on =
+    state.flashlight?.owned &&
+    state.flashlight.on &&
+    state.flashlight.battery > 0;
+
+  let sx =
+    state.x - camera.x;
+  let sy =
+    state.y - camera.y - 8;
+
+  if (on) {
+    if (state.facing === "left") sx -= 50;
+    else if (state.facing === "right") sx += 50;
+    else if (state.facing === "up") sy -= 55;
+    else sy += 55;
+  }
+
+  const gradient =
+    c.createRadialGradient(
+      sx,
+      sy,
+      on ? 28 : 10,
+      sx,
+      sy,
+      on ? 205 : 55
+    );
+
+  if (on) {
+    gradient.addColorStop(0, "rgba(0,0,0,0.02)");
+    gradient.addColorStop(0.4, "rgba(0,0,0,0.12)");
+    gradient.addColorStop(0.72, "rgba(0,0,0,0.67)");
+    gradient.addColorStop(1, "rgba(0,0,0,0.98)");
+  } else {
+    gradient.addColorStop(0, "rgba(0,0,0,0.70)");
+    gradient.addColorStop(1, "rgba(0,0,0,0.995)");
+  }
+
+  c.save();
+  c.fillStyle = gradient;
+  c.fillRect(0, 0, W, H);
+
+  txt(
+    "LANTERNA " +
+    Math.ceil(state.flashlight?.battery || 0) +
+    "% · L",
+    14,
+    H - 14,
+    (state.flashlight?.battery || 0) < 20
+      ? "#c49a83"
+      : "#c9c2ad",
+    7
+  );
+
+  c.restore();
+}
+
+function v070DrawMemoryHouse() {
+  const memory =
+    state.memoryHouse;
+
+  rect(0, 0, W, H, "#090a0c");
+
+  const phase =
+    memory.phase;
+
+  // Cada versão é um cenário completo, sem colisão ou movimento.
+  const wall =
+    phase === "true"
+      ? "#5b5144"
+      : phase === "v5" || phase === "v5break"
+        ? "#725d43"
+        : "#423d37";
+
+  const floor =
+    phase === "true"
+      ? "#4b4035"
+      : "#2f2b28";
+
+  rect(34, 32, W - 68, H - 58, wall);
+  rect(48, 94, W - 96, H - 132, floor);
+
+  // Janela.
+  rect(72, 49, 78, 38, "#171c20");
+  rect(109, 49, 3, 38, "#4c4940");
+  rect(72, 67, 78, 3, "#4c4940");
+
+  // Mesa.
+  rect(205, 147, 120, 42, "#5b4633");
+  rect(218, 189, 8, 34, "#3c3027");
+  rect(304, 189, 8, 34, "#3c3027");
+
+  // Relógio.
+  rect(359, 56, 54, 38, "#242424");
+  txt(
+    phase === "true"
+      ? "00:17"
+      : "07:00",
+    369,
+    79,
+    "#b5ad99",
+    8
+  );
+
+  if (phase === "v1") {
+    // Cadeira propositalmente no lado errado.
+    rect(168, 155, 28, 34, "#554334");
+  } else {
+    rect(331, 155, 28, 34, "#554334");
+  }
+
+  if (phase === "v2") {
+    txt(
+      "UMA LEMBRANÇA CONTADA POR OUTRA VOZ",
+      84,
+      238,
+      "#8e897f",
+      7
+    );
+  }
+
+  if (phase === "v3") {
+    // A mesa dos pais fica vazia.
+    rect(48, 94, 110, 85, "#2a2725");
+    txt(
+      "NADA FOI ENCONTRADO",
+      63,
+      141,
+      "#777067",
+      7
+    );
+  }
+
+  if (phase === "v4") {
+    // Quarto do irmão apagado.
+    rect(48, 94, W - 96, H - 132, "#242526");
+    rect(95, 125, 285, 88, "#292a2b");
+    txt(
+      "UM CÔMODO SEM HISTÓRIA",
+      151,
+      173,
+      "#716d66",
+      8
+    );
+  }
+
+  if (
+    phase === "v5" ||
+    phase === "v5break"
+  ) {
+    person(
+      276,
+      168,
+      "father",
+      0,
+      "down",
+      1.08
+    );
+
+    // Tatuagem fica visível como detalhe físico, não como "monstro".
+    rect(
+      286,
+      153,
+      8,
+      3,
+      "#222126"
+    );
+  }
+
+  if (phase === "true") {
+    person(
+      140,
+      190,
+      "brother",
+      0,
+      "right",
+      0.82
+    );
+
+    person(
+      370,
+      192,
+      "mother",
+      0,
+      "left",
+      0.96
+    );
+  }
+
+  if (elapsed < v070MemoryStaticUntil) {
+    for (let i = 0; i < 34; i++) {
+      const y =
+        (i * 11 + Math.floor(elapsed * 930) % H) % H;
+
+      rect(
+        (i % 2 ? -8 : 4),
+        y,
+        W + 16,
+        1 + (i % 5 === 0 ? 2 : 0),
+        "rgba(232,234,228,0.14)"
+      );
+    }
+  }
+}
+
+const v070FinalDrawBase = drawWorld;
+drawWorld = function() {
+  if (
+    state?.memoryHouse?.active
+  ) {
+    v070DrawMemoryHouse();
+    return;
+  }
+
+  if (
+    state?.room === "undergroundPassage"
+  ) {
+    v070DrawTunnelWorld();
+    return;
+  }
+
+  if (
+    state?.room === "mineDeep"
+  ) {
+    v070DrawMineWorld();
+    return;
+  }
+
+  v070FinalDrawBase();
+};
+
+const v070FinalUpdateBase = update;
+update = function(dt) {
+  prepareSystems();
+
+  if (
+    state?.memoryHouse?.active
+  ) {
+    elapsed += dt;
+    return;
+  }
+
+  v070FinalUpdateBase(dt);
+
+  if (
+    !state ||
+    mode !== "game" ||
+    dialog ||
+    transitionBusy ||
+    !$("overlay").hidden ||
+    state.gameOver ||
+    state.dawnCollapse?.active ||
+    state.wakeUp?.active
+  ) {
+    return;
+  }
+
+  if (
+    ["undergroundPassage", "mineDeep"].includes(state.room) &&
+    state.flashlight?.owned &&
+    state.flashlight.on &&
+    state.flashlight.battery > 0
+  ) {
+    state.flashlight.battery = Math.max(
+      0,
+      state.flashlight.battery - dt * 0.11
+    );
+
+    if (
+      state.flashlight.battery <= 0 &&
+      !state.flashlight.emptyWarned
+    ) {
+      state.flashlight.on = false;
+      state.flashlight.emptyWarned = true;
+
+      v06Toast(
+        "A lanterna apagou. Preciso voltar.",
+        2.4
+      );
+
+      save();
+    }
+  }
+
+  if (
+    state.room === "undergroundPassage" &&
+    !state.chapter9.tunnelSeen &&
+    state.x > 1180
+  ) {
+    state.chapter9.tunnelSeen = true;
+    v070DeepStaticUntil = elapsed + 0.45;
+
+    v06Toast(
+      "A alvenaria da casa terminou. Isso é parte da mina.",
+      2.5
+    );
+
+    save();
+  }
+};
+
+const v070FinalHudBase = updateHud;
+updateHud = function() {
+  v070FinalHudBase();
+
+  if (!state || state.stage === "prologue") return;
+
+  prepareSystems();
+
+  if (
+    state.ending?.complete
+  ) {
+    $("objective").textContent =
+      state.ending.id === "good"
+        ? "FIM · A Casa que Restou"
+        : state.ending.id === "whoRemained"
+          ? "FIM · Quem Restou"
+          : "FIM · O Que Ficou Para Trás";
+    return;
+  }
+
+  if (
+    v070Chapter9Unlocked() &&
+    !state.chapter9.complete
+  ) {
+    if (!state.chapter9.brotherPrepared) {
+      $("objective").textContent =
+        "Converse com seu irmão antes de descer.";
+      return;
+    }
+
+    if (!state.chapter9.entered) {
+      $("objective").textContent =
+        "Volte ao porão com a lanterna e entre pela abertura atrás do armário.";
+      return;
+    }
+
+    if (state.room === "undergroundPassage") {
+      $("objective").textContent =
+        "Siga a passagem até a antiga mina.";
+      return;
+    }
+
+    if (
+      state.room === "mineDeep" &&
+      !state.chapter9.motherMet
+    ) {
+      $("objective").textContent =
+        "Encontre quem está na galeria.";
+      return;
+    }
+
+    if (
+      state.room === "mineDeep" &&
+      state.chapter9.motherMet &&
+      !state.chapter9.memoryStarted
+    ) {
+      $("objective").textContent =
+        "Aproxime-se do poço.";
+      return;
+    }
+  }
+};
+
+// Durante a Casa da Memória, Esc não pode fechar a decisão e devolver
+// movimento livre. A sequência só avança pelas escolhas narrativas.
+window.addEventListener(
+  "keydown",
+  event => {
+    if (
+      state?.memoryHouse?.active &&
+      event.key.toLowerCase() === "escape"
+    ) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }
+  },
+  true
+);
+
 $("version").textContent = "PROTÓTIPO · 0.6.51";
   
   requestAnimationFrame(frame);
