@@ -9000,17 +9000,8 @@ function v0646GoOldRoad() {
   );
 }
 
-function v0646ReturnVillage(escaped = false) {
+function v0646ReturnVillage() {
   prepareSystems();
-
-  if (escaped) {
-    state.oldManEvent.phase = "escaped";
-    state.oldManEvent.caught = false;
-    v0646CountOldManEncounter();
-
-    state.pendingBrotherRemark =
-      "Você voltou correndo... tinha alguém atrás de você?";
-  }
 
   fade(
     "",
@@ -9025,10 +9016,6 @@ function v0646ReturnVillage(escaped = false) {
       keys.clear();
       near = null;
       updateHud();
-
-      if (escaped) {
-        v06Toast("Consegui voltar para o bairro.", 2.1);
-      }
     }
   );
 }
@@ -9144,7 +9131,7 @@ interact = function(action) {
   }
 
   if (action === "oldRoadBack") {
-    v0646ReturnVillage(false);
+    v0646ReturnVillage();
     return;
   }
 
@@ -9330,18 +9317,6 @@ function v0646DrawOldRoad() {
 
   v0646ApplyOutdoorLight();
 
-  if (
-    state.oldManEvent.phase === "chase" &&
-    !state.oldManEvent.caught
-  ) {
-    txt(
-      "F · CORRER",
-      18,
-      H - 22,
-      "#dbc8a0",
-      8
-    );
-  }
 }
 
 const v0646DrawWorldBase = drawWorld;
