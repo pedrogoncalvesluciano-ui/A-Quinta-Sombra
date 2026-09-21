@@ -9625,6 +9625,8 @@ prepareSystems = function() {
 
   if (!state) return;
 
+  let migrated = false;
+
   if (!state.storyFlags || typeof state.storyFlags !== "object") {
     state.storyFlags = {};
   }
@@ -9651,10 +9653,12 @@ prepareSystems = function() {
     ["waiting", "brother"].includes(q.phase)
   ) {
     q.phase = "clues";
+    migrated = true;
   }
 
   if (q.phase === "cluesDone") {
     q.phase = "complete";
+    migrated = true;
   }
 
   // Migração: saves antigos podem ter Raimundo no papel hostil.
@@ -9667,70 +9671,16 @@ prepareSystems = function() {
     state.oldManEvent.caught = false;
     state.oldManEvent.runUnlocked = true;
     state.storyFlags.raimundoMet = true;
+    migrated = true;
+  }
+
+  if (migrated) {
+    save();
   }
 };
 
-v0646StartOldManChoice = function() {
-  prepareSystems();
-
-  say(
-    [
-      ["Raimundo", "Tá tarde para um garoto andar sozinho por esta estrada."],
-      ["Você", "O senhor conhece meus pais?"],
-      ["Raimundo", "Conheço o suficiente. Seu sobrenome já diz bastante, pra quem sabe ouvir."],
-      ["Você", "Como assim?"],
-      ["Raimundo", "Não vou te encher a cabeça com coisa que eu mesmo não sei explicar."],
-      ["Raimundo", "Só não entre na mata sem luz. E, se vir alguma coisa parada onde não devia estar, corre. Não chega perto."]
-    ],
-    () => {
-      state.oldManEvent.phase = "helped";
-      state.oldManEvent.runUnlocked = true;
-      state.oldManEvent.caught = false;
-      state.storyFlags.raimundoMet = true;
-
-      v0646CountOldManEncounter();
-
-      v06Toast(
-        "Corrida liberada · segure Shift ou F",
-        3
-      );
-
-      updateHud();
-      save();
-    }
-  );
-};
-
-// O assunto na delegacia deixa de tratar Raimundo como agressor.
-v0630PoliceOldMan = function() {
-  prepareSystems();
-
-  if (
-    state.storyEvents.oldManEncounters <=
-    state.policeReportedEvents.oldManEncounters
-  ) {
-    say([
-      ["Policial", "Sim, eu sei quem é o Raimundo."],
-      ["Policial", "Ele mora naquela estrada há muito tempo."]
-    ]);
-    return;
-  }
-
-  state.policeReportedEvents.oldManEncounters =
-    state.storyEvents.oldManEncounters;
-
-  state.policeReports.oldMan += 1;
-
-  say(
-    [
-      ["Você", "Encontrei um homem chamado Raimundo na estrada do sul."],
-      ["Policial", "Raimundo? Ele trabalhou na antiga mina quando era mais novo."],
-      ["Você", "Ele disse que conhece minha família."],
-      ["Policial", "Ele conhece muita história antiga da cidade. Se ele falou da mina, escute com cuidado, mas não entre naquele lugar."]
-    ],
-    save
-  );
-};
+// O encontro e o diálogo policial já foram corrigidos diretamente
+// nos sistemas-base da estrada. A 0.6.48 só cuida da migração de saves.
 
 const v0648GetNearBase = getNear;
 getNear = function() {
