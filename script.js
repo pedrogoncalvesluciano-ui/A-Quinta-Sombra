@@ -8321,6 +8321,12 @@ function v0645OpenInventory() {
       "%"
     );
   }
+  if (state.chapter6?.notebookRead) {
+    itemNames.push("Caderno do pai");
+  }
+  if (state.neighborKey) {
+    itemNames.push("Chave de Florinda");
+  }
 
   if (!itemNames.length) {
     itemNames.push("Nenhum item carregado.");
@@ -11736,6 +11742,365 @@ updateHud = function() {
       $("objective").textContent =
         "Converse com seu irmão sobre o que você registrou.";
     }
+  }
+};
+
+
+// =========================================================
+// 0.6.50 — CAPÍTULO 6 "O PORÃO"
+// =========================================================
+
+if (!maps.basement) {
+  room(
+    "basement",
+    [
+      obj(
+        82, 78, 118, 58,
+        "crate",
+        "Abrir a caixa de ferramentas",
+        "basementNotebook"
+      ),
+      obj(
+        245, 225, 138, 58,
+        "table",
+        "Examinar o mapa rabiscado",
+        "basementMap"
+      ),
+      obj(
+        455, 72, 105, 190,
+        "shelf",
+        "Examinar o armário antigo",
+        "basementCabinet"
+      ),
+      obj(80, 260, 95, 55, "crate"),
+      obj(210, 82, 72, 48, "crate"),
+      obj(318, 85, 82, 46, "shelf")
+    ],
+    [
+      door(
+        310, 374,
+        "village", 388, 548,
+        "Voltar ao quintal"
+      )
+    ]
+  );
+}
+roomNames.basement = "Porão dos Lancaster";
+
+function v0650Chapter6Unlocked() {
+  return Boolean(
+    state &&
+    state.day >= 11 &&
+    state.chapter5?.complete &&
+    v0650EnsureInvestigationLog().contradictions.length >= 3
+  );
+}
+
+const v0650Chapter6PrepareBase = prepareSystems;
+prepareSystems = function() {
+  v0650Chapter6PrepareBase();
+
+  if (!state) return;
+
+  if (!state.chapter6 || typeof state.chapter6 !== "object") {
+    state.chapter6 = {
+      basementUnlocked: false,
+      notebookRead: false,
+      mapRead: false,
+      cabinetInspected: false,
+      staticSeen: false,
+      complete: false
+    };
+  }
+
+  for (const key of [
+    "basementUnlocked",
+    "notebookRead",
+    "mapRead",
+    "cabinetInspected",
+    "staticSeen",
+    "complete"
+  ]) {
+    if (typeof state.chapter6[key] !== "boolean") {
+      state.chapter6[key] = false;
+    }
+  }
+};
+
+function v0650OpenBasement() {
+  prepareSystems();
+
+  if (!v0650Chapter6Unlocked()) {
+    const count =
+      state.investigationLog?.contradictions?.length || 0;
+
+    if (state.day < 11) {
+      say([
+        "A entrada continua trancada.",
+        "Ainda não tenho motivo suficiente para forçar isso."
+      ]);
+    } else if (count < 3) {
+      say([
+        "A entrada continua trancada.",
+        "As contradições que encontrei ainda não formam um padrão claro."
+      ]);
+    } else {
+      say([
+        "Ainda falta alguma coisa antes de mexer no porão."
+      ]);
+    }
+
+    return;
+  }
+
+  state.chapter6.basementUnlocked = true;
+
+  fade(
+    "O porão",
+    "A fechadura antiga cede depois de alguns minutos.",
+    () => {
+      go("basement", 310, 330);
+      save();
+    }
+  );
+}
+
+function v0650ReadFatherNotebook() {
+  prepareSystems();
+
+  if (state.chapter6.notebookRead) {
+    say([
+      "O caderno está cheio de datas, nomes e versões diferentes da mesma história.",
+      "A última anotação sublinhada diz: “estrada sul · poço da mina”."
+    ]);
+    return;
+  }
+
+  say(
+    [
+      "Dentro da caixa de ferramentas há um caderno do meu pai.",
+      "As primeiras páginas parecem anotações comuns. Depois começam as comparações.",
+      "“Dona Marta disse terça. Hoje jurou que foi quinta.”",
+      "“Anísio mostrou um registro e depois disse que nunca viu aquilo.”",
+      "“Se duas lembranças não batem, confiar primeiro no que ficou escrito antes.”",
+      "As páginas finais ficam mais apressadas.",
+      "“Estrada sul. Poço antigo. Fui até lá uma vez. Não devia ter ido sozinho.”"
+    ],
+    () => {
+      state.chapter6.notebookRead = true;
+      v0650EnsureInvestigationLog().keyClues.fatherNotebook = true;
+      v06Toast("Caderno do pai registrado no diário.", 2.2);
+      v0650TryCompleteChapter6();
+      updateHud();
+      save();
+    }
+  );
+}
+
+function v0650ReadBasementMap() {
+  prepareSystems();
+
+  if (state.chapter6.mapRead) {
+    say([
+      "O desenho liga o bairro à estrada do sul e termina num círculo marcado perto do antigo poço."
+    ]);
+    return;
+  }
+
+  say(
+    [
+      "Um mapa desenhado à mão.",
+      "A estrada do sul está marcada várias vezes.",
+      "Perto da mina, meu pai circulou o poço e escreveu apenas: “voltar com alguém”."
+    ],
+    () => {
+      state.chapter6.mapRead = true;
+      v0650TryCompleteChapter6();
+      updateHud();
+      save();
+    }
+  );
+}
+
+function v0650TryCompleteChapter6() {
+  if (
+    state.chapter6.notebookRead &&
+    state.chapter6.mapRead &&
+    !state.chapter6.complete
+  ) {
+    state.chapter6.complete = true;
+    v06Toast("Capítulo 6 concluído · O Porão", 2.5);
+  }
+}
+
+function v0650InspectBasementCabinet() {
+  prepareSystems();
+
+  if (!state.chapter6.cabinetInspected) {
+    state.chapter6.cabinetInspected = true;
+
+    say(
+      [
+        "Um armário antigo ocupa quase toda a parede.",
+        "Há riscos compridos no chão, como se esse móvel já tivesse sido arrastado antes.",
+        "É pesado demais para mexer sem saber o que estou procurando."
+      ],
+      () => {
+        updateHud();
+        save();
+      }
+    );
+
+    return;
+  }
+
+  say([
+    "Os riscos continuam até a parede atrás do armário.",
+    "Tem alguma coisa estranha nessa parte do porão."
+  ]);
+}
+
+const v0650Chapter6InteractBase = interact;
+interact = function(action) {
+  prepareSystems();
+
+  if (action === "yardBasement") {
+    v0650OpenBasement();
+    return;
+  }
+
+  if (action === "basementNotebook") {
+    v0650ReadFatherNotebook();
+    return;
+  }
+
+  if (action === "basementMap") {
+    v0650ReadBasementMap();
+    return;
+  }
+
+  if (action === "basementCabinet") {
+    v0650InspectBasementCabinet();
+    return;
+  }
+
+  v0650Chapter6InteractBase(action);
+};
+
+let v0650BasementStaticUntil = 0;
+
+const v0650Chapter6UpdateBase = update;
+update = function(dt) {
+  prepareSystems();
+  v0650Chapter6UpdateBase(dt);
+
+  if (
+    !state ||
+    mode !== "game" ||
+    dialog ||
+    transitionBusy ||
+    !$("overlay").hidden ||
+    state.gameOver ||
+    state.dawnCollapse?.active ||
+    state.wakeUp?.active
+  ) {
+    return;
+  }
+
+  if (
+    state.room === "basement" &&
+    state.chapter6.notebookRead &&
+    !state.chapter6.staticSeen &&
+    state.x > housePoint(405)
+  ) {
+    state.chapter6.staticSeen = true;
+    v0650BasementStaticUntil = elapsed + 0.75;
+    keys.clear();
+
+    v06Toast(
+      "A lâmpada chiou por um instante.",
+      1.8
+    );
+    save();
+  }
+};
+
+const v0650Chapter6DrawBase = drawWorld;
+drawWorld = function() {
+  v0650Chapter6DrawBase();
+
+  if (
+    !state ||
+    state.room !== "basement" ||
+    elapsed >= v0650BasementStaticUntil
+  ) {
+    return;
+  }
+
+  // Esta estática não é decoração: acontece uma única vez quando
+  // Estevão se aproxima da parede ligada à passagem.
+  for (let i = 0; i < 18; i++) {
+    const y =
+      (i * 19 + Math.floor(elapsed * 700) % H) % H;
+
+    rect(
+      0,
+      y,
+      W,
+      1 + (i % 2),
+      "rgba(224,229,220,0.10)"
+    );
+  }
+};
+
+const v0650Chapter6HudBase = updateHud;
+updateHud = function() {
+  v0650Chapter6HudBase();
+
+  if (
+    !state ||
+    state.stage === "prologue" ||
+    !state.chapter5?.complete
+  ) {
+    return;
+  }
+
+  prepareSystems();
+
+  if (
+    state.day >= 11 &&
+    !state.chapter6.basementUnlocked
+  ) {
+    $("objective").textContent =
+      "Volte à entrada externa do porão no quintal.";
+    return;
+  }
+
+  if (
+    state.room === "basement" &&
+    !state.chapter6.notebookRead
+  ) {
+    $("objective").textContent =
+      "Procure o que seu pai escondia no porão.";
+    return;
+  }
+
+  if (
+    state.room === "basement" &&
+    state.chapter6.notebookRead &&
+    !state.chapter6.mapRead
+  ) {
+    $("objective").textContent =
+      "Examine as outras anotações do porão.";
+    return;
+  }
+
+  if (
+    state.chapter6.complete &&
+    state.day < 14
+  ) {
+    $("objective").textContent =
+      "O caderno termina na estrada do sul e no poço da mina.";
   }
 };
 
