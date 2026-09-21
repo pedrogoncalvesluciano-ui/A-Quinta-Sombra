@@ -2,7 +2,7 @@
 "use strict";
 
 /*
-  A QUINTA SOMBRA — 0.6.48
+  A QUINTA SOMBRA — 0.6.49
 
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
@@ -1367,7 +1367,9 @@ function drawCharacterSprite(
     c.save();
     c.translate(-Math.floor(camera.x), -Math.floor(camera.y));
 
-    if (state.room === "square") {
+    if (state.room === "westRoad") {
+      v0649DrawWestEnvironment(m);
+    } else if (state.room === "square") {
       v0648DrawSquareEnvironment(m);
     } else if (state.room === "village") {
       rect(0, 0, m.w, m.h, "#34463b");
@@ -7621,7 +7623,7 @@ function v0633TalkSquareMan() {
   if (!state.squareManFirstSpeechDone) {
     state.squareManFirstSpeechDone = true;
     state.squareManTalks = 1;
-    state.squareManReturnObserverPending = true;
+    state.squareManReturnObserverPending = false;
 
     say(
       [
@@ -8039,10 +8041,19 @@ update = function(dt) {
       }
     }
 
-    // Oeste: futura rua escura / lanterna.
+    // Oeste: Rua Sem Luz. Só abre no Capítulo 4 e exige lanterna.
     if (state.x <= 24 && west) {
       state.x = 26;
-      v0639EdgeNotice("Não preciso seguir aqui por agora.");
+
+      if (v0649Chapter4Unlocked()) {
+        if (state.flashlight?.owned) {
+          v0649GoWestRoad();
+        } else {
+          v0639EdgeNotice("Sem uma lanterna eu não consigo seguir por essa rua.");
+        }
+      } else {
+        v0639EdgeNotice("Ainda não tenho motivo para seguir por aqui.");
+      }
     }
 
     // Leste: praça central, liberada no Capítulo 2.
@@ -8303,6 +8314,13 @@ function v0645OpenInventory() {
   const itemNames = [];
   if (state.key) itemNames.push("Chave reserva");
   if (state.food > 0) itemNames.push("Porção de comida");
+  if (state.flashlight?.owned) {
+    itemNames.push(
+      "Lanterna · " +
+      Math.ceil(state.flashlight.battery) +
+      "%"
+    );
+  }
 
   if (!itemNames.length) {
     itemNames.push("Nenhum item carregado.");
@@ -9803,7 +9821,13 @@ interact = function(action) {
   }
 
   if (action === "mineExterior") {
+    const firstVisit = !state.storyFlags.mineExteriorSeen;
+
     state.storyFlags.mineExteriorSeen = true;
+
+    if (firstVisit) {
+      state.storyFlags.southObserverPending = true;
+    }
 
     say(
       [
@@ -10028,7 +10052,1135 @@ updateHud = function() {
   }
 };
 
-$("version").textContent = "PROTÓTIPO · 0.6.48";
+
+// =========================================================
+// 0.6.49 — PARTE 2/5
+// FIM DO CAP. 3 + CAP. 4 "A RUA SEM LUZ"
+// =========================================================
+
+// A Bíblia não fixa onde a lanterna é encontrada. Para evitar criar
+// outro mapa ou ressuscitar o baú/câmera removido, a implementação
+// mínima usa a gaveta de ferramentas da cozinha.
+if (
+  maps.kitchen &&
+  !maps.kitchen.objects.some(o => o.action === "flashlightPickup")
+) {
+  maps.kitchen.objects.push(
+    {
+      x: housePoint(73),
+      y: housePoint(250),
+      w: housePoint(60),
+      h: housePoint(45),
+      type: "shelf",
+      label: "Examinar a gaveta de ferramentas",
+      action: "flashlightPickup"
+    }
+  );
+}
+
+// Rua oeste: propositalmente compacta. O objetivo é investigação,
+// iluminação limitada e perseguição, não um corredor enorme e vazio.
+if (!maps.westRoad) {
+  maps.westRoad = {
+    w: 1400,
+    h: 760,
+    objects: [
+      obj(80, 55, 220, 175, "building"),
+      obj(365, 70, 220, 165, "building"),
+      obj(690, 55, 225, 175, "building"),
+      obj(1035, 70, 245, 165, "building"),
+
+      obj(130, 535, 215, 165, "building"),
+      obj(455, 545, 205, 155, "building"),
+      obj(770, 535, 225, 165, "building"),
+      obj(1090, 545, 210, 155, "building")
+    ],
+    doors: []
+  };
+}
+roomNames.westRoad = "Rua oeste · Forgotten";
+
+const V0649_WEST_BODY = { x: 245, y: 390 };
+const V0649_WEST_BLOOD = [
+  { id: "blood1", x: 925, y: 418 },
+  { id: "blood2", x: 700, y: 396 },
+  { id: "blood3", x: 475, y: 425 }
+];
+
+let v0649SouthObserverUntil = 0;
+let v0649SouthStaticUntil = 0;
+
+function v0649Chapter4Unlocked() {
+  return Boolean(
+    state &&
+    state.stage !== "prologue" &&
+    state.day >= 6 &&
+    state.storyFlags?.raimundoMet &&
+    state.storyFlags?.mineExteriorSeen &&
+    state.storyFlags?.observerFirstSeen
+  );
+}
+
+const v0649PrepareBase = prepareSystems;
+prepareSystems = function() {
+  v0649PrepareBase();
+
+  if (!state) return;
+
+  let changed = false;
+
+  if (!state.storyFlags || typeof state.storyFlags !== "object") {
+    state.storyFlags = {};
+    changed = true;
+  }
+
+  for (const [key, fallback] of [
+    ["observerFirstSeen", false],
+    ["southObserverPending", false],
+    ["florindaChapter4Concern", false],
+    ["florindaChapter4ConcernSeen", false],
+    ["chapter4Complete", false]
+  ]) {
+    if (typeof state.storyFlags[key] !== "boolean") {
+      state.storyFlags[key] = fallback;
+      changed = true;
+    }
+  }
+
+  // Saves feitos depois da conversa da praça, mas antes desta versão,
+  // não podem disparar a silhueta cedo demais.
+  if (state.squareManReturnObserverPending) {
+    state.squareManReturnObserverPending = false;
+    changed = true;
+  }
+
+  if (!state.flashlight || typeof state.flashlight !== "object") {
+    state.flashlight = {
+      owned: false,
+      on: false,
+      battery: 100,
+      emptyWarned: false
+    };
+    changed = true;
+  }
+
+  if (typeof state.flashlight.owned !== "boolean") {
+    state.flashlight.owned = false;
+    changed = true;
+  }
+
+  if (typeof state.flashlight.on !== "boolean") {
+    state.flashlight.on = false;
+    changed = true;
+  }
+
+  if (!Number.isFinite(state.flashlight.battery)) {
+    state.flashlight.battery = 100;
+    changed = true;
+  }
+
+  state.flashlight.battery = Math.max(
+    0,
+    Math.min(100, state.flashlight.battery)
+  );
+
+  if (typeof state.flashlight.emptyWarned !== "boolean") {
+    state.flashlight.emptyWarned = false;
+    changed = true;
+  }
+
+  if (!state.chapter4 || typeof state.chapter4 !== "object") {
+    state.chapter4 = {
+      bloodSeen: [],
+      bodySeen: false,
+      bodyReported: false
+    };
+    changed = true;
+  }
+
+  if (!Array.isArray(state.chapter4.bloodSeen)) {
+    state.chapter4.bloodSeen = [];
+    changed = true;
+  }
+
+  if (typeof state.chapter4.bodySeen !== "boolean") {
+    state.chapter4.bodySeen = false;
+    changed = true;
+  }
+
+  if (typeof state.chapter4.bodyReported !== "boolean") {
+    state.chapter4.bodyReported = false;
+    changed = true;
+  }
+
+  if (!state.garciaEvent || typeof state.garciaEvent !== "object") {
+    state.garciaEvent = {
+      phase: "waiting",
+      x: 330,
+      y: 350,
+      caught: false
+    };
+    changed = true;
+  }
+
+  if (!["waiting", "chase", "escaped"].includes(state.garciaEvent.phase)) {
+    state.garciaEvent.phase =
+      state.chapter4.bodySeen ? "escaped" : "waiting";
+    changed = true;
+  }
+
+  if (!Number.isFinite(state.garciaEvent.x)) {
+    state.garciaEvent.x = 330;
+    changed = true;
+  }
+
+  if (!Number.isFinite(state.garciaEvent.y)) {
+    state.garciaEvent.y = 350;
+    changed = true;
+  }
+
+  if (typeof state.garciaEvent.caught !== "boolean") {
+    state.garciaEvent.caught = false;
+    changed = true;
+  }
+
+  // Compatibilidade: se o corpo já foi marcado como visto por um save
+  // de teste, não recria uma perseguição impossível.
+  if (
+    state.chapter4.bodyReported &&
+    state.garciaEvent.phase === "chase"
+  ) {
+    state.garciaEvent.phase = "escaped";
+    state.garciaEvent.caught = false;
+    changed = true;
+  }
+
+  if (changed) {
+    save();
+  }
+};
+
+function v0649GoWestRoad() {
+  prepareSystems();
+
+  if (!v0649Chapter4Unlocked()) {
+    v0639EdgeNotice("Ainda não tenho motivo para seguir por aqui.");
+    return;
+  }
+
+  if (!state.flashlight.owned) {
+    v0639EdgeNotice("Sem uma lanterna eu não consigo seguir por essa rua.");
+    return;
+  }
+
+  // Garcia é o evento grande desta saída. Evita empilhar uma invasão
+  // aleatória na volta para casa.
+  if (state.randomEventState) {
+    state.randomEventState.pending = false;
+  }
+
+  state.flashlight.on = true;
+  state.flashlight.emptyWarned = false;
+
+  fade(
+    "Rua oeste",
+    "A iluminação termina algumas quadras adiante.",
+    () => {
+      state.room = "westRoad";
+      state.x = 1335;
+      state.y = 390;
+      state.facing = "left";
+      state.walk = 0;
+
+      keys.clear();
+      near = null;
+      updateHud();
+      save();
+    }
+  );
+}
+
+function v0649ReturnVillageFromWest(escaped = false) {
+  prepareSystems();
+
+  if (escaped) {
+    state.garciaEvent.phase = "escaped";
+    state.garciaEvent.caught = false;
+    state.storyFlags.florindaChapter4Concern = true;
+  }
+
+  state.flashlight.on = false;
+
+  fade(
+    "",
+    "",
+    () => {
+      state.room = "village";
+      state.x = 58;
+      state.y = 424;
+      state.facing = "right";
+      state.walk = 0;
+
+      keys.clear();
+      near = null;
+      updateHud();
+      save();
+
+      if (escaped) {
+        v06Toast("Consegui voltar para o bairro.", 2.2);
+      }
+    }
+  );
+}
+
+function v0649ToggleFlashlight() {
+  prepareSystems();
+
+  if (!state.flashlight.owned) {
+    v06Toast("Você ainda não tem uma lanterna.", 1.8);
+    return;
+  }
+
+  if (state.flashlight.battery <= 0) {
+    state.flashlight.on = false;
+    v06Toast("A lanterna está sem bateria.", 1.8);
+    return;
+  }
+
+  state.flashlight.on = !state.flashlight.on;
+  v06Toast(
+    state.flashlight.on
+      ? "Lanterna ligada"
+      : "Lanterna desligada",
+    1.4
+  );
+
+  updateHud();
+  save();
+}
+
+function v0649StartGarciaChase() {
+  const e = state.garciaEvent;
+
+  e.phase = "chase";
+  e.caught = false;
+  e.x = 350;
+  e.y = 360;
+
+  keys.clear();
+
+  v06Toast(
+    "CORRA · volte para o bairro.",
+    2.6
+  );
+
+  updateHud();
+  save();
+}
+
+function v0649GarciaCaught() {
+  const e = state.garciaEvent;
+
+  if (e.caught) return;
+
+  e.caught = true;
+  keys.clear();
+
+  modal(
+    "Garcia te alcançou",
+    "Ele te segura antes que você consiga voltar para a rua principal.",
+    [
+      [
+        "Tentar novamente",
+        () => {
+          closeModal();
+
+          e.phase = "chase";
+          e.caught = false;
+          e.x = 820;
+          e.y = 390;
+
+          state.room = "westRoad";
+          state.x = 1110;
+          state.y = 390;
+          state.facing = "right";
+          state.walk = 0;
+
+          state.flashlight.on =
+            state.flashlight.battery > 0;
+
+          keys.clear();
+          near = null;
+
+          v06Toast(
+            "Corra para a saída leste.",
+            2.1
+          );
+
+          updateHud();
+        }
+      ]
+    ]
+  );
+}
+
+function v0649PoliceBody() {
+  prepareSystems();
+
+  if (state.chapter4.bodyReported) {
+    say([
+      ["Policial", "O caso da rua oeste já foi registrado."],
+      ["Policial", "Não volte para lá sozinho."]
+    ]);
+    return;
+  }
+
+  say(
+    [
+      ["Você", "Eu encontrei um corpo na rua oeste."],
+      ["Policial", "Um corpo? Onde exatamente?"],
+      ["Você", "No fim da rua. Tinha sangue pelo caminho."],
+      ["Policial", "Você viu mais alguém?"],
+      ["Você", "Um homem estava perto dele. Quando me viu, correu atrás de mim."],
+      ["Policial", "Pela descrição, pode ser Garcia. Não tire conclusão ainda. Nós vamos verificar."]
+    ],
+    () => {
+      state.chapter4.bodyReported = true;
+      updateHud();
+      save();
+    }
+  );
+}
+
+// Mantém todos os tópicos anteriores da delegacia e acrescenta
+// apenas o relato da rua oeste.
+v0630OpenPoliceTopics = function() {
+  prepareSystems();
+
+  const buttons = [];
+
+  buttons.push([
+    "Falar dos pais",
+    () => {
+      closeModal();
+      v0630PoliceParents();
+    }
+  ]);
+
+  if (state.storyEvents.oldManEncounters > 0) {
+    buttons.push([
+      "Falar do Raimundo",
+      () => {
+        closeModal();
+        v0630PoliceOldMan();
+      }
+    ]);
+  }
+
+  if (state.storyEvents.vanSightings > 0) {
+    buttons.push([
+      "Falar da van",
+      () => {
+        closeModal();
+        v0630PoliceVan();
+      }
+    ]);
+  }
+
+  if (state.chapter4?.bodySeen) {
+    buttons.push([
+      "Falar da rua oeste",
+      () => {
+        closeModal();
+        v0649PoliceBody();
+      }
+    ]);
+  }
+
+  buttons.push(["Sair", closeModal]);
+
+  modal(
+    "Delegacia",
+    "",
+    buttons
+  );
+};
+
+const v0649GetNearBase = getNear;
+getNear = function() {
+  prepareSystems();
+
+  if (state?.room === "westRoad") {
+    if (state.garciaEvent.phase === "chase") {
+      return null;
+    }
+
+    for (const mark of V0649_WEST_BLOOD) {
+      if (
+        !state.chapter4.bloodSeen.includes(mark.id) &&
+        Math.hypot(
+          state.x - mark.x,
+          state.y - mark.y
+        ) < 38
+      ) {
+        return {
+          label: "Examinar marca no chão",
+          action: "westBlood:" + mark.id
+        };
+      }
+    }
+
+    if (
+      !state.chapter4.bodyReported &&
+      Math.hypot(
+        state.x - V0649_WEST_BODY.x,
+        state.y - V0649_WEST_BODY.y
+      ) < 42
+    ) {
+      return {
+        label: state.chapter4.bodySeen
+          ? "Examinar o corpo novamente"
+          : "Examinar o que está no chão",
+        action: "westBody"
+      };
+    }
+  }
+
+  return v0649GetNearBase();
+};
+
+const v0649InteractBase = interact;
+interact = function(action) {
+  prepareSystems();
+
+  if (action === "flashlightPickup") {
+    if (!v0649Chapter4Unlocked()) {
+      say([
+        "Uma lanterna velha e algumas pilhas.",
+        "Não preciso carregar isso agora."
+      ]);
+      return;
+    }
+
+    if (!state.flashlight.owned) {
+      state.flashlight.owned = true;
+      state.flashlight.on = false;
+      state.flashlight.battery = 100;
+      state.flashlight.emptyWarned = false;
+
+      say(
+        [
+          "Uma lanterna velha da casa.",
+          "Ainda funciona. Posso ligar e desligar com L."
+        ],
+        () => {
+          v06Toast("Lanterna adicionada ao inventário.", 2);
+          updateHud();
+          save();
+        }
+      );
+      return;
+    }
+
+    if (state.flashlight.battery < 95) {
+      state.flashlight.battery = 100;
+      state.flashlight.emptyWarned = false;
+
+      say(
+        ["Troquei as pilhas da lanterna pelas que estavam guardadas aqui."],
+        () => {
+          updateHud();
+          save();
+        }
+      );
+      return;
+    }
+
+    say([
+      "Ainda há algumas pilhas guardadas aqui.",
+      "A lanterna está carregada."
+    ]);
+    return;
+  }
+
+  if (action?.startsWith("westBlood:")) {
+    const id = action.slice("westBlood:".length);
+
+    if (!state.chapter4.bloodSeen.includes(id)) {
+      state.chapter4.bloodSeen.push(id);
+
+      const count = state.chapter4.bloodSeen.length;
+      const lines = [
+        "Sangue. Não parece seco há muito tempo.",
+        "As marcas continuam pela rua.",
+        "Alguém arrastou alguma coisa por aqui."
+      ];
+
+      say(
+        [lines[Math.min(count - 1, lines.length - 1)]],
+        () => {
+          updateHud();
+          save();
+        }
+      );
+    }
+
+    return;
+  }
+
+  if (action === "westBody") {
+    if (state.chapter4.bodySeen) {
+      say([
+        "É um homem que eu não conheço.",
+        "Não tem nada aqui que ligue isso aos meus pais."
+      ]);
+      return;
+    }
+
+    state.chapter4.bodySeen = true;
+
+    say(
+      [
+        ["Você", "Tem alguém no chão..."],
+        ["Você", "Eu não conheço esse homem."],
+        ["Homem", "Ei."],
+        ["Você", "..."],
+        ["Homem", "Você não devia ter vindo até aqui."],
+        ["Você", "O que você fez?"],
+        ["Homem", "Vai embora. Agora."]
+      ],
+      v0649StartGarciaChase
+    );
+
+    return;
+  }
+
+  if (
+    action === "vendor" &&
+    state.chapter4?.bodyReported &&
+    state.storyFlags?.florindaChapter4Concern &&
+    !state.storyFlags.florindaChapter4ConcernSeen
+  ) {
+    say(
+      [
+        ["Florinda", "Você foi para a rua oeste, não foi?"],
+        ["Você", "Como você sabe?"],
+        ["Florinda", "Porque eu conheço essa cidade há tempo demais."],
+        ["Florinda", "Escuta: se estiver longe de casa quando começar a clarear, volte."],
+        ["Você", "Por quê?"],
+        ["Florinda", "Só não fique fora perto das sete. Promete?"]
+      ],
+      () => {
+        state.storyFlags.florindaChapter4ConcernSeen = true;
+        state.storyFlags.chapter4Complete = true;
+        updateHud();
+        save();
+      }
+    );
+    return;
+  }
+
+  v0649InteractBase(action);
+};
+
+function v0649DrawWestEnvironment(m) {
+  rect(0, 0, m.w, m.h, "#252b2e");
+
+  // Rua principal e calçadas.
+  rect(0, 295, m.w, 185, "#55585a");
+  rect(0, 275, m.w, 20, "#76766f");
+  rect(0, 480, m.w, 20, "#76766f");
+
+  for (let x = 20; x < m.w; x += 70) {
+    rect(x, 385, 34, 4, "#8c8978");
+  }
+
+  // Fachadas residenciais.
+  for (const o of m.objects) {
+    building(o);
+  }
+
+  // Postes: quase todos apagados.
+  for (const x of [150, 390, 640, 880, 1130, 1320]) {
+    rect(x, 245, 5, 50, "#34383a");
+    rect(x - 7, 241, 19, 5, "#4a4d4e");
+  }
+
+  // Pequeno beco/corredor visual onde o corpo está.
+  rect(170, 300, 155, 92, "#45484a");
+  rect(180, 300, 8, 72, "#2d3133");
+
+  // Marcas de sangue. Somente detalhes físicos, sem gore explícito.
+  for (const mark of V0649_WEST_BLOOD) {
+    rect(mark.x - 8, mark.y - 3, 16, 5, "#4d1f1f");
+    rect(mark.x + 5, mark.y + 2, 8, 3, "#3d1919");
+  }
+
+  // Corpo desconhecido: silhueta de roupa no chão.
+  if (!state.chapter4?.bodyReported) {
+    const bx = V0649_WEST_BODY.x;
+    const by = V0649_WEST_BODY.y;
+
+    rect(bx - 18, by - 6, 37, 12, "#24292c");
+    rect(bx - 31, by - 4, 17, 8, "#1d2225");
+    rect(bx + 16, by - 3, 22, 7, "#1d2225");
+    rect(bx - 10, by - 13, 14, 10, "#9b735f");
+
+    // Garcia ainda está perto do corpo antes da perseguição.
+    if (state.garciaEvent?.phase === "waiting") {
+      person(
+        330,
+        350,
+        "npcMale",
+        0,
+        "left",
+        0.94
+      );
+    }
+  } else {
+    // Depois do relato, deixa somente uma marca de isolamento simples.
+    rect(205, 340, 110, 4, "#b8a76f");
+    rect(205, 430, 110, 4, "#b8a76f");
+    txt("ÁREA ISOLADA", 218, 380, "#b8a76f", 7);
+  }
+
+  if (
+    state.garciaEvent?.phase === "chase" &&
+    !state.garciaEvent.caught
+  ) {
+    person(
+      state.garciaEvent.x,
+      state.garciaEvent.y,
+      "npcMale",
+      elapsed * 12,
+      Math.abs(state.x - state.garciaEvent.x) >
+      Math.abs(state.y - state.garciaEvent.y)
+        ? (state.x > state.garciaEvent.x ? "right" : "left")
+        : (state.y > state.garciaEvent.y ? "down" : "up"),
+      0.96
+    );
+  }
+
+  txt("RUA OESTE", 1165, 265, "#8f8d82", 7);
+}
+
+function v0649DrawFlashlightDarkness() {
+  if (
+    !state ||
+    state.room !== "westRoad" ||
+    state.dawnCollapse?.active ||
+    state.wakeUp?.active
+  ) {
+    return;
+  }
+
+  const on =
+    state.flashlight?.owned &&
+    state.flashlight.on &&
+    state.flashlight.battery > 0;
+
+  let sx = state.x - camera.x;
+  let sy = state.y - camera.y - 9;
+
+  if (on) {
+    if (state.facing === "left") sx -= 42;
+    else if (state.facing === "right") sx += 42;
+    else if (state.facing === "up") sy -= 48;
+    else sy += 48;
+  }
+
+  const inner = on ? 24 : 12;
+  const outer = on ? 185 : 68;
+
+  const gradient = c.createRadialGradient(
+    sx, sy, inner,
+    sx, sy, outer
+  );
+
+  if (on) {
+    gradient.addColorStop(0, "rgba(0,0,0,0.02)");
+    gradient.addColorStop(0.32, "rgba(0,0,0,0.10)");
+    gradient.addColorStop(0.68, "rgba(0,0,0,0.58)");
+    gradient.addColorStop(1, "rgba(0,0,0,0.95)");
+  } else {
+    gradient.addColorStop(0, "rgba(0,0,0,0.48)");
+    gradient.addColorStop(0.45, "rgba(0,0,0,0.82)");
+    gradient.addColorStop(1, "rgba(0,0,0,0.985)");
+  }
+
+  c.save();
+  c.fillStyle = gradient;
+  c.fillRect(0, 0, W, H);
+
+  // Leitura mínima de bateria sem criar uma HUD nova.
+  if (state.flashlight?.owned) {
+    txt(
+      "LANTERNA " +
+      Math.ceil(state.flashlight.battery) +
+      "% · L",
+      14,
+      H - 14,
+      state.flashlight.battery < 20
+        ? "#c49a83"
+        : "#c9c2ad",
+      7
+    );
+  }
+
+  c.restore();
+}
+
+function v0649DrawSouthObserver() {
+  if (
+    !state ||
+    state.room !== "oldRoad" ||
+    elapsed >= v0649SouthObserverUntil ||
+    state.dawnCollapse?.active
+  ) {
+    return;
+  }
+
+  c.save();
+  c.translate(
+    -Math.floor(camera.x),
+    -Math.floor(camera.y)
+  );
+
+  const x = 355;
+  const y = 635;
+  const jitter = Math.sin(elapsed * 47) * 2;
+
+  // Forma animal-adjacente, sem olhos/rosto e sem anatomia estável.
+  rect(x - 18 + jitter, y - 17, 34, 12, "#040506");
+  rect(x - 11 - jitter, y - 28, 23, 16, "#030405");
+  rect(x - 24, y - 10 + jitter, 14, 7, "#030405");
+  rect(x + 10, y - 12 - jitter, 17, 8, "#030405");
+  rect(x - 14, y - 6, 7, 12, "#020304");
+  rect(x + 7, y - 7, 8, 13, "#020304");
+
+  c.restore();
+}
+
+function v0649DrawSouthStatic() {
+  if (
+    elapsed >= v0649SouthStaticUntil ||
+    state?.dawnCollapse?.active
+  ) {
+    return;
+  }
+
+  const strength = Math.min(
+    1,
+    Math.max(v0649SouthStaticUntil - elapsed, 0) / 1.15
+  );
+
+  for (let i = 0; i < 24; i++) {
+    const y =
+      (i * 23 + Math.floor(elapsed * 620) % H) % H;
+
+    rect(
+      (i % 3) * -5,
+      y,
+      W + 12,
+      1 + (i % 2),
+      "rgba(225,230,220," +
+      (0.035 + strength * 0.12) +
+      ")"
+    );
+  }
+}
+
+const v0649DrawWorldBase = drawWorld;
+drawWorld = function() {
+  v0649DrawWorldBase();
+
+  v0649DrawSouthObserver();
+  v0649DrawSouthStatic();
+
+  if (state?.room === "westRoad") {
+    v0649DrawFlashlightDarkness();
+  }
+};
+
+const v0649UpdateBase = update;
+update = function(dt) {
+  prepareSystems();
+  v0649UpdateBase(dt);
+
+  if (
+    !state ||
+    mode !== "game" ||
+    dialog ||
+    transitionBusy ||
+    !$("overlay").hidden ||
+    state.gameOver ||
+    state.dawnCollapse?.active ||
+    state.wakeUp?.active
+  ) {
+    return;
+  }
+
+  // Final real do Capítulo 3: depois de examinar a mina, a primeira
+  // silhueta aparece à distância quando Estevão começa a voltar.
+  if (
+    state.room === "oldRoad" &&
+    state.storyFlags?.southObserverPending &&
+    !state.storyFlags.observerFirstSeen &&
+    state.y < 700
+  ) {
+    state.storyFlags.southObserverPending = false;
+    state.storyFlags.observerFirstSeen = true;
+
+    v0649SouthObserverUntil = elapsed + 0.9;
+    v0649SouthStaticUntil = elapsed + 1.15;
+
+    keys.clear();
+    v06Toast(
+      "Alguma coisa estava entre as árvores.",
+      2.1
+    );
+
+    updateHud();
+    save();
+    return;
+  }
+
+  if (state.room !== "westRoad") return;
+
+  // Bateria é tensão por excursão, não punição permanente.
+  // Há pilhas de reposição na própria casa para evitar softlock.
+  if (
+    state.flashlight.owned &&
+    state.flashlight.on &&
+    state.flashlight.battery > 0
+  ) {
+    state.flashlight.battery = Math.max(
+      0,
+      state.flashlight.battery - dt * 0.18
+    );
+
+    if (
+      state.flashlight.battery <= 0 &&
+      !state.flashlight.emptyWarned
+    ) {
+      state.flashlight.on = false;
+      state.flashlight.emptyWarned = true;
+      v06Toast("A lanterna apagou.", 2);
+      updateHud();
+      save();
+    }
+  }
+
+  const right =
+    keys.has("d") ||
+    keys.has("arrowright");
+
+  if (
+    state.x >= maps.westRoad.w - 28 &&
+    right
+  ) {
+    state.x = maps.westRoad.w - 30;
+
+    v0649ReturnVillageFromWest(
+      state.garciaEvent.phase === "chase"
+    );
+    return;
+  }
+
+  const e = state.garciaEvent;
+
+  if (
+    e.phase === "chase" &&
+    !e.caught
+  ) {
+    const dx = state.x - e.x;
+    const dy = state.y - e.y;
+    const distance = Math.hypot(dx, dy) || 1;
+
+    if (distance < 21) {
+      v0649GarciaCaught();
+      return;
+    }
+
+    const step = Math.min(
+      distance,
+      108 * dt
+    );
+
+    e.x += dx / distance * step;
+    e.y += dy / distance * step;
+  }
+};
+
+const v0649UpdateHudBase = updateHud;
+updateHud = function() {
+  v0649UpdateHudBase();
+
+  if (!state || state.stage === "prologue") return;
+
+  prepareSystems();
+
+  if (state.flashlight?.owned) {
+    const baseInventory = $("inventory").textContent;
+
+    if (!baseInventory.includes("LANTERNA")) {
+      $("inventory").textContent =
+        baseInventory +
+        " · LANTERNA " +
+        Math.ceil(state.flashlight.battery) +
+        "%";
+    }
+  }
+
+  if (
+    state.garciaEvent?.phase === "chase"
+  ) {
+    $("objective").textContent =
+      "CORRA. Volte para o bairro pela saída leste.";
+    return;
+  }
+
+  if (
+    v0649Chapter4Unlocked() &&
+    !state.flashlight.owned
+  ) {
+    $("objective").textContent =
+      "Procure a lanterna na gaveta de ferramentas da cozinha.";
+    return;
+  }
+
+  if (
+    state.room === "westRoad" &&
+    !state.chapter4.bodySeen
+  ) {
+    $("objective").textContent =
+      "Explore a rua oeste e siga as marcas de sangue.";
+    return;
+  }
+
+  if (
+    state.chapter4.bodySeen &&
+    state.garciaEvent.phase === "escaped" &&
+    !state.chapter4.bodyReported
+  ) {
+    $("objective").textContent =
+      "Relate à polícia o que encontrou na rua oeste.";
+    return;
+  }
+
+  if (
+    state.chapter4.bodyReported &&
+    state.storyFlags.florindaChapter4Concern &&
+    !state.storyFlags.florindaChapter4ConcernSeen
+  ) {
+    $("objective").textContent =
+      "Converse com Florinda.";
+    return;
+  }
+
+  if (state.storyFlags.chapter4Complete) {
+    $("objective").textContent =
+      "A rua oeste foi registrada. Continue observando Forgotten.";
+  }
+};
+
+// L liga/desliga a lanterna. Não interfere com diálogo, pausa ou transição.
+window.addEventListener(
+  "keydown",
+  event => {
+    if (
+      event.key.toLowerCase() !== "l" ||
+      event.repeat ||
+      mode !== "game" ||
+      !state ||
+      dialog ||
+      transitionBusy ||
+      !$("overlay").hidden
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    v0649ToggleFlashlight();
+  },
+  true
+);
+
+// Comando de desenvolvimento para testar o Capítulo 4 sem quebrar saves.
+const v0649DevCommandBase = v0645RunDevCommand;
+v0645RunDevCommand = function(raw) {
+  const command = String(raw || "").trim().toLowerCase();
+
+  if (command === "oeste") {
+    prepareSystems();
+
+    state.stage = "free";
+    state.day = Math.max(6, state.day || 6);
+    state.finished = true;
+
+    state.storyFlags.marketParentsConfirmed = true;
+    state.squareManFirstSpeechDone = true;
+    state.storyFlags.raimundoMet = true;
+    state.storyFlags.mineExteriorSeen = true;
+    state.storyFlags.observerFirstSeen = true;
+    state.storyFlags.southObserverPending = false;
+
+    state.flashlight.owned = true;
+    state.flashlight.on = true;
+    state.flashlight.battery = 100;
+    state.flashlight.emptyWarned = false;
+
+    state.chapter4.bloodSeen = [];
+    state.chapter4.bodySeen = false;
+    state.chapter4.bodyReported = false;
+
+    state.garciaEvent.phase = "waiting";
+    state.garciaEvent.x = 330;
+    state.garciaEvent.y = 350;
+    state.garciaEvent.caught = false;
+
+    state.room = "westRoad";
+    state.x = 1335;
+    state.y = 390;
+    state.facing = "left";
+    state.walk = 0;
+
+    v0645ResetTransientState();
+    state.flashlight.on = true;
+
+    updateHud();
+    save();
+
+    v06Toast("TESTE: Capítulo 4 · rua oeste", 2);
+    return;
+  }
+
+  v0649DevCommandBase(raw);
+};
+
+const v0649OpenDevPanelBase = v0645OpenDevPanel;
+v0645OpenDevPanel = function() {
+  v0649OpenDevPanelBase();
+
+  const pre = $("modalText").querySelector("pre");
+
+  if (
+    pre &&
+    !pre.textContent.includes("oeste")
+  ) {
+    pre.textContent +=
+      "\noeste       → testa a Rua Sem Luz / Capítulo 4";
+  }
+};
+
+// Ajuda final da 0.6.49.
+$("help").onclick = () => modal(
+  "Como jogar",
+  "WASD / setas: andar. Shift/F: correr quando disponível. E: interagir. I: inventário. L: ligar/desligar a lanterna. Esc: pausar. ESPAÇO: soco apenas contra ameaças físicas compatíveis.\n\nA fome do irmão cai durante o jogo ativo. Eventos importantes não são empilhados durante a sequência da rua oeste.\n\nÀs 07:00, depois da primeira meia-noite, Estevão perde os sentidos.",
+  [["Voltar", closeModal]]
+);
+
+$("version").textContent = "PROTÓTIPO · 0.6.49";
   
   requestAnimationFrame(frame);
   showBootSplash();
