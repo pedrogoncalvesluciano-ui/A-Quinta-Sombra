@@ -15255,6 +15255,10 @@ function v070FinishGame(result) {
 
   state.flashlight.on = false;
 
+  // Persiste o desfecho antes de abrir qualquer modal final.
+  // Assim, fechar o navegador durante o epílogo não perde o resultado.
+  save();
+
   if (result === "good") {
     state.storyFlags.motherRescued = true;
     state.storyFlags.fatherPermanentlyLost = true;
