@@ -12757,6 +12757,506 @@ updateHud = function() {
   }
 };
 
+
+// =========================================================
+// 0.6.50 — CAPÍTULO 8 "O QUE FICA PERTO DE CASA"
+// FLORINDA + SÓTÃO + ARMÁRIO/PASSAGEM + SPLIT
+// =========================================================
+
+const V0650_ATTIC_AXIS_POS = {
+  x: housePoint(505),
+  y: housePoint(205)
+};
+
+const V0650_BASEMENT_HOLE_POS = {
+  x: housePoint(525),
+  y: housePoint(165)
+};
+
+let v0650BasementObserverUntil = 0;
+let v0650BasementObserverStaticUntil = 0;
+
+function v0650Chapter8Unlocked() {
+  return Boolean(
+    state &&
+    state.day >= 17 &&
+    state.chapter7?.complete
+  );
+}
+
+const v0650Chapter8PrepareBase = prepareSystems;
+prepareSystems = function() {
+  v0650Chapter8PrepareBase();
+
+  if (!state) return;
+
+  if (!state.chapter8 || typeof state.chapter8 !== "object") {
+    state.chapter8 = {
+      brotherEvidenceSeen: false,
+      atticAxisFound: false,
+      florindaConfronted: false,
+      wheelchairLateLineSeen: false,
+      splitRevealSeen: false,
+      cabinetMoved: false,
+      motherClueFound: false,
+      complete: false
+    };
+  }
+
+  for (const key of [
+    "brotherEvidenceSeen",
+    "atticAxisFound",
+    "florindaConfronted",
+    "wheelchairLateLineSeen",
+    "splitRevealSeen",
+    "cabinetMoved",
+    "motherClueFound",
+    "complete"
+  ]) {
+    if (typeof state.chapter8[key] !== "boolean") {
+      state.chapter8[key] = false;
+    }
+  }
+
+  if (typeof state.neighborKey !== "boolean") {
+    state.neighborKey = false;
+  }
+
+  // O armário é um objeto físico persistente. Depois de empurrado,
+  // muda de posição também ao recarregar o save.
+  const cabinet = maps.basement?.objects.find(
+    o => o.action === "basementCabinet"
+  );
+
+  if (cabinet) {
+    cabinet.x = state.chapter8.cabinetMoved
+      ? housePoint(350)
+      : housePoint(455);
+  }
+};
+
+function v0650BrotherFlorindaEvidence() {
+  say(
+    [
+      ["Irmão", "Tem uma coisa que eu não te contei."],
+      ["Você", "O quê?"],
+      ["Irmão", "A Florinda entra aqui de noite às vezes."],
+      ["Você", "Entra aqui?"],
+      ["Irmão", "Eu ouço a porta. Depois ouço ela subindo."],
+      ["Irmão", "Eu não contei porque acho que ela não quer que a gente saiba."]
+    ],
+    () => {
+      state.chapter8.brotherEvidenceSeen = true;
+      updateHud();
+      save();
+    }
+  );
+}
+
+function v0650InspectAtticAxis() {
+  if (state.chapter8.atticAxisFound) {
+    say([
+      "O espaço estreito desce por dentro da parede.",
+      "Pela direção, termina exatamente acima do porão."
+    ]);
+    return;
+  }
+
+  say(
+    [
+      "Atrás dos móveis cobertos, a madeira da parede não acompanha o resto da casa.",
+      "Há um vão estreito, antigo, descendo por dentro da estrutura.",
+      "O ar sobe frio por ali.",
+      "Se esse eixo continua reto, ele termina perto da parede do porão."
+    ],
+    () => {
+      state.chapter8.atticAxisFound = true;
+      v06Toast("Estrutura da casa registrada.", 2);
+      updateHud();
+      save();
+    }
+  );
+}
+
+function v0650ConfrontFlorinda() {
+  if (state.chapter8.florindaConfronted) {
+    say([
+      ["Florinda", "Eu já te contei o que prometi."],
+      ["Florinda", "A chave era da sua mãe. Eu só usei para trazer você de volta."]
+    ]);
+    return;
+  }
+
+  if (!state.chapter8.brotherEvidenceSeen) {
+    say([
+      ["Florinda", "Está tudo bem com seu irmão?"],
+      ["Florinda", "Volte antes de amanhecer."]
+    ]);
+    return;
+  }
+
+  if (
+    v0650EnsureInvestigationLog().contradictions.length < 3
+  ) {
+    say([
+      ["Você", "Por que você sabe tanto sobre as sete?"],
+      ["Florinda", "Porque eu me preocupo com vocês."],
+      ["Florinda", "Isso é tudo que consigo te dizer agora."]
+    ]);
+    return;
+  }
+
+  say(
+    [
+      ["Você", "Você sabia. Sobre as sete horas. Sabia o tempo todo."],
+      ["Florinda", "Eu prometi aos seus pais que não deixaria você lá fora quando isso acontecesse."],
+      ["Você", "Isso não responde por que eu sempre acordo em casa sem lembrar de nada."],
+      ["Florinda", "..."],
+      ["Florinda", "Porque eu vou até você."],
+      ["Florinda", "Uso a chave que sua mãe me deu. Eu te levo para dentro antes que alguém mais... note."],
+      ["Você", "Note o quê?"],
+      ["Florinda", "Eu não sei o nome disso."],
+      ["Florinda", "Só sei que não posso deixar acontecer com você do jeito que seus pais temiam."],
+      "Ela coloca uma chave na mesa.",
+      ["Florinda", "Sua mãe me deu uma cópia. Fica com você agora."]
+    ],
+    () => {
+      state.chapter8.florindaConfronted = true;
+      state.neighborKey = true;
+      v0650EnsureInvestigationLog().keyClues.florindaConfession = true;
+
+      v06Toast(
+        "Chave de Florinda adicionada ao inventário.",
+        2.3
+      );
+
+      updateHud();
+      save();
+    }
+  );
+}
+
+function v0650RaimundoSplitReveal() {
+  if (state.chapter8.splitRevealSeen) {
+    say([
+      ["Raimundo", "Eu já te disse o nome. Split Lancaster."],
+      ["Raimundo", "Se quer saber mais, vai ter que descobrir o que sua família guardou naquela casa."]
+    ]);
+    return;
+  }
+
+  say(
+    [
+      ["Raimundo", "Seu nome... seu sobrenome é bem familiar."],
+      ["Raimundo", "Há quarenta anos eu trabalhava numa mina."],
+      ["Raimundo", "O chefe de lá se chamava Lancaster. Split Lancaster."],
+      ["Raimundo", "Duro. Não deixava passar erro nenhum."],
+      ["Você", "Isso é... uma coincidência?"],
+      ["Raimundo", "Eu já parei de acreditar em coincidência faz uns quarenta anos."]
+    ],
+    () => {
+      state.chapter8.splitRevealSeen = true;
+      v0650EnsureInvestigationLog().keyClues.splitReveal = true;
+
+      v06Toast(
+        "Nome registrado: Split Lancaster.",
+        2.2
+      );
+
+      updateHud();
+      save();
+    }
+  );
+}
+
+function v0650PushBasementCabinet() {
+  if (
+    !state.chapter8.atticAxisFound ||
+    !state.chapter8.florindaConfronted
+  ) {
+    say([
+      "O armário é pesado.",
+      "Ainda não sei se vale a pena mexer nisso."
+    ]);
+    return;
+  }
+
+  if (state.chapter8.cabinetMoved) {
+    say([
+      "O armário continua afastado da parede.",
+      "Atrás dele há uma abertura escura."
+    ]);
+    return;
+  }
+
+  say(
+    [
+      "Eu empurro o armário usando o ombro.",
+      "A madeira raspa no chão exatamente sobre as marcas antigas.",
+      "Atrás dele não há uma porta.",
+      "Há uma abertura quebrada na parede, larga o bastante para uma pessoa passar abaixada."
+    ],
+    () => {
+      state.chapter8.cabinetMoved = true;
+
+      const cabinet = maps.basement.objects.find(
+        o => o.action === "basementCabinet"
+      );
+
+      if (cabinet) {
+        cabinet.x = housePoint(350);
+      }
+
+      v0650BasementObserverUntil = elapsed + 0.65;
+      v0650BasementObserverStaticUntil = elapsed + 0.95;
+
+      keys.clear();
+      updateHud();
+      save();
+    }
+  );
+}
+
+function v0650InspectBasementHole() {
+  if (!state.chapter8.cabinetMoved) return;
+
+  if (!state.chapter8.motherClueFound) {
+    say(
+      [
+        "A passagem desce além do alcance da luz do porão.",
+        "Na poeira da entrada há uma pegada recente.",
+        "O desenho da sola é igual ao das botas que minha mãe deixava perto da porta.",
+        "Alguém passou por aqui depois do desaparecimento.",
+        "Se foi ela... talvez ainda esteja viva."
+      ],
+      () => {
+        state.chapter8.motherClueFound = true;
+        state.chapter8.complete = true;
+
+        v06Toast(
+          "Capítulo 8 concluído · Há alguém sob a casa.",
+          2.7
+        );
+
+        updateHud();
+        save();
+      }
+    );
+    return;
+  }
+
+  say([
+    "A passagem continua no escuro.",
+    "Minha lanterna será necessária lá embaixo.",
+    "Antes de descer, preciso garantir que meu irmão fique seguro."
+  ]);
+}
+
+const v0650Chapter8GetNearBase = getNear;
+getNear = function() {
+  prepareSystems();
+
+  if (
+    v0650Chapter8Unlocked() &&
+    state.room === "attic" &&
+    Math.hypot(
+      state.x - V0650_ATTIC_AXIS_POS.x,
+      state.y - V0650_ATTIC_AXIS_POS.y
+    ) < 46
+  ) {
+    return {
+      label: "Examinar a parede atrás dos móveis",
+      action: "atticAxis"
+    };
+  }
+
+  if (
+    state.room === "basement" &&
+    state.chapter8?.cabinetMoved &&
+    Math.hypot(
+      state.x - V0650_BASEMENT_HOLE_POS.x,
+      state.y - V0650_BASEMENT_HOLE_POS.y
+    ) < 50
+  ) {
+    return {
+      label: "Examinar a abertura",
+      action: "basementHole"
+    };
+  }
+
+  return v0650Chapter8GetNearBase();
+};
+
+const v0650Chapter8InteractBase = interact;
+interact = function(action) {
+  prepareSystems();
+
+  if (
+    action === "brother" &&
+    v0650Chapter8Unlocked() &&
+    !state.chapter8.brotherEvidenceSeen
+  ) {
+    v0650BrotherFlorindaEvidence();
+    return;
+  }
+
+  if (action === "atticAxis") {
+    v0650InspectAtticAxis();
+    return;
+  }
+
+  if (
+    action === "vendor" &&
+    v0650Chapter8Unlocked() &&
+    state.chapter8.brotherEvidenceSeen
+  ) {
+    v0650ConfrontFlorinda();
+    return;
+  }
+
+  if (
+    action === "oldManTalk" &&
+    v0650Chapter8Unlocked() &&
+    state.chapter8.florindaConfronted
+  ) {
+    v0650RaimundoSplitReveal();
+    return;
+  }
+
+  if (
+    action === "basementCabinet" &&
+    v0650Chapter8Unlocked()
+  ) {
+    v0650PushBasementCabinet();
+    return;
+  }
+
+  if (action === "basementHole") {
+    v0650InspectBasementHole();
+    return;
+  }
+
+  if (
+    action === "squareMan" &&
+    v0650Chapter8Unlocked() &&
+    state.chapter8.florindaConfronted &&
+    !state.chapter8.wheelchairLateLineSeen
+  ) {
+    say(
+      [
+        ["Homem", "Ela cumpriu a palavra dela."],
+        ["Você", "Você sabia?"],
+        ["Homem", "Poucos cumprem."]
+      ],
+      () => {
+        state.chapter8.wheelchairLateLineSeen = true;
+        save();
+      }
+    );
+    return;
+  }
+
+  v0650Chapter8InteractBase(action);
+};
+
+const v0650Chapter8DrawBase = drawWorld;
+drawWorld = function() {
+  v0650Chapter8DrawBase();
+
+  if (!state) return;
+
+  if (
+    state.room === "basement" &&
+    state.chapter8?.cabinetMoved
+  ) {
+    c.save();
+    c.translate(
+      -Math.floor(camera.x),
+      -Math.floor(camera.y)
+    );
+
+    const hx = housePoint(475);
+    const hy = housePoint(94);
+    const hw = housePoint(82);
+    const hh = housePoint(145);
+
+    rect(hx, hy, hw, hh, "#07090a");
+    rect(hx + 6, hy + 7, hw - 12, hh - 14, "#111517");
+    rect(hx + 10, hy + 12, hw - 20, hh - 22, "#050607");
+
+    if (elapsed < v0650BasementObserverUntil) {
+      const ox = hx + hw * 0.52;
+      const oy = hy + hh * 0.72;
+      const jitter = Math.sin(elapsed * 51) * 1.5;
+
+      rect(ox - 14 + jitter, oy - 13, 27, 10, "#010203");
+      rect(ox - 9 - jitter, oy - 23, 18, 14, "#010203");
+      rect(ox - 18, oy - 7, 11, 6, "#010203");
+      rect(ox + 7, oy - 8, 12, 6, "#010203");
+    }
+
+    c.restore();
+  }
+
+  if (elapsed < v0650BasementObserverStaticUntil) {
+    for (let i = 0; i < 30; i++) {
+      const y =
+        (i * 14 + Math.floor(elapsed * 820) % H) % H;
+
+      rect(
+        0,
+        y,
+        W,
+        1 + (i % 4 === 0 ? 1 : 0),
+        "rgba(232,235,228,0.12)"
+      );
+    }
+  }
+};
+
+const v0650Chapter8HudBase = updateHud;
+updateHud = function() {
+  v0650Chapter8HudBase();
+
+  if (
+    !state ||
+    state.stage === "prologue" ||
+    !v0650Chapter8Unlocked() ||
+    state.chapter8.complete
+  ) {
+    return;
+  }
+
+  if (!state.chapter8.brotherEvidenceSeen) {
+    $("objective").textContent =
+      "Converse com seu irmão depois do que aconteceu.";
+    return;
+  }
+
+  if (!state.chapter8.florindaConfronted) {
+    $("objective").textContent =
+      "Confronte Florinda sobre as sete horas.";
+    return;
+  }
+
+  if (!state.chapter8.atticAxisFound) {
+    $("objective").textContent =
+      "Volte ao sótão e examine o lugar onde vocês se esconderam.";
+    return;
+  }
+
+  if (!state.chapter8.cabinetMoved) {
+    $("objective").textContent =
+      "Volte ao porão e examine o armário contra a parede.";
+    return;
+  }
+
+  if (!state.chapter8.motherClueFound) {
+    $("objective").textContent =
+      "Examine a abertura atrás do armário.";
+  }
+};
+
 $("version").textContent = "PROTÓTIPO · 0.6.50";
   
   requestAnimationFrame(frame);
