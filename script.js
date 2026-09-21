@@ -2,7 +2,7 @@
 "use strict";
 
 /*
-  A QUINTA SOMBRA — 0.1.0
+  A QUINTA SOMBRA — 0.6.48
 
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
@@ -2368,10 +2368,10 @@ function drawCharacterSprite(
               ["Pai", "Precisamos ir. Eles estão esperando."]
             ],
             () => fade(
-              "25 horas depois",
-              "15:00 · O silêncio da casa continua.",
+              "9 horas depois",
+              "23:00 · Seus pais ainda não voltaram.",
               () => {
-                state.minutes = 900;
+                state.minutes = 1380;
                 stage("parents");
                 go("bedroom", 180, 235);
               }
@@ -2473,7 +2473,7 @@ function drawCharacterSprite(
 
               modal(
                 "Primeira noite: abertura concluída",
-                "Você completou a sequência inicial. Pode continuar explorando a casa e a vila.\n\nEsta versão ainda não inclui invasões, combate, adaptação ou o desfecho. Seu progresso fica salvo neste navegador.",
+                "A sequência inicial terminou. Continue investigando o desaparecimento, cuide do seu irmão e observe o que muda em Forgotten.\n\nSeu progresso fica salvo neste navegador.",
                 [
                   ["Continuar explorando", closeModal]
                 ]
@@ -7778,10 +7778,23 @@ drawWorld = function() {
     const x = v0634ObserverX;
     const y = v0634ObserverY;
 
-    rect(x - 6, y - 31, 12, 24, "#090b0d");
-    rect(x - 5, y - 42, 10, 11, "#07090b");
-    rect(x - 8, y - 26, 3, 18, "#080a0c");
-    rect(x + 5, y - 26, 3, 18, "#080a0c");
+    // O Observador nunca assume uma anatomia humana estável.
+    // A massa baixa sugere um animal grande/agachado, com bordas
+    // corroídas pela própria interferência.
+    const jitter = Math.sin(elapsed * 43) * 2;
+
+    rect(x - 18 + jitter, y - 19, 34, 13, "#050607");
+    rect(x - 11 - jitter, y - 30, 23, 17, "#040506");
+    rect(x - 24, y - 12 + jitter, 14, 7, "#040506");
+    rect(x + 10, y - 13 - jitter, 17, 8, "#040506");
+    rect(x - 15, y - 7, 7, 13, "#030405");
+    rect(x + 7, y - 8, 8, 14, "#030405");
+
+    // Fragmentos nas bordas: nunca olhos, boca ou rosto legível.
+    if (Math.floor(elapsed * 28) % 2 === 0) {
+      rect(x - 21, y - 25, 5, 3, "rgba(5,6,7,0.78)");
+      rect(x + 16, y - 20, 6, 3, "rgba(5,6,7,0.72)");
+    }
 
     c.restore();
   }
