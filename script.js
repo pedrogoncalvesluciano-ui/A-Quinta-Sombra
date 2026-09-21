@@ -2,7 +2,7 @@
 "use strict";
 
 /*
-  A QUINTA SOMBRA — 0.7.0
+  A QUINTA SOMBRA — 0.7.1
 
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
@@ -8065,14 +8065,21 @@ update = function(dt) {
       }
     }
 
-    // Leste: praça central, liberada no Capítulo 2.
+    // Leste: a praça existe desde o início, mas a história só manda
+    // Estevão para lá depois da confirmação no mercado, no Capítulo 2.
     if (state.x >= maps.village.w - 24 && east) {
       state.x = maps.village.w - 26;
 
-      if (v0648Chapter2Unlocked()) {
-        v0648GoSquare();
+      if (!v0648Chapter2Unlocked()) {
+        v0639EdgeNotice(
+          "A praça fica por ali. Agora preciso resolver o que aconteceu perto de casa."
+        );
+      } else if (!state.storyFlags?.marketParentsConfirmed) {
+        v0639EdgeNotice(
+          "A praça fica a leste. Primeiro vou confirmar no mercado se meus pais realmente passaram por lá."
+        );
       } else {
-        v0639EdgeNotice("Ainda preciso resolver o que aconteceu perto de casa.");
+        v0648GoSquare();
       }
     }
 
@@ -9600,7 +9607,8 @@ function v0648GoSquare() {
     !state ||
     transitionBusy ||
     dialog ||
-    !v0648Chapter2Unlocked()
+    !v0648Chapter2Unlocked() ||
+    !state.storyFlags?.marketParentsConfirmed
   ) {
     return;
   }
@@ -9609,6 +9617,13 @@ function v0648GoSquare() {
     "Praça central",
     "Leste de Forgotten",
     () => {
+      const firstVisit =
+        !state.storyFlags.squareVisited;
+
+      state.storyFlags.squareVisited = true;
+      state.storyFlags.squareVisitCount =
+        (state.storyFlags.squareVisitCount || 0) + 1;
+
       state.room = "square";
       state.x = 82;
       state.y = 500;
@@ -9616,7 +9631,16 @@ function v0648GoSquare() {
       state.walk = 0;
       keys.clear();
       near = null;
+
+      if (firstVisit) {
+        v06Toast(
+          "Praça central · procure alguém que possa ter visto seus pais.",
+          2.6
+        );
+      }
+
       updateHud();
+      save();
     }
   );
 }
@@ -9662,6 +9686,26 @@ prepareSystems = function() {
 
   if (typeof state.storyFlags.raimundoMet !== "boolean") {
     state.storyFlags.raimundoMet = false;
+  }
+
+  if (typeof state.storyFlags.squareVisited !== "boolean") {
+    state.storyFlags.squareVisited = false;
+  }
+
+  if (!Number.isFinite(state.storyFlags.squareVisitCount)) {
+    state.storyFlags.squareVisitCount = 0;
+  }
+
+  if (typeof state.storyFlags.squareVendorTalked !== "boolean") {
+    state.storyFlags.squareVendorTalked = false;
+  }
+
+  if (typeof state.storyFlags.squareEarlyResidentTalked !== "boolean") {
+    state.storyFlags.squareEarlyResidentTalked = false;
+  }
+
+  if (typeof state.storyFlags.squareCardsTalked !== "boolean") {
+    state.storyFlags.squareCardsTalked = false;
   }
 
   // A Bíblia atual coloca as três pistas no Dia 1.
@@ -9788,12 +9832,14 @@ interact = function(action) {
           ["Você", "Meus pais estiveram aqui?"],
           ["Funcionário", "Estiveram. Os dois. Compraram algumas coisas e saíram juntos."],
           ["Você", "Tem certeza?"],
-          ["Funcionário", "Tenho. Seu pai ainda perguntou uma coisa sobre a estrada do sul antes de ir embora. Achei estranho, só isso."]
+          ["Funcionário", "Tenho. Seu pai ainda perguntou uma coisa sobre a estrada do sul antes de ir embora. Achei estranho, só isso."],
+          ["Você", "Alguém pode ter visto pra onde eles foram?"],
+          ["Funcionário", "Tenta a praça, a leste. O homem da cadeira costuma ficar lá até tarde e repara em todo mundo."]
         ],
         () => {
           state.storyFlags.marketParentsConfirmed = true;
           v06Toast(
-            "Pista confirmada: seus pais chegaram ao mercado.",
+            "Pista confirmada · nova rota: praça central, a leste.",
             2.8
           );
           updateHud();
@@ -9915,6 +9961,8 @@ function v0648DrawSquareEnvironment(m) {
     rect(bx + 48, by + 8, 5, 12, "#3f342b");
   }
 
+  v071DrawSquareAmbientWorld();
+
   for (const o of m.objects) {
     building(o);
   }
@@ -10017,8 +10065,16 @@ updateHud = function() {
     state.storyFlags?.marketParentsConfirmed &&
     !state.squareManFirstSpeechDone
   ) {
-    $("objective").textContent =
-      "Explore a praça a leste e converse com os moradores.";
+    if (!state.storyFlags?.squareVisited) {
+      $("objective").textContent =
+        "Vá à praça central, a leste.";
+    } else if (!state.storyFlags?.squareVendorTalked) {
+      $("objective").textContent =
+        "Pergunte na praça se alguém viu seus pais.";
+    } else {
+      $("objective").textContent =
+        "Fale com o homem de cadeira de rodas no lado leste da praça.";
+    }
     return;
   }
 
@@ -16182,7 +16238,336 @@ $("help").onclick = () => modal(
   [["Voltar", closeModal]]
 );
 
-$("version").textContent = "PROTÓTIPO · 0.7.0";
+
+// =========================================================
+// 0.7.1 — PRAÇA CENTRAL INTEGRADA À PROGRESSÃO
+// =========================================================
+
+// A praça já existia como mapa. Esta camada torna o acesso, a missão
+// e os moradores legíveis para o jogador sem alterar capítulos posteriores.
+const V071_SQUARE_VENDOR = {
+  x: 220,
+  y: 488
+};
+
+const V071_SQUARE_CARD_A = {
+  x: 420,
+  y: 555
+};
+
+const V071_SQUARE_CARD_B = {
+  x: 462,
+  y: 555
+};
+
+function v071DrawSquareAmbientWorld() {
+  if (
+    !state ||
+    state.room !== "square" ||
+    state.stage === "prologue"
+  ) {
+    return;
+  }
+
+  // Carrinho de picolé sendo fechado. Ele funciona como orientação
+  // diegética para o cadeirante na primeira visita.
+  if (state.day <= 7) {
+    rect(
+      V071_SQUARE_VENDOR.x - 26,
+      V071_SQUARE_VENDOR.y + 9,
+      48,
+      24,
+      "#6a6255"
+    );
+    rect(
+      V071_SQUARE_VENDOR.x - 21,
+      V071_SQUARE_VENDOR.y + 4,
+      38,
+      7,
+      "#b8aa88"
+    );
+    rect(
+      V071_SQUARE_VENDOR.x - 20,
+      V071_SQUARE_VENDOR.y + 32,
+      7,
+      7,
+      "#232628"
+    );
+    rect(
+      V071_SQUARE_VENDOR.x + 12,
+      V071_SQUARE_VENDOR.y + 32,
+      7,
+      7,
+      "#232628"
+    );
+
+    person(
+      V071_SQUARE_VENDOR.x,
+      V071_SQUARE_VENDOR.y,
+      "npcMale",
+      0,
+      "left",
+      0.9
+    );
+
+    txt(
+      "VENDEDOR",
+      V071_SQUARE_VENDOR.x - 28,
+      V071_SQUARE_VENDOR.y - 36,
+      "#b9b29e",
+      7
+    );
+  }
+
+  // Dois aposentados mantêm a praça com aparência de lugar vivido.
+  person(
+    V071_SQUARE_CARD_A.x,
+    V071_SQUARE_CARD_A.y,
+    "npcMale",
+    0,
+    "right",
+    0.86
+  );
+
+  person(
+    V071_SQUARE_CARD_B.x,
+    V071_SQUARE_CARD_B.y,
+    "npcMale",
+    0,
+    "left",
+    0.86
+  );
+
+  rect(
+    434,
+    557,
+    16,
+    10,
+    "#4b3f34"
+  );
+
+  // O morador do Capítulo 5 aparece desde cedo. Assim, quando sua
+  // lembrança muda mais tarde, o jogador já o conhece.
+  if (!v0650Chapter5Unlocked()) {
+    person(
+      V0650_SQUARE_RESIDENT.x,
+      V0650_SQUARE_RESIDENT.y,
+      "npcMale",
+      0,
+      "left",
+      0.9
+    );
+
+    txt(
+      "MORADOR",
+      V0650_SQUARE_RESIDENT.x - 25,
+      V0650_SQUARE_RESIDENT.y - 34,
+      "#aca798",
+      7
+    );
+  }
+}
+
+const v071GetNearBase = getNear;
+getNear = function() {
+  prepareSystems();
+
+  if (
+    state?.room === "square" &&
+    state.stage !== "prologue"
+  ) {
+    if (
+      state.day <= 7 &&
+      Math.hypot(
+        state.x - V071_SQUARE_VENDOR.x,
+        state.y - V071_SQUARE_VENDOR.y
+      ) < 44
+    ) {
+      return {
+        label: "Falar com o vendedor",
+        action: "squareVendor"
+      };
+    }
+
+    if (
+      !v0650Chapter5Unlocked() &&
+      Math.hypot(
+        state.x - V0650_SQUARE_RESIDENT.x,
+        state.y - V0650_SQUARE_RESIDENT.y
+      ) < 42
+    ) {
+      return {
+        label: "Falar com o morador",
+        action: "squareEarlyResident"
+      };
+    }
+
+    const cardsDistance = Math.min(
+      Math.hypot(
+        state.x - V071_SQUARE_CARD_A.x,
+        state.y - V071_SQUARE_CARD_A.y
+      ),
+      Math.hypot(
+        state.x - V071_SQUARE_CARD_B.x,
+        state.y - V071_SQUARE_CARD_B.y
+      )
+    );
+
+    if (cardsDistance < 44) {
+      return {
+        label: "Falar com os aposentados",
+        action: "squareCards"
+      };
+    }
+  }
+
+  return v071GetNearBase();
+};
+
+const v071InteractBase = interact;
+interact = function(action) {
+  prepareSystems();
+
+  if (action === "squareVendor") {
+    const first =
+      !state.storyFlags.squareVendorTalked;
+
+    if (first) {
+      state.storyFlags.squareVendorTalked = true;
+
+      say(
+        [
+          ["Você", "O senhor viu meus pais passarem por aqui? Os Lancaster."],
+          ["Vendedor", "Hoje não. Mas eu fecho tarde e não fico olhando a rua o tempo todo."],
+          ["Vendedor", "Se alguém reparou, foi o homem de cadeira ali do outro lado."],
+          ["Vendedor", "Ele fica horas olhando quem entra e quem sai da praça."],
+          ["Você", "Ele conhece meus pais?"],
+          ["Vendedor", "Não sei se conhece. Só sei que ele repara em coisa que ninguém mais repara."]
+        ],
+        () => {
+          updateHud();
+          save();
+        }
+      );
+    } else {
+      say([
+        ["Vendedor", "O homem da cadeira ainda está ali."],
+        ["Vendedor", "Se veio perguntar de novo, eu realmente não vi seus pais."]
+      ]);
+    }
+
+    return;
+  }
+
+  if (action === "squareEarlyResident") {
+    const first =
+      !state.storyFlags.squareEarlyResidentTalked;
+
+    state.storyFlags.squareEarlyResidentTalked = true;
+
+    say(
+      first
+        ? [
+            ["Morador", "Os Lancaster? Não vi os dois hoje."],
+            ["Morador", "Eu fico mais olhando a fonte do que a rua."],
+            ["Você", "Você vem sempre aqui?"],
+            ["Morador", "Há anos. Meus filhos eram pequenos e essa fonte já vivia entupindo."]
+          ]
+        : [
+            ["Morador", "Seus pais não passaram por mim."],
+            ["Morador", "Mas essa praça engole tanta conversa que eu já nem sei quem eu vi ontem."]
+          ],
+      save
+    );
+
+    return;
+  }
+
+  if (action === "squareCards") {
+    const first =
+      !state.storyFlags.squareCardsTalked;
+
+    state.storyFlags.squareCardsTalked = true;
+
+    say(
+      first
+        ? [
+            ["Aposentado", "Lancaster? Não vi. Pergunta pro homem da cadeira."],
+            ["Outro aposentado", "Você não viu nem a carta que eu joguei."],
+            ["Aposentado", "Eu vi. Só não gostei dela."],
+            ["Você", "...Tá."]
+          ]
+        : [
+            ["Aposentado", "Ainda procurando?"],
+            ["Você", "Ainda."],
+            ["Outro aposentado", "Então não perde tempo com a nossa mesa."]
+          ],
+      save
+    );
+
+    return;
+  }
+
+  v071InteractBase(action);
+};
+
+// Sinal visível no bairro: o jogador entende que existe uma rota leste
+// mesmo enquanto ela ainda está bloqueada narrativamente.
+const v071DrawWorldBase = drawWorld;
+drawWorld = function() {
+  v071DrawWorldBase();
+
+  if (
+    !state ||
+    state.room !== "village" ||
+    state.stage === "prologue"
+  ) {
+    return;
+  }
+
+  c.save();
+  c.translate(
+    -Math.floor(camera.x),
+    -Math.floor(camera.y)
+  );
+
+  const signX =
+    maps.village.w - 118;
+  const signY = 372;
+
+  rect(
+    signX,
+    signY,
+    86,
+    24,
+    "#4b4438"
+  );
+  rect(
+    signX + 4,
+    signY + 4,
+    78,
+    16,
+    "#6b604d"
+  );
+  txt(
+    "PRAÇA →",
+    signX + 15,
+    signY + 16,
+    "#d2c7a9",
+    8
+  );
+  rect(
+    signX + 39,
+    signY + 24,
+    7,
+    27,
+    "#41392f"
+  );
+
+  c.restore();
+};
+
+$("version").textContent = "PROTÓTIPO · 0.7.1";
   
   requestAnimationFrame(frame);
   showBootSplash();
