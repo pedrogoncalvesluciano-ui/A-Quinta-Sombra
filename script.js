@@ -11191,7 +11191,555 @@ $("help").onclick = () => modal(
   [["Voltar", closeModal]]
 );
 
-$("version").textContent = "PROTÓTIPO · 0.6.49";
+
+// =========================================================
+// 0.6.50 — PARTES 3/5 E 4/5
+// CAPÍTULO 5 "PADRÕES" — CONTRADIÇÕES E DIÁRIO
+// =========================================================
+
+const V0650_CONTRADICTION_LABELS = {
+  policeRecord: "Registro policial que Anísio não lembra de ter escrito",
+  marketTime: "Horário lembrado pelo funcionário não bate com o recibo",
+  squareFountain: "Memória do morador não bate com a placa da praça"
+};
+
+function v0650EnsureInvestigationLog() {
+  if (!state) return null;
+
+  if (
+    !state.investigationLog ||
+    typeof state.investigationLog !== "object"
+  ) {
+    state.investigationLog = {};
+  }
+
+  if (!Array.isArray(state.investigationLog.contradictions)) {
+    state.investigationLog.contradictions = [];
+  }
+
+  if (
+    !state.investigationLog.keyClues ||
+    typeof state.investigationLog.keyClues !== "object"
+  ) {
+    state.investigationLog.keyClues = {};
+  }
+
+  for (const id of [
+    "marketConfirmed",
+    "policeContradiction",
+    "fatherNotebook",
+    "photoCopy",
+    "florindaConfession",
+    "splitReveal"
+  ]) {
+    if (typeof state.investigationLog.keyClues[id] !== "boolean") {
+      state.investigationLog.keyClues[id] = false;
+    }
+  }
+
+  if (state.storyFlags?.marketParentsConfirmed) {
+    state.investigationLog.keyClues.marketConfirmed = true;
+  }
+
+  if (
+    !state.memoryFacts ||
+    typeof state.memoryFacts !== "object"
+  ) {
+    state.memoryFacts = {
+      squarePlaqueRead: false,
+      squareResidentHeard: false,
+      marketTimeChecked: false,
+      policeRecordChecked: false
+    };
+  }
+
+  for (const key of [
+    "squarePlaqueRead",
+    "squareResidentHeard",
+    "marketTimeChecked",
+    "policeRecordChecked"
+  ]) {
+    if (typeof state.memoryFacts[key] !== "boolean") {
+      state.memoryFacts[key] = false;
+    }
+  }
+
+  return state.investigationLog;
+}
+
+function v0650HasContradiction(id) {
+  const log = v0650EnsureInvestigationLog();
+  return Boolean(log?.contradictions.includes(id));
+}
+
+function v0650RecordContradiction(id) {
+  const log = v0650EnsureInvestigationLog();
+
+  if (!log || log.contradictions.includes(id)) {
+    return false;
+  }
+
+  log.contradictions.push(id);
+
+  if (id === "policeRecord") {
+    log.keyClues.policeContradiction = true;
+  }
+
+  v06Toast(
+    "Contradição registrada · " +
+    log.contradictions.length +
+    "/3",
+    2.4
+  );
+
+  updateHud();
+  save();
+  return true;
+}
+
+function v0650Chapter5Unlocked() {
+  return Boolean(
+    state &&
+    state.stage !== "prologue" &&
+    state.day >= 8 &&
+    state.storyFlags?.chapter4Complete
+  );
+}
+
+function v0650Chapter5Ready() {
+  return Boolean(
+    v0650Chapter5Unlocked() &&
+    v0650EnsureInvestigationLog().contradictions.length >= 3
+  );
+}
+
+function v0650OpenJournal() {
+  prepareSystems();
+  const log = v0650EnsureInvestigationLog();
+
+  modal(
+    "Diário de investigação",
+    "",
+    [["Fechar", closeModal]]
+  );
+
+  const root = $("modalText");
+  root.replaceChildren();
+
+  const clueTitle = document.createElement("strong");
+  clueTitle.textContent = "PISTAS IMPORTANTES";
+  root.append(clueTitle);
+
+  const q = chapter();
+  const clueBox = document.createElement("div");
+  clueBox.style.display = "grid";
+  clueBox.style.gap = "6px";
+  clueBox.style.margin = "10px 0 18px";
+
+  const collected = q?.clues || [];
+
+  if (!collected.length) {
+    const none = document.createElement("div");
+    none.textContent = "Nenhuma pista registrada.";
+    clueBox.append(none);
+  } else {
+    for (const id of collected) {
+      if (!["list", "photo", "note"].includes(id)) continue;
+
+      const row = document.createElement("div");
+      row.textContent =
+        "• " +
+        v0645ClueName(id) +
+        " — " +
+        clueText[id];
+      clueBox.append(row);
+    }
+  }
+
+  root.append(clueBox);
+
+  const contradictionTitle = document.createElement("strong");
+  contradictionTitle.textContent = "CONTRADIÇÕES OBSERVADAS";
+  root.append(contradictionTitle);
+
+  const contradictionBox = document.createElement("div");
+  contradictionBox.style.display = "grid";
+  contradictionBox.style.gap = "7px";
+  contradictionBox.style.marginTop = "10px";
+
+  if (!log.contradictions.length) {
+    const none = document.createElement("div");
+    none.textContent =
+      "Nenhuma contradição de memória confirmada.";
+    contradictionBox.append(none);
+  } else {
+    for (const id of log.contradictions) {
+      const row = document.createElement("div");
+      row.textContent =
+        "• " +
+        (V0650_CONTRADICTION_LABELS[id] || id);
+      contradictionBox.append(row);
+    }
+  }
+
+  root.append(contradictionBox);
+
+  if (v0650Chapter5Unlocked()) {
+    const hint = document.createElement("p");
+    hint.style.marginTop = "16px";
+    hint.textContent =
+      log.contradictions.length >= 3
+        ? "Há um padrão. Três contradições já não parecem coincidência."
+        : "Compare o que as pessoas dizem com registros físicos e com o que você já viu.";
+    root.append(hint);
+  }
+}
+
+// J volta a ser o diário de investigação. I continua sendo inventário.
+openJournal = function() {
+  v0650OpenJournal();
+};
+
+const v0650Chapter5PrepareBase = prepareSystems;
+prepareSystems = function() {
+  v0650Chapter5PrepareBase();
+
+  if (!state) return;
+
+  v0650EnsureInvestigationLog();
+
+  if (!state.chapter5 || typeof state.chapter5 !== "object") {
+    state.chapter5 = {
+      complete: false,
+      brotherLineSeen: false
+    };
+  }
+
+  if (typeof state.chapter5.complete !== "boolean") {
+    state.chapter5.complete = false;
+  }
+
+  if (typeof state.chapter5.brotherLineSeen !== "boolean") {
+    state.chapter5.brotherLineSeen = false;
+  }
+};
+
+const V0650_SQUARE_RESIDENT = {
+  x: 575,
+  y: 360
+};
+
+const V0650_SQUARE_PLAQUE = {
+  x: 487,
+  y: 410
+};
+
+const v0650Chapter5GetNearBase = getNear;
+getNear = function() {
+  prepareSystems();
+
+  if (
+    state?.room === "square" &&
+    v0650Chapter5Unlocked()
+  ) {
+    if (
+      Math.hypot(
+        state.x - V0650_SQUARE_PLAQUE.x,
+        state.y - V0650_SQUARE_PLAQUE.y
+      ) < 38
+    ) {
+      return {
+        label: "Ler a placa da fonte",
+        action: "memory:squarePlaque"
+      };
+    }
+
+    if (
+      Math.hypot(
+        state.x - V0650_SQUARE_RESIDENT.x,
+        state.y - V0650_SQUARE_RESIDENT.y
+      ) < 42
+    ) {
+      return {
+        label: "Falar com o morador",
+        action: "memory:squareResident"
+      };
+    }
+  }
+
+  return v0650Chapter5GetNearBase();
+};
+
+function v0650TrySquareContradiction() {
+  if (
+    state.memoryFacts.squarePlaqueRead &&
+    state.memoryFacts.squareResidentHeard
+  ) {
+    v0650RecordContradiction("squareFountain");
+  }
+}
+
+function v0650PoliceContradiction() {
+  prepareSystems();
+
+  if (v0650HasContradiction("policeRecord")) {
+    say([
+      ["Anísio", "Eu já conferi aquilo três vezes."],
+      ["Anísio", "A assinatura é minha. O texto parece meu. Mas eu não lembro de escrever."]
+    ]);
+    return;
+  }
+
+  say(
+    [
+      ["Você", "Esse relatório é do caso dos meus pais?"],
+      ["Anísio", "É... espera."],
+      ["Você", "O que foi?"],
+      ["Anísio", "Está assinado por mim e datado de ontem."],
+      ["Você", "Então?"],
+      ["Anísio", "Eu não escrevi isso."],
+      ["Você", "A assinatura é sua."],
+      ["Anísio", "Eu sei como é a minha assinatura."],
+      ["Anísio", "E é exatamente por isso que isso está me incomodando."]
+    ],
+    () => {
+      state.memoryFacts.policeRecordChecked = true;
+      v0650RecordContradiction("policeRecord");
+    }
+  );
+}
+
+function v0650OpenPoliceTopics() {
+  prepareSystems();
+
+  const buttons = [];
+
+  buttons.push([
+    "Falar dos pais",
+    () => {
+      closeModal();
+      v0630PoliceParents();
+    }
+  ]);
+
+  if (state.storyEvents.oldManEncounters > 0) {
+    buttons.push([
+      "Falar do Raimundo",
+      () => {
+        closeModal();
+        v0630PoliceOldMan();
+      }
+    ]);
+  }
+
+  if (state.storyEvents.vanSightings > 0) {
+    buttons.push([
+      "Falar da van",
+      () => {
+        closeModal();
+        v0630PoliceVan();
+      }
+    ]);
+  }
+
+  if (state.chapter4?.bodySeen) {
+    buttons.push([
+      "Falar da rua oeste",
+      () => {
+        closeModal();
+        v0649PoliceBody();
+      }
+    ]);
+  }
+
+  if (v0650Chapter5Unlocked()) {
+    buttons.push([
+      v0650HasContradiction("policeRecord")
+        ? "Rever o relatório estranho"
+        : "Conferir um relatório",
+      () => {
+        closeModal();
+        v0650PoliceContradiction();
+      }
+    ]);
+  }
+
+  buttons.push(["Sair", closeModal]);
+
+  modal(
+    "Delegacia",
+    "",
+    buttons
+  );
+}
+
+v0630OpenPoliceTopics = v0650OpenPoliceTopics;
+
+const v0650Chapter5InteractBase = interact;
+interact = function(action) {
+  prepareSystems();
+
+  if (action === "memory:squarePlaque") {
+    const first = !state.memoryFacts.squarePlaqueRead;
+    state.memoryFacts.squarePlaqueRead = true;
+
+    say(
+      [
+        "Uma placa de metal presa à base da fonte:",
+        "“Fonte da praça · reforma concluída em 1987.”"
+      ],
+      () => {
+        if (first) {
+          v0650TrySquareContradiction();
+          save();
+        }
+      }
+    );
+    return;
+  }
+
+  if (action === "memory:squareResident") {
+    const first = !state.memoryFacts.squareResidentHeard;
+    state.memoryFacts.squareResidentHeard = true;
+
+    say(
+      [
+        ["Morador", "Essa fonte é nova. Trocaram tudo aqui há dois anos."],
+        ["Você", "Tem certeza?"],
+        ["Morador", "Claro. Eu estava aqui no dia em que terminaram."]
+      ],
+      () => {
+        if (first) {
+          v0650TrySquareContradiction();
+          save();
+        }
+      }
+    );
+    return;
+  }
+
+  if (
+    action === "marketClerk" &&
+    v0650Chapter5Unlocked() &&
+    !state.memoryFacts.marketTimeChecked
+  ) {
+    say(
+      [
+        ["Você", "Você lembra que horas meus pais saíram daqui?"],
+        ["Funcionário", "Quase quatro da tarde. Tenho certeza."],
+        ["Você", "Mas você disse outra coisa quando eu vim antes."],
+        ["Funcionário", "Não disse, não."],
+        ["Funcionário", "Espera... o recibo ainda está no sistema."],
+        ["Funcionário", "14:20."],
+        ["Você", "Então por que você lembra de quase quatro?"],
+        ["Funcionário", "...Eu não sei."]
+      ],
+      () => {
+        state.memoryFacts.marketTimeChecked = true;
+        v0650RecordContradiction("marketTime");
+      }
+    );
+    return;
+  }
+
+  if (
+    action === "brother" &&
+    v0650Chapter5Ready() &&
+    !state.chapter5.brotherLineSeen
+  ) {
+    say(
+      [
+        ["Irmão", "Você está escrevendo tudo agora."],
+        ["Você", "Porque as pessoas estão falando coisas diferentes."],
+        ["Irmão", "Você também."],
+        ["Você", "Como assim?"],
+        ["Irmão", "Você lembra diferente de ontem."],
+        ["Você", "...Diferente como?"],
+        ["Irmão", "Ontem você disse que o homem do mercado lembrava certinho. Hoje você disse que nunca confiou nele."]
+      ],
+      () => {
+        state.chapter5.brotherLineSeen = true;
+        state.chapter5.complete = true;
+        v06Toast("Capítulo 5 concluído · Padrões", 2.5);
+        updateHud();
+        save();
+      }
+    );
+    return;
+  }
+
+  v0650Chapter5InteractBase(action);
+};
+
+const v0650Chapter5DrawBase = drawWorld;
+drawWorld = function() {
+  v0650Chapter5DrawBase();
+
+  if (
+    !state ||
+    state.room !== "square" ||
+    !v0650Chapter5Unlocked()
+  ) {
+    return;
+  }
+
+  c.save();
+  c.translate(
+    -Math.floor(camera.x),
+    -Math.floor(camera.y)
+  );
+
+  person(
+    V0650_SQUARE_RESIDENT.x,
+    V0650_SQUARE_RESIDENT.y,
+    "npcMale",
+    0,
+    "left",
+    0.9
+  );
+
+  rect(
+    V0650_SQUARE_PLAQUE.x - 12,
+    V0650_SQUARE_PLAQUE.y - 6,
+    24,
+    12,
+    "#77705f"
+  );
+
+  c.restore();
+};
+
+const v0650Chapter5HudBase = updateHud;
+updateHud = function() {
+  v0650Chapter5HudBase();
+
+  if (
+    !state ||
+    state.stage === "prologue" ||
+    !v0650Chapter5Unlocked()
+  ) {
+    return;
+  }
+
+  prepareSystems();
+
+  if (!state.chapter5.complete) {
+    const count =
+      state.investigationLog.contradictions.length;
+
+    if (count < 3) {
+      $("objective").textContent =
+        "Compare relatos e registros em Forgotten: " +
+        count +
+        "/3 contradições. J: diário.";
+    } else {
+      $("objective").textContent =
+        "Converse com seu irmão sobre o que você registrou.";
+    }
+  }
+};
+
+$("version").textContent = "PROTÓTIPO · 0.6.50";
   
   requestAnimationFrame(frame);
   showBootSplash();
