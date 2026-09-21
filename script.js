@@ -943,25 +943,12 @@ function drawCharacterSprite(
     // hurt.png tem 13 quadros. Ao contrário, a queda vira o player levantando.
     frame = 12 - Math.floor(wakeProgress * 13);
   } else if (punching) {
-    // Os quadros laterais de thrust usam uma composição incompatível
-    // com a roupa atual do protagonista. Nos lados, preservamos o
-    // corpo correto e o golpe continua funcionando normalmente.
-    if (facing === "left" || facing === "right") {
-      animation = "idle";
-      frame = 0;
-    } else {
-      animation = "thrust";
-
-      const progress = Math.max(
-        0,
-        Math.min(
-          0.999,
-          1 - state.danger.punch / 0.45
-        )
-      );
-
-      frame = Math.floor(progress * 8);
-    }
+    // O spritesheet thrust atual possui quadros incompatíveis com a
+    // composição de roupa do protagonista e alguns quadros são quase
+    // transparentes. Mantemos o player visível com idle em TODAS as
+    // direções e desenhamos o impacto separadamente.
+    animation = "idle";
+    frame = 0;
   } else if (moving) {
     animation = "walk";
 
@@ -9463,6 +9450,88 @@ v0645OpenDevPanel = function() {
   }
 };
 
+// =========================================================
+// 0.6.47 — CORREÇÃO VISUAL DO SOCO / PLAYER INVISÍVEL
+// =========================================================
+
+const v0647DrawWorldBase = drawWorld;
+drawWorld = function() {
+  v0647DrawWorldBase();
+
+  if (
+    !state ||
+    mode !== "game" ||
+    !state.danger ||
+    state.danger.punch <= 0 ||
+    state.room === "oldRoad"
+  ) {
+    return;
+  }
+
+  // Pequeno impacto em pixels. O personagem continua usando idle,
+  // evitando os frames quebrados/transparentes de thrust.png.
+  c.save();
+  c.translate(
+    -Math.floor(camera.x),
+    -Math.floor(camera.y)
+  );
+
+  const p = Math.max(
+    0,
+    Math.min(1, 1 - state.danger.punch / 0.45)
+  );
+
+  const reach = 15 + p * 6;
+  let dx = 0;
+  let dy = 0;
+
+  if (state.facing === "left") dx = -reach;
+  else if (state.facing === "right") dx = reach;
+  else if (state.facing === "up") dy = -reach;
+  else dy = reach;
+
+  rect(
+    state.x + dx - 4,
+    state.y + dy - 12,
+    8,
+    5,
+    "rgba(224,207,171,0.75)"
+  );
+
+  rect(
+    state.x + dx - 2,
+    state.y + dy - 9,
+    4,
+    3,
+    "rgba(255,238,198,0.55)"
+  );
+
+  c.restore();
+};
+
+// Proteção extra: coordenadas inválidas nunca podem fazer a câmera
+// perder o protagonista depois de um combate.
+const v0647UpdateBase = update;
+update = function(dt) {
+  if (state && mode === "game") {
+    const m = maps[state.room];
+
+    if (
+      !m ||
+      !Number.isFinite(state.x) ||
+      !Number.isFinite(state.y)
+    ) {
+      state.room = "village";
+      state.x = 442;
+      state.y = 742;
+      state.facing = "down";
+      state.walk = 0;
+    }
+  }
+
+  v0647UpdateBase(dt);
+};
+
 // Recupera um save que tenha ficado dentro de um móvel reposicionado.
 const roomUpdateBeforeFix=update;
 let roomPositionChecked=false;
@@ -9482,7 +9551,7 @@ update=function(dt) {
   roomUpdateBeforeFix(dt);
 };
 
-$("version").textContent = "PROTÓTIPO · 0.6.46";
+$("version").textContent = "PROTÓTIPO · 0.6.47";
   
   requestAnimationFrame(frame);
   showBootSplash();
