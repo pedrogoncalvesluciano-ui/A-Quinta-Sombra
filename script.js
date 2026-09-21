@@ -4703,15 +4703,16 @@ interact = function (action) {
       [
         [
           "Irmão",
-          "Ouvi a voz da mãe perto do porão. " +
-          "Mas não sei se era ela."
+          "Eu ouvi passos lá embaixo enquanto você estava fora."
+        ],
+        [
+          "Você",
+          "Você viu alguém?"
         ],
         [
           "Irmão",
-          "Ela jamais falaria uma coisa assim."
-        ],
-        ["Você", "O quê? O que ela disse?"],
-        ["Irmão", "Não é nada… esquece."]
+          "Não. Quando eu fui olhar, já tinha parado."
+        ]
       ],
       () => {
         q.phase = "clues";
@@ -6917,8 +6918,8 @@ function v0630PoliceOldMan() {
     state.policeReportedEvents.oldManEncounters
   ) {
     say([
-      ["Policial", "Mas eu já te falei sobre isso."],
-      ["Policial", "Se ele fizer alguma coisa de novo, volte aqui."]
+      ["Policial", "Sim, eu sei quem é o Raimundo."],
+      ["Policial", "Ele mora naquela estrada há muito tempo."]
     ]);
     return;
   }
@@ -6926,29 +6927,17 @@ function v0630PoliceOldMan() {
   state.policeReportedEvents.oldManEncounters =
     state.storyEvents.oldManEncounters;
 
-  const count = state.policeReports.oldMan++;
+  state.policeReports.oldMan += 1;
 
-  const lines =
-    count === 0
-      ? [
-          ["Você", "Tinha um homem idoso me perseguindo."],
-          ["Policial", "O senhor que mora no fim da estrada de terra?"],
-          ["Você", "Ele me chamou para entrar e depois veio atrás de mim."],
-          ["Policial", "Vamos anotar. Por enquanto, não volte lá sozinho."]
-        ]
-      : count === 1
-        ? [
-            ["Você", "Estou falando daquele idoso de novo."],
-            ["Policial", "Nós sabemos quem ele é."],
-            ["Policial", "Ele vive naquela casa há muito tempo. Ainda não temos nada que justifique uma abordagem."]
-          ]
-        : [
-            ["Você", "Ele continua me preocupando."],
-            ["Policial", "Entendi."],
-            ["Policial", "Evite aquela estrada. Se houver algo verificável, nós iremos até lá."]
-          ];
-
-  say(lines, save);
+  say(
+    [
+      ["Você", "Encontrei um homem chamado Raimundo na estrada do sul."],
+      ["Policial", "Raimundo? Ele trabalhou na antiga mina quando era mais novo."],
+      ["Você", "Ele disse que conhece minha família."],
+      ["Policial", "Ele conhece muita história antiga da cidade. Se ele falou da mina, escute com cuidado, mas não entre naquele lugar."]
+    ],
+    save
+  );
 }
 
 function v0630PoliceVan() {
@@ -9004,59 +8993,36 @@ function v0646ReturnVillage(escaped = false) {
 }
 
 function v0646StartOldManChoice() {
+  prepareSystems();
+
   say(
     [
-      ["Velho", "Seus pais sabem que você está essa hora andando por aqui?"],
+      ["Raimundo", "Tá tarde para um garoto andar sozinho por esta estrada."],
       ["Você", "O senhor conhece meus pais?"],
-      ["Velho", "Conheço. Já vi os dois por esta estrada algumas vezes."],
-      ["Velho", "Está ficando tarde. Se quiser, pode passar a noite aqui."]
+      ["Raimundo", "Conheço o suficiente. Seu sobrenome já diz bastante, pra quem sabe ouvir."],
+      ["Você", "Como assim?"],
+      ["Raimundo", "Não vou te encher a cabeça com coisa que eu mesmo não sei explicar."],
+      ["Raimundo", "Só não entre na mata sem luz. E, se vir alguma coisa parada onde não devia estar, corre. Não chega perto."]
     ],
     () => {
-      modal(
-        "O que fazer?",
-        "",
-        [
-          [
-            "Aceitar",
-            () => {
-              closeModal();
+      state.oldManEvent.phase = "helped";
+      state.oldManEvent.runUnlocked = true;
+      state.oldManEvent.caught = false;
 
-              state.oldManEvent.phase = "chase";
-              state.oldManEvent.runUnlocked = true;
-              state.oldManEvent.caught = false;
-              state.oldManEvent.x = 625;
-              state.oldManEvent.y = 785;
+      if (!state.storyFlags || typeof state.storyFlags !== "object") {
+        state.storyFlags = {};
+      }
+      state.storyFlags.raimundoMet = true;
 
-              v0646CountOldManEncounter();
+      v0646CountOldManEncounter();
 
-              say(
-                [["Velho", "Então venha. É melhor sair da estrada."]],
-                () => {
-                  v06Toast(
-                    "Ele vai te alcançar. Segure F para correr.",
-                    3
-                  );
-                  save();
-                }
-              );
-            }
-          ],
-          [
-            "Recusar",
-            () => {
-              closeModal();
-
-              state.oldManEvent.phase = "refused";
-              v0646CountOldManEncounter();
-
-              say([
-                ["Você", "Não. Eu preciso voltar para casa."],
-                ["Velho", "Então não fique parado por aqui."]
-              ]);
-            }
-          ]
-        ]
+      v06Toast(
+        "Corrida liberada · segure Shift ou F",
+        3
       );
+
+      updateHud();
+      save();
     }
   );
 }
