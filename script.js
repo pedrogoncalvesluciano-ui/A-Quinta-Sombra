@@ -9850,6 +9850,19 @@ const v0648GetNearBase = getNear;
 getNear = function() {
   prepareSystems();
 
+  const baseTarget = v0648GetNearBase();
+
+  if (
+    baseTarget?.action === "oldRoadAdvance" &&
+    !v0648Chapter3Unlocked()
+  ) {
+    return {
+      ...baseTarget,
+      label: "Estrada ao sul",
+      action: "southLocked"
+    };
+  }
+
   if (state?.room === "oldRoad") {
     if (
       state.oldManEvent?.phase === "helped" &&
@@ -9884,12 +9897,31 @@ getNear = function() {
     }
   }
 
-  return v0648GetNearBase();
+  return baseTarget;
 };
 
 const v0648InteractBase = interact;
 interact = function(action) {
   prepareSystems();
+
+  if (action === "southLocked") {
+    say([
+      state.day < 4
+        ? "Ainda preciso procurar meus pais nas áreas mais próximas."
+        : "Antes de seguir pela estrada do sul, preciso confirmar o que aconteceu no mercado e na praça."
+    ]);
+    return;
+  }
+
+  if (
+    action === "oldRoadAdvance" &&
+    !v0648Chapter3Unlocked()
+  ) {
+    say([
+      "Ainda não tenho motivo para ir tão longe pela estrada do sul."
+    ]);
+    return;
+  }
 
   if (action === "marketClerk") {
     if (!state.storyFlags.marketParentsConfirmed) {
@@ -9949,6 +9981,15 @@ interact = function(action) {
   }
 
   v0648InteractBase(action);
+
+  if (
+    action?.startsWith("clue:") &&
+    chapter().phase === "cluesDone"
+  ) {
+    chapter().phase = "complete";
+    updateHud();
+    save();
+  }
 };
 
 function v0648DrawMarketClerk() {
@@ -10033,8 +10074,6 @@ function v0648DrawSquare() {
     building(o);
   }
 
-  v0633DrawWheelchairMan();
-
   person(
     state.x,
     state.y,
@@ -10057,6 +10096,9 @@ function v0648DrawSquare() {
   }
 
   c.restore();
+
+  // A função do NPC já aplica a câmera internamente.
+  v0633DrawWheelchairMan();
 
   v0646ApplyOutdoorLight();
 
