@@ -12104,6 +12104,659 @@ updateHud = function() {
   }
 };
 
+
+// =========================================================
+// 0.6.50 — CAPÍTULO 7 "RETORNO"
+// CÓPIA DO PAI + FOTOGRAFIA + PERSEGUIÇÃO DOMÉSTICA
+// =========================================================
+
+const V0650_FATHER_HOME_POS = {
+  x: housePoint(440),
+  y: housePoint(245)
+};
+
+const V0650_ATTIC_HIDE_POS = {
+  x: housePoint(515),
+  y: housePoint(275)
+};
+
+let v0650CopyStaticUntil = 0;
+
+function v0650Chapter7Unlocked() {
+  return Boolean(
+    state &&
+    state.day >= 14 &&
+    state.chapter6?.complete
+  );
+}
+
+const v0650Chapter7PrepareBase = prepareSystems;
+prepareSystems = function() {
+  v0650Chapter7PrepareBase();
+
+  if (!state) return;
+
+  if (!state.copyFather || typeof state.copyFather !== "object") {
+    state.copyFather = {
+      phase: "waiting",
+      room: "foyer",
+      x: V0650_FATHER_HOME_POS.x,
+      y: V0650_FATHER_HOME_POS.y,
+      followDelay: 0,
+      caught: false
+    };
+  }
+
+  if (![
+    "waiting",
+    "pending",
+    "inside",
+    "suspect",
+    "chase",
+    "resolved"
+  ].includes(state.copyFather.phase)) {
+    state.copyFather.phase = "waiting";
+  }
+
+  if (!Number.isFinite(state.copyFather.x)) {
+    state.copyFather.x = V0650_FATHER_HOME_POS.x;
+  }
+
+  if (!Number.isFinite(state.copyFather.y)) {
+    state.copyFather.y = V0650_FATHER_HOME_POS.y;
+  }
+
+  if (!Number.isFinite(state.copyFather.followDelay)) {
+    state.copyFather.followDelay = 0;
+  }
+
+  if (typeof state.copyFather.caught !== "boolean") {
+    state.copyFather.caught = false;
+  }
+
+  if (!state.chapter7 || typeof state.chapter7 !== "object") {
+    state.chapter7 = {
+      started: false,
+      brotherWarned: false,
+      photoCompared: false,
+      brotherFollowing: false,
+      hideUnlocked: false,
+      complete: false
+    };
+  }
+
+  for (const key of [
+    "started",
+    "brotherWarned",
+    "photoCompared",
+    "brotherFollowing",
+    "hideUnlocked",
+    "complete"
+  ]) {
+    if (typeof state.chapter7[key] !== "boolean") {
+      state.chapter7[key] = false;
+    }
+  }
+
+  if (
+    v0650Chapter7Unlocked() &&
+    !state.chapter7.started &&
+    state.copyFather.phase === "waiting"
+  ) {
+    state.copyFather.phase = "pending";
+  }
+};
+
+function v0650StartFatherReturn() {
+  prepareSystems();
+
+  if (
+    state.copyFather.phase !== "pending" ||
+    !v0650Chapter7Unlocked()
+  ) {
+    return false;
+  }
+
+  state.chapter7.started = true;
+
+  say(
+    [
+      "TOC. TOC.",
+      ["Você", "Quem é?"],
+      ["Pai", "Estevão? Abre a porta."],
+      ["Você", "...Pai?"],
+      "Quando a porta abre, ele está sozinho.",
+      ["Você", "Cadê a mãe?"],
+      ["Pai", "Depois eu explico. Primeiro deixa eu entrar."]
+    ],
+    () => {
+      state.copyFather.phase = "inside";
+      state.copyFather.room = "foyer";
+      state.copyFather.x = V0650_FATHER_HOME_POS.x;
+      state.copyFather.y = V0650_FATHER_HOME_POS.y;
+      state.copyFather.caught = false;
+
+      v06Toast("Seu pai voltou sozinho.", 2.3);
+      updateHud();
+      save();
+    }
+  );
+
+  return true;
+}
+
+function v0650BrotherWarnsAboutFather() {
+  prepareSystems();
+
+  say(
+    [
+      ["Irmão", "Ele voltou."],
+      ["Você", "Eu vi. Graças a Deus."],
+      ["Irmão", "Não."],
+      ["Você", "O quê?"],
+      ["Irmão", "Ele não perguntou onde eu estava. Ele sempre pergunta primeiro."],
+      ["Você", "Ele pode estar assustado."],
+      ["Irmão", "Compara com a foto. O bilhete disse pra fazer isso, lembra?"]
+    ],
+    () => {
+      state.chapter7.brotherWarned = true;
+      state.copyFather.phase = "suspect";
+      updateHud();
+      save();
+    }
+  );
+}
+
+function v0650CompareFatherPhoto() {
+  prepareSystems();
+
+  if (state.copyFather.phase !== "suspect") {
+    return;
+  }
+
+  const hasPhoto =
+    chapter()?.clues?.includes("photo");
+
+  if (!hasPhoto) {
+    say([
+      "Preciso encontrar a fotografia antes de confrontá-lo."
+    ]);
+    return;
+  }
+
+  say(
+    [
+      ["Você", "Pai... lembra dessa foto?"],
+      ["Pai", "Claro. Seu aniversário."],
+      ["Você", "Onde foi?"],
+      ["Pai", "Na praça. Você fez treze naquele dia."],
+      ["Você", "Não foi na praça."],
+      "Ele pega a fotografia. A manga sobe por um instante.",
+      "Há uma tatuagem escura no antebraço.",
+      "Na fotografia, o braço do meu pai está completamente limpo.",
+      ["Você", "Meu pai nunca teve essa tatuagem."],
+      ["Pai", "..."],
+      ["Pai", "Você não devia ter comparado."]
+    ],
+    () => {
+      state.chapter7.photoCompared = true;
+      v0650EnsureInvestigationLog().keyClues.photoCopy = true;
+      v0650CopyStaticUntil = elapsed + 1.1;
+      v0650StartFatherChase();
+    }
+  );
+}
+
+function v0650StartFatherChase() {
+  const e = state.copyFather;
+
+  e.phase = "chase";
+  e.room = state.room;
+  e.x = Math.max(
+    housePoint(80),
+    Math.min(
+      maps[state.room].w - housePoint(80),
+      state.x + housePoint(120)
+    )
+  );
+  e.y = state.y;
+  e.followDelay = 0;
+  e.caught = false;
+
+  state.chapter7.brotherFollowing = false;
+  state.chapter7.hideUnlocked = true;
+
+  keys.clear();
+
+  v06Toast(
+    "CORRA · encontre seu irmão.",
+    2.5
+  );
+
+  updateHud();
+  save();
+}
+
+function v0650FatherCaught() {
+  const e = state.copyFather;
+
+  if (e.caught) return;
+
+  e.caught = true;
+  keys.clear();
+
+  modal(
+    "Ele te alcançou",
+    "A mão dele fecha no seu braço antes que você consiga chegar ao seu irmão.",
+    [
+      [
+        "Tentar novamente",
+        () => {
+          closeModal();
+
+          state.room = "foyer";
+          state.x = housePoint(190);
+          state.y = housePoint(285);
+          state.facing = "right";
+          state.walk = 0;
+
+          state.chapter7.brotherFollowing = false;
+
+          e.phase = "chase";
+          e.room = "foyer";
+          e.x = V0650_FATHER_HOME_POS.x;
+          e.y = V0650_FATHER_HOME_POS.y;
+          e.followDelay = 0;
+          e.caught = false;
+
+          keys.clear();
+          near = null;
+
+          v06Toast(
+            "Encontre seu irmão e leve-o ao sótão.",
+            2.2
+          );
+
+          updateHud();
+          save();
+        }
+      ]
+    ]
+  );
+}
+
+function v0650TakeBrotherDuringChase() {
+  say(
+    [
+      ["Você", "Vem comigo. Agora."],
+      ["Irmão", "É ele?"],
+      ["Você", "Não olha pra trás. Só fica comigo."]
+    ],
+    () => {
+      state.chapter7.brotherFollowing = true;
+      v06Toast("Leve seu irmão ao sótão.", 2);
+      updateHud();
+      save();
+    }
+  );
+}
+
+function v0650HideFromFather() {
+  if (
+    state.copyFather.phase !== "chase" ||
+    !state.chapter7.brotherFollowing
+  ) {
+    return;
+  }
+
+  keys.clear();
+
+  say(
+    [
+      "Vocês se apertam atrás dos móveis cobertos por lençóis.",
+      "Passos sobem a escada.",
+      "O irmão prende a respiração.",
+      "A estática toma o cômodo por alguns segundos.",
+      "Os passos param do outro lado da porta.",
+      "...",
+      "Depois descem novamente.",
+      "Quando o ruído desaparece, a casa fica em silêncio."
+    ],
+    () => {
+      state.copyFather.phase = "resolved";
+      state.copyFather.room = "";
+      state.copyFather.caught = false;
+      state.chapter7.brotherFollowing = false;
+      state.chapter7.complete = true;
+      state.storyFlags.fatherCopyExposed = true;
+
+      v0650CopyStaticUntil = elapsed + 1.3;
+
+      v06Toast(
+        "Capítulo 7 concluído · Retorno",
+        2.5
+      );
+
+      updateHud();
+      save();
+    }
+  );
+}
+
+const v0650Chapter7GetNearBase = getNear;
+getNear = function() {
+  prepareSystems();
+
+  if (
+    ["inside", "suspect"].includes(state.copyFather?.phase) &&
+    state.room === "foyer" &&
+    Math.hypot(
+      state.x - state.copyFather.x,
+      state.y - state.copyFather.y
+    ) < 48
+  ) {
+    return {
+      label:
+        state.copyFather.phase === "suspect"
+          ? "Comparar com a fotografia"
+          : "Falar com seu pai",
+      action:
+        state.copyFather.phase === "suspect"
+          ? "compareFatherPhoto"
+          : "copyFatherTalk"
+    };
+  }
+
+  if (
+    state.copyFather?.phase === "chase" &&
+    state.chapter7.brotherFollowing &&
+    state.room === "attic" &&
+    Math.hypot(
+      state.x - V0650_ATTIC_HIDE_POS.x,
+      state.y - V0650_ATTIC_HIDE_POS.y
+    ) < 48
+  ) {
+    return {
+      label: "Esconder-se com seu irmão",
+      action: "fatherHide"
+    };
+  }
+
+  return v0650Chapter7GetNearBase();
+};
+
+const v0650Chapter7InteractBase = interact;
+interact = function(action) {
+  prepareSystems();
+
+  if (
+    action === "outside" &&
+    state.room === "foyer" &&
+    state.copyFather?.phase === "pending"
+  ) {
+    v0650StartFatherReturn();
+    return;
+  }
+
+  if (
+    action === "outside" &&
+    state.room === "foyer" &&
+    ["inside", "suspect", "chase"].includes(
+      state.copyFather?.phase
+    )
+  ) {
+    say([
+      state.copyFather.phase === "chase"
+        ? "Não posso fugir e deixar meu irmão aqui."
+        : "Meu pai acabou de voltar. Preciso entender o que está acontecendo."
+    ]);
+    return;
+  }
+
+  if (
+    action === "copyFatherTalk" &&
+    state.copyFather?.phase === "inside"
+  ) {
+    say([
+      ["Pai", "Eu estou cansado. Vai ver seu irmão."],
+      ["Pai", "Depois eu explico o que aconteceu."]
+    ]);
+    return;
+  }
+
+  if (
+    action === "brother" &&
+    state.copyFather?.phase === "inside" &&
+    !state.chapter7.brotherWarned
+  ) {
+    v0650BrotherWarnsAboutFather();
+    return;
+  }
+
+  if (action === "compareFatherPhoto") {
+    v0650CompareFatherPhoto();
+    return;
+  }
+
+  if (
+    action === "brother" &&
+    state.copyFather?.phase === "chase" &&
+    !state.chapter7.brotherFollowing
+  ) {
+    v0650TakeBrotherDuringChase();
+    return;
+  }
+
+  if (action === "fatherHide") {
+    v0650HideFromFather();
+    return;
+  }
+
+  v0650Chapter7InteractBase(action);
+};
+
+const v0650Chapter7UpdateBase = update;
+update = function(dt) {
+  prepareSystems();
+  v0650Chapter7UpdateBase(dt);
+
+  if (
+    !state ||
+    mode !== "game" ||
+    dialog ||
+    transitionBusy ||
+    !$("overlay").hidden ||
+    state.gameOver ||
+    state.dawnCollapse?.active ||
+    state.wakeUp?.active ||
+    state.copyFather?.phase !== "chase"
+  ) {
+    return;
+  }
+
+  const e = state.copyFather;
+
+  if (e.room !== state.room) {
+    e.followDelay += dt;
+
+    if (e.followDelay >= 0.9) {
+      e.room = state.room;
+      e.followDelay = 0;
+
+      const m = maps[state.room];
+
+      e.x = Math.max(
+        housePoint(70),
+        Math.min(
+          m.w - housePoint(70),
+          state.x + (
+            state.facing === "left"
+              ? housePoint(115)
+              : -housePoint(115)
+          )
+        )
+      );
+
+      e.y = Math.max(
+        housePoint(70),
+        Math.min(
+          m.h - housePoint(70),
+          state.y + housePoint(25)
+        )
+      );
+    }
+
+    return;
+  }
+
+  const dx = state.x - e.x;
+  const dy = state.y - e.y;
+  const distance = Math.hypot(dx, dy) || 1;
+
+  if (distance < housePoint(26)) {
+    v0650FatherCaught();
+    return;
+  }
+
+  const speed = 68;
+  const step = Math.min(
+    distance,
+    speed * dt
+  );
+
+  e.x += dx / distance * step;
+  e.y += dy / distance * step;
+};
+
+const v0650Chapter7DrawBase = drawWorld;
+drawWorld = function() {
+  v0650Chapter7DrawBase();
+
+  if (!state) return;
+
+  if (
+    ["inside", "suspect", "chase"].includes(
+      state.copyFather?.phase
+    ) &&
+    state.copyFather.room === state.room
+  ) {
+    c.save();
+    c.translate(
+      -Math.floor(camera.x),
+      -Math.floor(camera.y)
+    );
+
+    person(
+      state.copyFather.x,
+      state.copyFather.y,
+      "father",
+      state.copyFather.phase === "chase"
+        ? elapsed * 10
+        : 0,
+      "left",
+      1
+    );
+
+    c.restore();
+  }
+
+  if (
+    state.chapter7?.brotherFollowing &&
+    state.room !== "brother"
+  ) {
+    c.save();
+    c.translate(
+      -Math.floor(camera.x),
+      -Math.floor(camera.y)
+    );
+
+    const bx =
+      state.x +
+      (state.facing === "left" ? 22 : -22);
+    const by = state.y + 12;
+
+    person(
+      bx,
+      by,
+      "brother",
+      state.walk,
+      state.facing,
+      0.8
+    );
+
+    c.restore();
+  }
+
+  if (
+    state.copyFather?.phase === "chase" &&
+    !["village", "oldRoad", "westRoad", "square"].includes(
+      state.room
+    )
+  ) {
+    rect(
+      0, 0, W, H,
+      "rgba(5,7,10,0.16)"
+    );
+  }
+
+  if (elapsed < v0650CopyStaticUntil) {
+    for (let i = 0; i < 26; i++) {
+      const y =
+        (i * 17 + Math.floor(elapsed * 760) % H) % H;
+
+      rect(
+        0,
+        y,
+        W,
+        1 + (i % 3 === 0 ? 1 : 0),
+        "rgba(230,232,225,0.11)"
+      );
+    }
+  }
+};
+
+const v0650Chapter7HudBase = updateHud;
+updateHud = function() {
+  v0650Chapter7HudBase();
+
+  if (
+    !state ||
+    state.stage === "prologue" ||
+    !v0650Chapter7Unlocked() ||
+    state.chapter7.complete
+  ) {
+    return;
+  }
+
+  if (state.copyFather.phase === "pending") {
+    $("objective").textContent =
+      "Alguém está batendo na porta de entrada.";
+    return;
+  }
+
+  if (
+    state.copyFather.phase === "inside" &&
+    !state.chapter7.brotherWarned
+  ) {
+    $("objective").textContent =
+      "Converse com seu irmão.";
+    return;
+  }
+
+  if (state.copyFather.phase === "suspect") {
+    $("objective").textContent =
+      "Use a fotografia para verificar quem voltou.";
+    return;
+  }
+
+  if (state.copyFather.phase === "chase") {
+    $("objective").textContent =
+      state.chapter7.brotherFollowing
+        ? "Leve seu irmão ao sótão e encontre um esconderijo."
+        : "Encontre seu irmão antes que ele te alcance.";
+  }
+};
+
 $("version").textContent = "PROTÓTIPO · 0.6.50";
   
   requestAnimationFrame(frame);
