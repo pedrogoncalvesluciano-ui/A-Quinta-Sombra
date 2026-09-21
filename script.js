@@ -2,7 +2,7 @@
 "use strict";
 
 /*
-  A QUINTA SOMBRA — 0.7.3
+  A QUINTA SOMBRA — 0.7.4
 
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
@@ -2333,8 +2333,8 @@ function drawCharacterSprite(
       ? state.forcedSleepDue
         ? "14:00 · VOCÊ PRECISA DORMIR"
         : state.minutes >= 360
-          ? "DIA · TEMPO 2× · 1 HORA = 00:40"
-          : "NOITE · 1 HORA = 01:20"
+          ? "DIA · 1 HORA = 01:00"
+          : "NOITE · 1 HORA = 01:00"
       : "TEMPO PARADO · INTRODUÇÃO";
 
     $("inventory").textContent =
@@ -2798,12 +2798,11 @@ function drawCharacterSprite(
     if (state.firstExit) {
       const old = state.minutes;
 
-      // NOVO CICLO:
-      // 00:00–05:59 -> 1 hora do jogo = 1m20s reais.
-      // 06:00–14:00 -> tempo 2x mais rápido = 40s reais por hora.
-      // Às 14:00 o relógio para até o player dormir.
-      const timeRate =
-        state.minutes >= 360 ? 1.5 : 0.75;
+      // CICLO DE TEMPO:
+      // 1 hora do jogo = 1 minuto real, em qualquer horário ativo.
+      // Isso deixa 00:00–07:00 em aproximadamente 7 minutos reais.
+      // Às 14:00 o relógio continua parando até o player dormir.
+      const timeRate = 1;
 
       state.minutes += dt * timeRate;
 
@@ -6660,10 +6659,10 @@ updateHud = function () {
       "14:00 · TEMPO PARADO · DURMA";
   } else if (state.minutes >= 360) {
     $("timeNote").textContent =
-      "DIA · TEMPO 2× · 1 HORA = 00:40";
+      "DIA · 1 HORA = 01:00";
   } else {
     $("timeNote").textContent =
-      "NOITE · 1 HORA = 01:20";
+      "NOITE · 1 HORA = 01:00";
   }
 };
 
@@ -16913,7 +16912,7 @@ $("help").onclick = () => modal(
   [["Voltar", closeModal]]
 );
 
-$("version").textContent = "PROTÓTIPO · 0.7.3";
+$("version").textContent = "PROTÓTIPO · 0.7.4";
   
   requestAnimationFrame(frame);
   showBootSplash();
