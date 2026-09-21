@@ -10976,10 +10976,10 @@ update = function(dt) {
     keys.has("arrowright");
 
   if (
-    state.x >= maps.westRoad.w - 28 &&
+    state.x >= maps.westRoad.w - 42 &&
     right
   ) {
-    state.x = maps.westRoad.w - 30;
+    state.x = maps.westRoad.w - 44;
 
     v0649ReturnVillageFromWest(
       state.garciaEvent.phase === "chase"
@@ -11046,6 +11046,17 @@ updateHud = function() {
   ) {
     $("objective").textContent =
       "Procure a lanterna na gaveta de ferramentas da cozinha.";
+    return;
+  }
+
+  if (
+    v0649Chapter4Unlocked() &&
+    state.flashlight.owned &&
+    state.room !== "westRoad" &&
+    !state.chapter4.bodySeen
+  ) {
+    $("objective").textContent =
+      "Explore a rua oeste.";
     return;
   }
 
