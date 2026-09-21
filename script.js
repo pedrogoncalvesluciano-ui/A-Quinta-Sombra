@@ -15262,6 +15262,7 @@ function v070FinishGame(result) {
   if (result === "good") {
     state.storyFlags.motherRescued = true;
     state.storyFlags.fatherPermanentlyLost = true;
+    save();
 
     v070EndingGood();
     return;
@@ -15269,12 +15270,14 @@ function v070FinishGame(result) {
 
   if (result === "whoRemained") {
     state.storyFlags.brotherLost = true;
+    save();
 
     v070EndingWhoRemained();
     return;
   }
 
   state.storyFlags.estevaoLost = true;
+  save();
 
   v070EndingLeftBehind();
 }
