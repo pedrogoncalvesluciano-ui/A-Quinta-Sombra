@@ -2,7 +2,7 @@
 "use strict";
 
 /*
-  A QUINTA SOMBRA — 0.6.51
+  A QUINTA SOMBRA — 0.7.0
 
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
@@ -13295,6 +13295,1007 @@ updateHud = function() {
   }
 };
 
+
+
+// =========================================================
+// 0.7.0 — FUNDAÇÃO FINAL
+// ECONOMIA, RELAÇÃO COM O IRMÃO, EVENTOS PEQUENOS E MISSÕES SECUNDÁRIAS
+// =========================================================
+
+const V070_FOOD_PRICE = 8;
+
+const V070_RANDOM_EVENT_WEIGHTS = [
+  { id: "van", weight: 18, minDay: 1 },
+  { id: "voices", weight: 17, minDay: 1 },
+  { id: "knock", weight: 12, minDay: 2 },
+  { id: "blackout", weight: 10, minDay: 2 },
+  { id: "windowLight", weight: 10, minDay: 3 },
+  { id: "brotherEcho", weight: 7, minDay: 4 },
+  { id: "burntSmell", weight: 8, minDay: 6 },
+  { id: "invasion", weight: 8, minDay: 5, needsFinished: true }
+];
+
+let v070WindowLightUntil = 0;
+let v070RadioStaticUntil = 0;
+
+function v070EnsureFinalSystems() {
+  if (!state) return;
+
+  if (!Number.isFinite(state.money)) {
+    state.money = 0;
+  }
+
+  if (typeof state.walletFound !== "boolean") {
+    state.walletFound = false;
+  }
+
+  if (!state.relationship || typeof state.relationship !== "object") {
+    state.relationship = {
+      brotherCare: 0,
+      brotherTrust: 0,
+      brotherNeglect: 0,
+      toyReturned: false,
+      protectedDuringReturn: Boolean(state.chapter7?.complete)
+    };
+  }
+
+  for (const key of [
+    "brotherCare",
+    "brotherTrust",
+    "brotherNeglect"
+  ]) {
+    if (!Number.isFinite(state.relationship[key])) {
+      state.relationship[key] = 0;
+    }
+  }
+
+  for (const key of [
+    "toyReturned",
+    "protectedDuringReturn"
+  ]) {
+    if (typeof state.relationship[key] !== "boolean") {
+      state.relationship[key] = false;
+    }
+  }
+
+  if (state.chapter7?.complete) {
+    state.relationship.protectedDuringReturn = true;
+    state.relationship.brotherTrust = Math.max(
+      state.relationship.brotherTrust,
+      2
+    );
+  }
+
+  if (!state.sideQuests || typeof state.sideQuests !== "object") {
+    state.sideQuests = {};
+  }
+
+  if (!state.sideQuests.squareMemory || typeof state.sideQuests.squareMemory !== "object") {
+    state.sideQuests.squareMemory = {
+      resolved: false,
+      rewardTaken: false
+    };
+  }
+
+  if (!state.sideQuests.brotherToy || typeof state.sideQuests.brotherToy !== "object") {
+    state.sideQuests.brotherToy = {
+      found: false,
+      returned: false
+    };
+  }
+
+  if (!state.sideQuests.westCase || typeof state.sideQuests.westCase !== "object") {
+    state.sideQuests.westCase = {
+      garciaStatement: false,
+      evidenceFound: false,
+      resolved: false,
+      osvaldoNamed: false
+    };
+  }
+
+  if (!state.sideQuests.policeInsight || typeof state.sideQuests.policeInsight !== "object") {
+    state.sideQuests.policeInsight = {
+      resolved: false
+    };
+  }
+
+  if (!state.homeAtmosphere || typeof state.homeAtmosphere !== "object") {
+    state.homeAtmosphere = {
+      pendingRadio: false,
+      timer: 0
+    };
+  }
+}
+
+const v070PrepareBase = prepareSystems;
+prepareSystems = function() {
+  v070PrepareBase();
+  v070EnsureFinalSystems();
+};
+
+function v070KeyClueCount() {
+  prepareSystems();
+
+  const clues =
+    state.investigationLog?.keyClues || {};
+
+  return [
+    clues.marketConfirmed,
+    clues.policeContradiction,
+    clues.fatherNotebook,
+    clues.photoCopy,
+    clues.florindaConfession,
+    clues.splitReveal
+  ].filter(Boolean).length;
+}
+
+function v070BrotherBond() {
+  prepareSystems();
+
+  const r = state.relationship;
+
+  let score =
+    r.brotherCare +
+    r.brotherTrust -
+    r.brotherNeglect;
+
+  if (r.toyReturned) score += 1;
+  if (r.protectedDuringReturn) score += 2;
+  if (state.chapter7?.photoCompared) score += 1;
+
+  return score;
+}
+
+const v070FeedBrotherBase = v06FeedBrother;
+v06FeedBrother = function() {
+  const result = v070FeedBrotherBase();
+
+  if (result && state) {
+    v070EnsureFinalSystems();
+    state.relationship.brotherCare += 1;
+    save();
+  }
+
+  return result;
+};
+
+function v070FindWallet() {
+  prepareSystems();
+
+  if (state.walletFound) {
+    say([
+      "A carteira do meu pai está vazia. Eu já peguei o que havia nela."
+    ]);
+    return;
+  }
+
+  say(
+    [
+      "A carteira do meu pai ficou esquecida entre alguns papéis.",
+      "Tem R$ 32 dentro. Não é muito, mas pode comprar comida por alguns dias.",
+      "Não vai aparecer dinheiro novo aqui amanhã."
+    ],
+    () => {
+      state.walletFound = true;
+      state.money += 32;
+      v06Toast("Carteira do pai · R$ 32", 2.2);
+      updateHud();
+      save();
+    }
+  );
+}
+
+function v070OpenMarketMenu() {
+  prepareSystems();
+
+  const buttons = [];
+
+  if (
+    state.food <= 0 &&
+    state.money >= V070_FOOD_PRICE
+  ) {
+    buttons.push([
+      "Comprar comida · R$ " + V070_FOOD_PRICE,
+      () => {
+        closeModal();
+
+        state.money -= V070_FOOD_PRICE;
+        state.food = 1;
+
+        say(
+          [
+            ["Funcionário", "Aqui. É o que dá pra levar sem estragar."],
+            ["Você", "Obrigado."]
+          ],
+          () => {
+            updateHud();
+            save();
+          }
+        );
+      }
+    ]);
+  }
+
+  if (state.food > 0) {
+    buttons.push([
+      "Já estou carregando comida",
+      closeModal
+    ]);
+  } else if (state.money < V070_FOOD_PRICE) {
+    buttons.push([
+      "Sem dinheiro suficiente",
+      closeModal
+    ]);
+  }
+
+  buttons.push([
+    "Perguntar sobre meus pais",
+    () => {
+      closeModal();
+      say([
+        ["Funcionário", "Eles vieram juntos e saíram juntos."],
+        ["Funcionário", "Seu pai perguntou sobre a estrada do sul. Depois disso eu não vi nenhum dos dois."]
+      ]);
+    }
+  ]);
+
+  buttons.push(["Sair", closeModal]);
+
+  modal(
+    "Mercado de Forgotten",
+    "Dinheiro: R$ " + state.money,
+    buttons
+  );
+}
+
+function v070ResolveSquareSideQuest() {
+  prepareSystems();
+
+  const quest = state.sideQuests.squareMemory;
+
+  if (quest.resolved) {
+    say([
+      ["Morador", "A placa continua ali. Pelo menos alguma coisa ainda fica no lugar."]
+    ]);
+    return;
+  }
+
+  if (!v0650HasContradiction("squareFountain")) {
+    say([
+      ["Morador", "Eu sei o que eu lembro. Só não sei por que aquela placa me incomoda tanto."]
+    ]);
+    return;
+  }
+
+  say(
+    [
+      ["Você", "A placa está ali desde 1987. Você lembra que instalaram a fonte há dois anos."],
+      ["Morador", "...Eu consigo lembrar dos dois dias."],
+      ["Você", "Os dois não podem ter acontecido."],
+      ["Morador", "Então guarda isso escrito. Não deixa alguém te convencer depois."],
+      ["Morador", "Toma. Eu ia gastar no baralho mesmo."]
+    ],
+    () => {
+      quest.resolved = true;
+      quest.rewardTaken = true;
+      state.money += 6;
+      v06Toast("Missão secundária concluída · +R$ 6", 2.3);
+      updateHud();
+      save();
+    }
+  );
+}
+
+function v070FindBrotherToy() {
+  prepareSystems();
+
+  const quest = state.sideQuests.brotherToy;
+
+  if (quest.found) {
+    say(["Não tem mais nada aqui."]);
+    return;
+  }
+
+  say(
+    [
+      "Um carrinho pequeno está preso embaixo do banco.",
+      "É do meu irmão. Ele procurou isso por semanas."
+    ],
+    () => {
+      quest.found = true;
+      v06Toast("Item encontrado · carrinho do seu irmão", 2.1);
+      save();
+    }
+  );
+}
+
+function v070ReturnBrotherToy() {
+  prepareSystems();
+
+  const quest = state.sideQuests.brotherToy;
+
+  if (!quest.found || quest.returned) {
+    return false;
+  }
+
+  say(
+    [
+      ["Você", "Olha o que eu achei na praça."],
+      ["Irmão", "Meu carrinho! Eu achei que tinha perdido pra sempre."],
+      ["Você", "Guarda melhor dessa vez."],
+      ["Irmão", "Eu vou guardar. Prometo."]
+    ],
+    () => {
+      quest.returned = true;
+      state.relationship.toyReturned = true;
+      state.relationship.brotherTrust += 1;
+      v06Toast("Seu irmão vai lembrar disso.", 2);
+      save();
+    }
+  );
+
+  return true;
+}
+
+function v070GarciaStatement() {
+  prepareSystems();
+
+  const quest = state.sideQuests.westCase;
+
+  if (quest.garciaStatement) {
+    say([
+      ["Garcia", "Eu encontrei o corpo. Não matei aquele homem."],
+      ["Garcia", "Mexer na cena foi a pior coisa que eu podia ter feito. Eu sei."]
+    ]);
+    return;
+  }
+
+  say(
+    [
+      ["Você", "Você estava mexendo no corpo quando eu cheguei."],
+      ["Garcia", "Eu sei como parece."],
+      ["Garcia", "Eu encontrei ele ali. Já estava morto."],
+      ["Você", "Então por que arrastou o corpo?"],
+      ["Garcia", "Porque eu entrei em pânico. Tenho passagem na polícia. Achei que iam colocar aquilo nas minhas costas."],
+      ["Garcia", "Eu tentei tirar ele da minha propriedade e só deixei tudo pior."],
+      ["Você", "Você correu atrás de mim."],
+      ["Garcia", "Porque você me viu fazendo a coisa mais idiota da minha vida."]
+    ],
+    () => {
+      quest.garciaStatement = true;
+      save();
+    }
+  );
+}
+
+function v070WestEvidence() {
+  prepareSystems();
+
+  const quest = state.sideQuests.westCase;
+
+  if (quest.evidenceFound) {
+    say([
+      "O pedaço de nota continua guardado comigo."
+    ]);
+    return;
+  }
+
+  say(
+    [
+      "Entre o meio-fio e a terra há um pedaço de papel preso.",
+      "É parte de uma nota de serviço. Só restaram uma inicial, um telefone e manchas de óleo.",
+      "Não prova quem matou o homem, mas não combina com nada que Garcia carrega."
+    ],
+    () => {
+      quest.evidenceFound = true;
+      v06Toast("Evidência opcional registrada.", 2);
+      save();
+    }
+  );
+}
+
+function v070ResolveWestCase() {
+  prepareSystems();
+
+  const quest = state.sideQuests.westCase;
+
+  if (quest.resolved) {
+    say([
+      ["Anísio", "A morte da rua oeste está separada do caso dos seus pais."],
+      ["Anísio", "Garcia encobriu a cena, mas não foi ele quem matou aquele homem."]
+    ]);
+    return;
+  }
+
+  if (!quest.garciaStatement || !quest.evidenceFound) {
+    say([
+      ["Anísio", "Se quer que eu reabra essa linha, traga algo além da palavra do Garcia."]
+    ]);
+    return;
+  }
+
+  say(
+    [
+      ["Você", "Garcia disse que encontrou o corpo. E achei isso perto da rua."],
+      ["Anísio", "Uma nota de serviço... espera."],
+      ["Anísio", "Esse telefone é de Osvaldo Ferreira."],
+      ["Você", "Quem é ele?"],
+      ["Anísio", "Faz bicos pela região. E devia dinheiro à vítima."],
+      ["Anísio", "Nós conferimos a oficina dele. O sangue encontrado lá bate com o da vítima."],
+      ["Você", "Então foi ele."],
+      ["Anísio", "Foi. Uma briga saiu do controle. Garcia encontrou o corpo depois e tentou esconder o problema do jeito mais estúpido possível."],
+      ["Anísio", "Isso aqui é humano. Não misture com o resto do seu caso."]
+    ],
+    () => {
+      quest.resolved = true;
+      quest.osvaldoNamed = true;
+      v06Toast("Missão secundária concluída · Osvaldo identificado", 2.6);
+      save();
+    }
+  );
+}
+
+function v070PoliceInsight() {
+  prepareSystems();
+
+  const quest = state.sideQuests.policeInsight;
+
+  if (quest.resolved) {
+    say([
+      ["Anísio", "Eu continuo sem uma explicação. Só parei de fingir que está tudo normal."]
+    ]);
+    return;
+  }
+
+  say(
+    [
+      ["Anísio", "Eu reli meus próprios relatórios."],
+      ["Anísio", "Tem frase minha que eu não lembro de escrever. Tem horário que muda entre uma cópia e outra."],
+      ["Você", "Então acredita em mim?"],
+      ["Anísio", "Eu acredito que alguma coisa em Forgotten não fecha."],
+      ["Anísio", "Isso é o máximo que eu consigo colocar num relatório sem mentir."]
+    ],
+    () => {
+      quest.resolved = true;
+      save();
+    }
+  );
+}
+
+function v070OpenPoliceTopics() {
+  prepareSystems();
+
+  const buttons = [];
+
+  buttons.push([
+    "Falar dos pais",
+    () => {
+      closeModal();
+      v0630PoliceParents();
+    }
+  ]);
+
+  if (state.storyEvents.oldManEncounters > 0) {
+    buttons.push([
+      "Falar do Raimundo",
+      () => {
+        closeModal();
+        v0630PoliceOldMan();
+      }
+    ]);
+  }
+
+  if (state.storyEvents.vanSightings > 0) {
+    buttons.push([
+      "Falar da van",
+      () => {
+        closeModal();
+        v0630PoliceVan();
+      }
+    ]);
+  }
+
+  if (state.chapter4?.bodySeen) {
+    buttons.push([
+      "Falar da rua oeste",
+      () => {
+        closeModal();
+        v0649PoliceBody();
+      }
+    ]);
+  }
+
+  if (v0650Chapter5Unlocked()) {
+    buttons.push([
+      v0650HasContradiction("policeRecord")
+        ? "Rever o registro estranho"
+        : "Conferir um relatório",
+      () => {
+        closeModal();
+        v0650PoliceContradiction();
+      }
+    ]);
+  }
+
+  if (
+    state.sideQuests.westCase.garciaStatement ||
+    state.sideQuests.westCase.evidenceFound
+  ) {
+    buttons.push([
+      "Reabrir o caso da rua oeste",
+      () => {
+        closeModal();
+        v070ResolveWestCase();
+      }
+    ]);
+  }
+
+  if (
+    state.chapter8?.complete
+  ) {
+    buttons.push([
+      "Perguntar o que Anísio realmente pensa",
+      () => {
+        closeModal();
+        v070PoliceInsight();
+      }
+    ]);
+  }
+
+  buttons.push(["Sair", closeModal]);
+
+  modal(
+    "Delegacia",
+    "",
+    buttons
+  );
+}
+
+v0630OpenPoliceTopics = v070OpenPoliceTopics;
+
+function v070WeightedEvent() {
+  const candidates =
+    V070_RANDOM_EVENT_WEIGHTS.filter(item =>
+      state.day >= item.minDay &&
+      (!item.needsFinished || state.finished)
+    );
+
+  const total = candidates.reduce(
+    (sum, item) => sum + item.weight,
+    0
+  );
+
+  let roll = Math.random() * total;
+
+  for (const item of candidates) {
+    roll -= item.weight;
+    if (roll <= 0) return item.id;
+  }
+
+  return candidates[0]?.id || "voices";
+}
+
+v0645ScheduleOutingEvent = function() {
+  prepareSystems();
+
+  state.randomEventState.pending = true;
+  state.randomEventState.timer =
+    7 + Math.random() * 9;
+  state.randomEventState.type =
+    v070WeightedEvent();
+
+  save();
+};
+
+const v070TriggerRandomBase = v0645TriggerRandomEvent;
+v0645TriggerRandomEvent = function() {
+  prepareSystems();
+
+  const event = state.randomEventState;
+
+  if (!event?.pending) return;
+
+  if (event.type === "windowLight") {
+    event.pending = false;
+    v070WindowLightUntil = elapsed + 5;
+
+    v06Toast(
+      "Uma janela acendeu numa casa vazia. A luz apagou quando você olhou.",
+      2.8
+    );
+
+    save();
+    return;
+  }
+
+  if (event.type === "burntSmell") {
+    event.pending = false;
+
+    v06Toast(
+      "Cheiro de queimado. Não há fumaça, fogo ou fonte alguma por perto.",
+      2.8
+    );
+
+    save();
+    return;
+  }
+
+  if (event.type === "brotherEcho") {
+    event.pending = false;
+
+    v06Toast(
+      "Por um instante, pareceu que seu irmão chamou seu nome de muito longe.",
+      2.8
+    );
+
+    state.pendingBrotherRemark =
+      "Eu também achei que ouvi você me chamando. Mas você estava fora.";
+
+    save();
+    return;
+  }
+
+  v070TriggerRandomBase();
+};
+
+function v070TriggerHomeRadio() {
+  prepareSystems();
+
+  state.homeAtmosphere.pendingRadio = false;
+  state.homeAtmosphere.timer = 0;
+
+  v070RadioStaticUntil = elapsed + 1.4;
+  v06Toast(
+    "O rádio mudou de estação sozinho. Só há estática.",
+    2.5
+  );
+
+  save();
+}
+
+const v070GoBase = go;
+go = function(nextRoom, x, y) {
+  const comingHome =
+    state &&
+    state.room === "village" &&
+    nextRoom === "foyer" &&
+    state.day >= 8;
+
+  v070GoBase(nextRoom, x, y);
+
+  if (
+    comingHome &&
+    Math.random() < 0.22
+  ) {
+    prepareSystems();
+    state.homeAtmosphere.pendingRadio = true;
+    state.homeAtmosphere.timer = 1.8 + Math.random() * 1.8;
+  }
+};
+
+const V070_TOY_POS = {
+  x: 705,
+  y: 585
+};
+
+const V070_WEST_EVIDENCE_POS = {
+  x: 250,
+  y: 410
+};
+
+const V070_GARCIA_AFTER_POS = {
+  x: 350,
+  y: 355
+};
+
+const v070GetNearBase = getNear;
+getNear = function() {
+  prepareSystems();
+
+  if (
+    state.room === "parents" &&
+    !state.walletFound &&
+    Math.hypot(
+      state.x - housePoint(515),
+      state.y - housePoint(205)
+    ) < 44
+  ) {
+    return {
+      label: "Examinar a carteira",
+      action: "fatherWallet"
+    };
+  }
+
+  if (
+    state.room === "square" &&
+    state.day >= 3 &&
+    !state.sideQuests.brotherToy.found &&
+    Math.hypot(
+      state.x - V070_TOY_POS.x,
+      state.y - V070_TOY_POS.y
+    ) < 38
+  ) {
+    return {
+      label: "Pegar o objeto embaixo do banco",
+      action: "brotherToy"
+    };
+  }
+
+  if (
+    state.room === "square" &&
+    v0650HasContradiction("squareFountain") &&
+    !state.sideQuests.squareMemory.resolved &&
+    Math.hypot(
+      state.x - V0650_SQUARE_RESIDENT.x,
+      state.y - V0650_SQUARE_RESIDENT.y
+    ) < 42
+  ) {
+    return {
+      label: "Mostrar a placa ao morador",
+      action: "squareMemoryResolve"
+    };
+  }
+
+  if (
+    state.room === "westRoad" &&
+    state.day >= 9 &&
+    state.chapter4?.bodyReported &&
+    !state.sideQuests.westCase.garciaStatement &&
+    Math.hypot(
+      state.x - V070_GARCIA_AFTER_POS.x,
+      state.y - V070_GARCIA_AFTER_POS.y
+    ) < 48
+  ) {
+    return {
+      label: "Falar com Garcia",
+      action: "garciaStatement"
+    };
+  }
+
+  if (
+    state.room === "westRoad" &&
+    state.day >= 9 &&
+    state.chapter4?.bodyReported &&
+    !state.sideQuests.westCase.evidenceFound &&
+    Math.hypot(
+      state.x - V070_WEST_EVIDENCE_POS.x,
+      state.y - V070_WEST_EVIDENCE_POS.y
+    ) < 42
+  ) {
+    return {
+      label: "Examinar o meio-fio",
+      action: "westCaseEvidence"
+    };
+  }
+
+  return v070GetNearBase();
+};
+
+const v070InteractBase = interact;
+interact = function(action) {
+  prepareSystems();
+
+  if (action === "fatherWallet") {
+    v070FindWallet();
+    return;
+  }
+
+  if (
+    action === "marketClerk" &&
+    state.storyFlags?.marketParentsConfirmed &&
+    (
+      !v0650Chapter5Unlocked() ||
+      state.memoryFacts?.marketTimeChecked
+    )
+  ) {
+    v070OpenMarketMenu();
+    return;
+  }
+
+  if (action === "brotherToy") {
+    v070FindBrotherToy();
+    return;
+  }
+
+  if (action === "squareMemoryResolve") {
+    v070ResolveSquareSideQuest();
+    return;
+  }
+
+  if (action === "garciaStatement") {
+    v070GarciaStatement();
+    return;
+  }
+
+  if (action === "westCaseEvidence") {
+    v070WestEvidence();
+    return;
+  }
+
+  if (
+    action === "brother" &&
+    state.sideQuests?.brotherToy?.found &&
+    !state.sideQuests.brotherToy.returned
+  ) {
+    if (v070ReturnBrotherToy()) return;
+  }
+
+  v070InteractBase(action);
+};
+
+const v070InventoryBase = v0645OpenInventory;
+v0645OpenInventory = function() {
+  v070InventoryBase();
+
+  if (!state) return;
+
+  prepareSystems();
+
+  const root = $("modalText");
+  const economy = document.createElement("div");
+
+  economy.style.marginTop = "12px";
+  economy.textContent =
+    "Dinheiro: R$ " + state.money;
+
+  root.append(economy);
+
+  if (
+    state.sideQuests?.brotherToy?.found &&
+    !state.sideQuests.brotherToy.returned
+  ) {
+    const toy = document.createElement("div");
+    toy.textContent =
+      "• Carrinho do seu irmão";
+    root.append(toy);
+  }
+
+  if (
+    state.sideQuests?.westCase?.evidenceFound &&
+    !state.sideQuests.westCase.resolved
+  ) {
+    const evidence = document.createElement("div");
+    evidence.textContent =
+      "• Pedaço de nota da rua oeste";
+    root.append(evidence);
+  }
+};
+
+const v070UpdateBase = update;
+update = function(dt) {
+  prepareSystems();
+  v070UpdateBase(dt);
+
+  if (
+    !state ||
+    mode !== "game" ||
+    dialog ||
+    transitionBusy ||
+    !$("overlay").hidden ||
+    state.gameOver ||
+    state.dawnCollapse?.active ||
+    state.wakeUp?.active
+  ) {
+    return;
+  }
+
+  if (
+    state.homeAtmosphere?.pendingRadio &&
+    !["village", "square", "oldRoad", "westRoad", "market", "police"].includes(state.room)
+  ) {
+    state.homeAtmosphere.timer -= dt;
+
+    if (state.homeAtmosphere.timer <= 0) {
+      v070TriggerHomeRadio();
+      return;
+    }
+  }
+};
+
+const v070DrawBase = drawWorld;
+drawWorld = function() {
+  v070DrawBase();
+
+  if (!state) return;
+
+  if (
+    state.room === "westRoad" &&
+    state.day >= 9 &&
+    state.chapter4?.bodyReported &&
+    !state.sideQuests?.westCase?.garciaStatement
+  ) {
+    c.save();
+    c.translate(
+      -Math.floor(camera.x),
+      -Math.floor(camera.y)
+    );
+
+    person(
+      V070_GARCIA_AFTER_POS.x,
+      V070_GARCIA_AFTER_POS.y,
+      "npcMale",
+      0,
+      "right",
+      0.94
+    );
+
+    c.restore();
+  }
+
+  if (
+    state.room === "square" &&
+    state.day >= 3 &&
+    !state.sideQuests?.brotherToy?.found
+  ) {
+    c.save();
+    c.translate(
+      -Math.floor(camera.x),
+      -Math.floor(camera.y)
+    );
+
+    rect(
+      V070_TOY_POS.x - 5,
+      V070_TOY_POS.y - 3,
+      10,
+      6,
+      "#6b4b36"
+    );
+
+    c.restore();
+  }
+
+  if (
+    state.room === "village" &&
+    elapsed < v070WindowLightUntil
+  ) {
+    c.save();
+    c.translate(
+      -Math.floor(camera.x),
+      -Math.floor(camera.y)
+    );
+
+    rect(
+      955,
+      625,
+      22,
+      26,
+      "rgba(215,190,125,0.75)"
+    );
+
+    c.restore();
+  }
+
+  if (elapsed < v070RadioStaticUntil) {
+    for (let i = 0; i < 18; i++) {
+      const y =
+        (i * 19 + Math.floor(elapsed * 720) % H) % H;
+
+      rect(
+        0,
+        y,
+        W,
+        1,
+        "rgba(228,231,224,0.09)"
+      );
+    }
+  }
+};
+
+const v070HudBase = updateHud;
+updateHud = function() {
+  v070HudBase();
+
+  if (!state || state.stage === "prologue") return;
+
+  prepareSystems();
+
+  const current = $("inventory").textContent;
+
+  if (!current.includes("R$")) {
+    $("inventory").textContent =
+      current + " · R$ " + state.money;
+  }
+};
 
 $("version").textContent = "PROTÓTIPO · 0.6.51";
   
