@@ -1367,7 +1367,9 @@ function drawCharacterSprite(
     c.save();
     c.translate(-Math.floor(camera.x), -Math.floor(camera.y));
 
-    if (state.room === "village") {
+    if (state.room === "square") {
+      v0648DrawSquareEnvironment(m);
+    } else if (state.room === "village") {
       rect(0, 0, m.w, m.h, "#34463b");
 
       for (let y = 0; y < m.h; y += 12) {
@@ -10023,25 +10025,7 @@ function v0648DrawMarketClerk() {
   c.restore();
 }
 
-function v0648DrawSquare() {
-  const m = maps.square;
-
-  camera.x = Math.max(
-    0,
-    Math.min(m.w - W, state.x - W / 2)
-  );
-
-  camera.y = Math.max(
-    0,
-    Math.min(m.h - H, state.y - H / 2)
-  );
-
-  c.save();
-  c.translate(
-    -Math.floor(camera.x),
-    -Math.floor(camera.y)
-  );
-
+function v0648DrawSquareEnvironment(m) {
   rect(0, 0, m.w, m.h, "#31483b");
 
   // Calçamento central e caminhos.
@@ -10077,66 +10061,10 @@ function v0648DrawSquare() {
   for (const o of m.objects) {
     building(o);
   }
-
-  person(
-    state.x,
-    state.y,
-    "player",
-    state.walk,
-    state.facing
-  );
-
-  // Aparição do Observador: massa baixa, sem anatomia humana legível.
-  if (elapsed < v0634ObserverUntil) {
-    const x = v0634ObserverX;
-    const y = v0634ObserverY;
-
-    rect(x - 17, y - 17, 34, 14, "#060708");
-    rect(x - 12, y - 27, 22, 17, "#050607");
-    rect(x - 21, y - 9, 12, 7, "#050607");
-    rect(x + 10, y - 11, 15, 8, "#050607");
-    rect(x - 14, y - 4, 7, 12, "#050607");
-    rect(x + 8, y - 5, 7, 13, "#050607");
-  }
-
-  c.restore();
-
-  // A função do NPC já aplica a câmera internamente.
-  v0633DrawWheelchairMan();
-
-  v0646ApplyOutdoorLight();
-
-  if (elapsed < v0634StaticUntil) {
-    const strength = Math.min(
-      1,
-      Math.max(v0634StaticUntil - elapsed, 0) / 0.85
-    );
-
-    for (let i = 0; i < 28; i++) {
-      const y =
-        (i * 19 + Math.floor(elapsed * 700) % H) % H;
-      const h = 1 + (i % 3);
-
-      rect(
-        (i % 4) * -4,
-        y,
-        W + 16,
-        h,
-        "rgba(225,230,220," +
-        (0.04 + strength * 0.14) +
-        ")"
-      );
-    }
-  }
 }
 
 const v0648DrawWorldBase = drawWorld;
 drawWorld = function() {
-  if (state?.room === "square") {
-    v0648DrawSquare();
-    return;
-  }
-
   v0648DrawWorldBase();
 
   if (state?.room === "market") {
