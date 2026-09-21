@@ -932,19 +932,25 @@ function drawCharacterSprite(
     // hurt.png tem 13 quadros. Ao contrário, a queda vira o player levantando.
     frame = 12 - Math.floor(wakeProgress * 13);
   } else if (punching) {
-    animation = "thrust";
+    // Os quadros laterais de thrust usam uma composição incompatível
+    // com a roupa atual do protagonista. Nos lados, preservamos o
+    // corpo correto e o golpe continua funcionando normalmente.
+    if (facing === "left" || facing === "right") {
+      animation = "idle";
+      frame = 0;
+    } else {
+      animation = "thrust";
 
-    // O golpe dura 0,45 s no sistema atual.
-    // thrust possui 8 quadros válidos: 0..7.
-    const progress = Math.max(
-      0,
-      Math.min(
-        0.999,
-        1 - state.danger.punch / 0.45
-      )
-    );
+      const progress = Math.max(
+        0,
+        Math.min(
+          0.999,
+          1 - state.danger.punch / 0.45
+        )
+      );
 
-    frame = Math.floor(progress * 8);
+      frame = Math.floor(progress * 8);
+    }
   } else if (moving) {
     animation = "walk";
 
@@ -1396,6 +1402,36 @@ function drawCharacterSprite(
       // Entrada curta da casa da família até a rua principal.
       rect(420, 710, 190, 45, "#706b5f");
 
+      // Calçadas e meios-fios: ajudam a separar rua, casas e gramado.
+      rect(590, 0, 16, 1020, "#8b877c");
+      rect(692, 0, 16, 1020, "#8b877c");
+      rect(0, 369, 1280, 16, "#8b877c");
+      rect(0, 463, 1280, 16, "#8b877c");
+      rect(0, 739, 1280, 16, "#8b877c");
+      rect(0, 837, 1280, 16, "#8b877c");
+
+      // Marcação central discreta da rua principal.
+      for (let y = 24; y < 1000; y += 54) {
+        rect(647, y, 4, 22, "#b9ad87");
+      }
+
+      // Textura de terra do caminho do velho.
+      for (let y = 1040; y < m.h; y += 26) {
+        const drift = (Math.floor(y / 26) % 2) * 17;
+        rect(620 + drift, y, 12, 4, "#75624d");
+        rect(663 - drift / 2, y + 11, 9, 3, "#514333");
+      }
+
+      // Postes simples, sem colisão, para dar leitura de bairro residencial.
+      for (const [lx, ly] of [
+        [575, 330], [705, 520], [575, 690], [705, 900],
+        [270, 475], [990, 475]
+      ]) {
+        rect(lx, ly, 4, 34, "#343a39");
+        rect(lx - 4, ly - 3, 12, 5, "#4d5350");
+        rect(lx - 2, ly - 1, 8, 3, "#d2b777");
+      }
+
       for (let y = 0; y < 1040; y += 16) {
         for (let x = 614; x < 686; x += 14) {
           rect(x, y, 10, 9, "#858071");
@@ -1527,15 +1563,45 @@ function drawCharacterSprite(
 
     c.restore();
 
-    // Iluminação provisória por horário.
-    const night =
-      state.stage === "prologue" ? 0 :
-      state.minutes < 360 ? 0.28 :
-      state.minutes < 480 ? 0.14 :
-      state.minutes > 1080 ? 0.22 :
-      0.04;
+    // Iluminação gradual por horário.
+    // O prólogo acontece às 14:00, portanto também usa luz de dia.
+    const lightMinutes =
+      state.stage === "prologue"
+        ? 14 * 60
+        : ((state.minutes % 1440) + 1440) % 1440;
+
+    let night = 0.03;
+
+    if (lightMinutes < 300) {
+      night = 0.34;
+    } else if (lightMinutes < 420) {
+      const p = (lightMinutes - 300) / 120;
+      night = 0.34 - p * 0.29;
+    } else if (lightMinutes < 1020) {
+      night = 0.03;
+    } else if (lightMinutes < 1260) {
+      const p = (lightMinutes - 1020) / 240;
+      night = 0.03 + p * 0.29;
+    } else {
+      night = 0.34;
+    }
 
     rect(0, 0, W, H, `rgba(6,16,37,${night})`);
+
+    // Um tom quente entra e sai devagar no amanhecer/entardecer.
+    const dawnWarm = Math.max(
+      0,
+      1 - Math.abs(lightMinutes - 390) / 100
+    );
+    const duskWarm = Math.max(
+      0,
+      1 - Math.abs(lightMinutes - 1080) / 130
+    );
+    const warm = Math.max(dawnWarm, duskWarm) * 0.10;
+
+    if (warm > 0) {
+      rect(0, 0, W, H, `rgba(181,116,72,${warm})`);
+    }
 
     // Partículas ambientais.
     for (let i = 0; i < 20; i++) {
@@ -2989,9 +3055,9 @@ function drawCharacterSprite(
         <article class="control-card">
           <span class="control-icon">▱</span>
           <div>
-            <strong>DIÁRIO</strong>
-            <kbd>J</kbd>
-            <p>Consulte pistas, registros e informações importantes da investigação.</p>
+            <strong>INVENTÁRIO</strong>
+            <kbd>I</kbd>
+            <p>Consulte itens carregados e pistas já coletadas.</p>
           </div>
         </article>
 
@@ -4113,38 +4179,30 @@ const chapterBase = {
 const clueText = {
   list:
     "Pão, feijão, sal, óleo e ataduras. " +
-    "Sob os riscos: DUAS CÓPIAS. No rodapé: LUA.",
+    "Alguns itens foram riscados e reescritos.",
 
   photo:
-    "Quatro pessoas, cinco sombras. No verso: OLHO.",
+    "Uma fotografia antiga da família perto da escada.",
 
   note:
     "Se voltarmos diferentes, compare a fotografia. " +
-    "A câmera está no segundo baú do sótão. " +
-    "Feche a sequência com CASA."
+    "Não confie na primeira lembrança."
 };
 
 const clueSpots = [
   [
     "parents", 125, 165,
-    "list", "Ler lista de mantimentos"
+    "list", "Coletar pista"
   ],
   [
     "parents", 440, 170,
-    "photo", "Examinar fotografia"
+    "photo", "Coletar pista"
   ],
   [
     "parents", 320, 250,
-    "note", "Ler bilhete"
-  ],
-  [
-    "bedroom", 110, 240,
-    "normal", "Observar sua fotografia"
-  ],
-  [
-    "attic", 410, 175,
-    "chest", "Abrir baú da câmera"
+    "note", "Coletar pista"
   ]
+
 ];
 
 // Mantém as pistas alinhadas aos móveis após compactar os cômodos.
@@ -4616,7 +4674,7 @@ getNear = function () {
       ([room, x, y, id]) =>
         state.room === room &&
         Math.hypot(state.x - x, state.y - y) < 35 &&
-        (id !== "chest" || q.clues.length === 3)
+        !q.clues.includes(id)
     );
 
     if (spot) {
@@ -4668,37 +4726,30 @@ interact = function (action) {
 
   const id = action.slice(5);
 
-  if (id === "chest") {
-    if (q.camera) {
-      return say([
-        "O baú está vazio. A câmera está comigo."
-      ]);
-    }
-
-    return chestPuzzle();
+  if (!["list", "photo", "note"].includes(id)) {
+    return;
   }
 
-  if (id === "normal") {
-    return say([
-      "Nossa foto na escada. Quatro pessoas, quatro sombras."
-    ]);
+  if (q.clues.includes(id)) {
+    return;
   }
 
- say([clueText[id]], () => {
-  if (!q.clues.includes(id)) {
-    q.clues.push(id);
-  }
+  q.clues.push(id);
 
-  if (
-    q.clues.length === 3 &&
-    q.phase === "clues"
-  ) {
-    q.phase = "chest";
+  const clueNames = {
+    list: "Lista de mantimentos",
+    photo: "Fotografia da família",
+    note: "Bilhete dos pais"
+  };
+
+  v06Toast("Pista coletada: " + clueNames[id], 2.2);
+
+  if (q.clues.length >= 3) {
+    q.phase = "cluesDone";
   }
 
   updateHud();
   save();
-});
 };
 
 updateHud = function () {
@@ -4803,12 +4854,14 @@ drawWorld = function () {
     for (const [room, x, y, id] of clueSpots) {
       if (state.room !== room) continue;
 
+      if (q.clues.includes(id)) continue;
+
       rect(
         x - 5,
         y - 7,
         10,
         7,
-        q.clues.includes(id) ? "#69756a" : "#dfc997"
+        "#dfc997"
       );
     }
   }
@@ -4962,16 +5015,8 @@ if (v06AtticFirstChest) {
   v06AtticFirstChest.label = "Vasculhar o primeiro baú";
 }
 
-const v06CameraChest =
-  maps.attic.objects.find(o =>
-    o !== v06AtticFirstChest &&
-    o.type === "crate"
-  );
+const v06CameraChest = null;
 
-if (v06CameraChest) {
-  v06CameraChest.type = "chest";
-  v06CameraChest.cameraChest = true;
-}
 
 // Móveis antigos cobertos por lençóis no sótão.
 if (!maps.attic.objects.some(o => o.coveredFurniture)) {
@@ -5163,8 +5208,13 @@ prepareSystems = function () {
   }
 
   if (typeof state.dawnCollapseArmed !== "boolean") {
-    // Saves antigos que já passaram por um desmaio continuam armados.
-    state.dawnCollapseArmed = state.dawnCollapseCount > 0;
+    state.dawnCollapseArmed =
+      state.day >= 1 ||
+      state.dawnCollapseCount > 0;
+  }
+
+  if (state.day >= 1 && state.stage !== "prologue") {
+    state.dawnCollapseArmed = true;
   }
 
   if (!state.wakeUp || typeof state.wakeUp !== "object") {
@@ -5361,37 +5411,12 @@ function v06TriggerHungerDefeat() {
 }
 
 function v06UpdateBrotherFood() {
-  prepareSystems();
+  if (!state) return;
 
-  const now = v06AbsoluteMinutes();
+  // A drenagem real é aplicada no update final da 0.6.45.
+  // Mantemos apenas o relógio antigo sincronizado para saves anteriores.
+  state.foodClock = v06AbsoluteMinutes();
 
-  // O relógio de alimentação começa a contar de verdade
-  // após a primeira saída. Antes disso, os saltos narrativos
-  // são tratados pelo sistema de dormir.
-  if (!state.firstExit) {
-    state.foodClock = now;
-    return;
-  }
-
-  let delta = now - state.foodClock;
-
-  if (!Number.isFinite(delta) || delta < 0) {
-    state.foodClock = now;
-    return;
-  }
-
-  if (delta <= 0) return;
-
-  state.brotherFood = Math.max(
-    0,
-    state.brotherFood - delta * (3 / 60)
-  );
-
-  state.foodClock = now;
-
-  if (state.brotherFood <= 0) {
-    v06TriggerHungerDefeat();
-  }
 }
 
 function v06Sleep() {
@@ -6072,7 +6097,7 @@ drawWorld = function () {
 
     rect(
       W / 2 - w / 2,
-      H - 58,
+      16,
       w,
       24,
       "#0b131beb"
@@ -6081,7 +6106,7 @@ drawWorld = function () {
     txt(
       v06ToastText,
       W / 2 - w / 2 + 9,
-      H - 42,
+      32,
       "#e3d3ac",
       8
     );
@@ -7395,10 +7420,12 @@ update = function(dt) {
     state &&
     state.stage !== "prologue" &&
     !state.gameOver &&
-    state.dawnCollapseArmed &&
+    state.day >= 1 &&
     state.minutes >= 420 &&
     !state.dawnCollapse.active
   ) {
+    state.minutes = 420;
+    state.dawnCollapseArmed = true;
     v0632StartDawnCollapse();
   }
 };
@@ -7913,15 +7940,30 @@ function v0639FinishPrologueAtNorth() {
 
   keys.clear();
 
+  // Pai e mãe param juntos no fim da rua antes de desaparecerem.
+  state.x = 636;
+  state.y = 58;
+  state.facing = "down";
+  state.walk = 0;
+
+  prepareMother();
+  state.mother.x = 672;
+  state.mother.y = 58;
+  state.mother.facing = "down";
+  state.mother.walk = 0;
+  state.mother.targetX = 672;
+  state.mother.targetY = 58;
+
   say(
     [
-      ["Mãe", "É aqui. Vou pegar a lista."],
-      ["Pai", "Não deve demorar."]
+      ["Pai", "Vamos comprar as coisas rápido e já voltar."],
+      ["Mãe", "Vamos. Não deve demorar."]
     ],
     () => fade(
-      "Horas depois",
-      "23:00 · Seus pais ainda não voltaram.",
+      "",
+      "",
       () => {
+        // A troca ocorre com a tela preta para o jogador não ver o teleporte.
         state.day = 0;
         state.minutes = 1380;
         state.dawnCollapseArmed = false;
@@ -7947,13 +7989,12 @@ function v0639FinishPrologueAtNorth() {
 
         keys.clear();
         near = null;
-        transitionBusy = false;
 
         updateHud();
-        save();
       }
     )
   );
+
 }
 
 const v0639UpdateBase = update;
@@ -7980,8 +8021,8 @@ update = function(dt) {
 
     // Norte: mercado em outro mapa. No prólogo, chegar aqui conclui
     // o trajeto dos pais; depois fica bloqueado por enquanto.
-    if (state.y <= 24 && north) {
-      state.y = 26;
+    if (state.y <= 64 && north) {
+      state.y = 64;
 
       if (state.stage === "prologue") {
         v0639FinishPrologueAtNorth();
@@ -8154,6 +8195,702 @@ update = function(dt) {
   }
 };
 
+// =========================================================
+// 0.6.45 — INVENTÁRIO, EVENTOS, DEBUG E AJUSTES DE FLUXO
+// =========================================================
+
+const v0645PrepareBase = prepareSystems;
+prepareSystems = function() {
+  v0645PrepareBase();
+
+  if (!state) return;
+
+  // Remove a antiga missão em que um homem pedia para atacar outro.
+  if (state.westMission) {
+    state.westMission.status = "disabled";
+    state.westMission.targetHp = 0;
+  }
+
+  // Saves antigos que chegaram às fases da câmera/livro voltam
+  // para o fluxo simples de pistas.
+  if (state.investigation) {
+    const q = state.investigation;
+
+    if (["chest", "camera", "done"].includes(q.phase)) {
+      q.phase = q.clues?.length >= 3 ? "cluesDone" : "clues";
+    }
+
+    q.camera = false;
+    q.photo = null;
+  }
+
+  if (!state.randomEventState || typeof state.randomEventState !== "object") {
+    state.randomEventState = {
+      pending: false,
+      timer: 0,
+      type: null
+    };
+  }
+
+  if (!Number.isFinite(state.hungerActiveSeconds)) {
+    state.hungerActiveSeconds = 0;
+  }
+};
+
+// A invasão deixa de nascer automaticamente em todo passeio.
+// Ela passa a ser apenas uma das possibilidades do sistema aleatório.
+const v0645DangerBase = updateDanger;
+updateDanger = function(dt) {
+  if (state?.danger?.phase === "safe") {
+    state.danger.cooldown = 999999;
+  }
+
+  v0645DangerBase(dt);
+};
+
+function v0645ClueName(id) {
+  return {
+    list: "Lista de mantimentos",
+    photo: "Fotografia da família",
+    note: "Bilhete dos pais"
+  }[id] || id;
+}
+
+function v0645OpenInventory() {
+  prepareSystems();
+
+  modal(
+    "Inventário",
+    "",
+    [["Fechar", closeModal]]
+  );
+
+  const root = $("modalText");
+  root.replaceChildren();
+
+  const status = document.createElement("p");
+  status.textContent =
+    "Porção: " + state.food + "/1 · Fome do irmão: " +
+    Math.round(state.brotherFood) + "%";
+  root.append(status);
+
+  const itemsTitle = document.createElement("strong");
+  itemsTitle.textContent = "ITENS";
+  root.append(itemsTitle);
+
+  const items = document.createElement("div");
+  items.style.display = "grid";
+  items.style.gap = "8px";
+  items.style.margin = "10px 0 18px";
+
+  const itemNames = [];
+  if (state.key) itemNames.push("Chave reserva");
+  if (state.food > 0) itemNames.push("Porção de comida");
+
+  if (!itemNames.length) {
+    itemNames.push("Nenhum item carregado.");
+  }
+
+  for (const label of itemNames) {
+    const row = document.createElement("div");
+    row.textContent = "• " + label;
+    items.append(row);
+  }
+
+  root.append(items);
+
+  const clueTitle = document.createElement("strong");
+  clueTitle.textContent = "PISTAS";
+  root.append(clueTitle);
+
+  const q = chapter();
+  const clueBox = document.createElement("div");
+  clueBox.style.display = "grid";
+  clueBox.style.gap = "8px";
+  clueBox.style.marginTop = "10px";
+
+  if (!q?.clues?.length) {
+    const none = document.createElement("div");
+    none.textContent = "Nenhuma pista coletada.";
+    clueBox.append(none);
+  } else {
+    for (const id of q.clues) {
+      if (!["list", "photo", "note"].includes(id)) continue;
+
+      const button = document.createElement("button");
+      button.textContent = v0645ClueName(id);
+
+      button.onclick = () => {
+        modal(
+          v0645ClueName(id),
+          clueText[id],
+          [
+            ["Voltar ao inventário", v0645OpenInventory],
+            ["Fechar", closeModal]
+          ]
+        );
+      };
+
+      clueBox.append(button);
+    }
+  }
+
+  root.append(clueBox);
+}
+
+// O antigo atalho do diário agora abre apenas o inventário.
+openJournal = function() {
+  v0645OpenInventory();
+};
+
+function v0645ResetTransientState() {
+  transitionBusy = false;
+  dialog = null;
+  $("dialog").hidden = true;
+  $("overlay").hidden = true;
+  $("transition").classList.remove("active");
+
+  if (state?.danger) {
+    state.danger.phase = "safe";
+    state.danger.time = 0;
+    state.danger.enemy = null;
+    state.danger.cooldown = 999999;
+    state.danger.punch = 0;
+  }
+
+  if (state?.dawnCollapse) {
+    state.dawnCollapse.active = false;
+    state.dawnCollapse.phase = "idle";
+    state.dawnCollapse.time = 0;
+  }
+
+  if (state?.wakeUp) {
+    state.wakeUp.active = false;
+    state.wakeUp.time = 0;
+  }
+
+  keys.clear();
+  near = null;
+}
+
+function v0645RunDevCommand(raw) {
+  const command = String(raw || "").trim().toLowerCase();
+
+  if (!command) return;
+
+  if (command === "noite1") {
+    state = initial();
+    state.familyFarewell = true;
+    state.stage = "parents";
+    state.day = 0;
+    state.minutes = 1380;
+    state.room = "bedroom";
+    state.x = housePoint(180);
+    state.y = housePoint(235);
+    state.facing = "down";
+    state.walk = 0;
+    state.firstExit = false;
+    state.key = false;
+    state.food = 0;
+    delete state.mother;
+
+    prepareSystems();
+    v0645ResetTransientState();
+    enterGame();
+    updateHud();
+    save();
+    v06Toast("TESTE: primeira noite carregada", 2);
+    return;
+  }
+
+  if (command === "amanhecer") {
+    prepareSystems();
+    state.stage = state.stage === "prologue" ? "free" : state.stage;
+    state.day = Math.max(1, state.day || 1);
+    state.minutes = 410;
+    state.firstExit = true;
+    state.dawnCollapseArmed = true;
+    state.room = "village";
+    state.x = 442;
+    state.y = 742;
+    v0645ResetTransientState();
+    updateHud();
+    save();
+    v06Toast("TESTE: 06:50 do Dia " + state.day, 2);
+    return;
+  }
+
+  if (command.startsWith("fome ")) {
+    const value = Number(command.slice(5).trim());
+
+    if (Number.isFinite(value)) {
+      prepareSystems();
+      state.brotherFood = Math.max(0, Math.min(100, value));
+      updateHud();
+      save();
+      v06Toast("TESTE: fome = " + Math.round(state.brotherFood) + "%", 2);
+    }
+    return;
+  }
+
+  if (command === "pistas") {
+    prepareSystems();
+    const q = chapter();
+    q.phase = "clues";
+    q.clues = [];
+    state.room = "parents";
+    state.x = housePoint(320);
+    state.y = housePoint(280);
+    v0645ResetTransientState();
+    updateHud();
+    save();
+    v06Toast("TESTE: coleta de pistas", 2);
+    return;
+  }
+
+  if (command === "casa") {
+    state.room = "bedroom";
+    state.x = housePoint(180);
+    state.y = housePoint(235);
+    v0645ResetTransientState();
+    updateHud();
+    save();
+    return;
+  }
+
+  if (command === "vila") {
+    state.room = "village";
+    state.x = 442;
+    state.y = 742;
+    v0645ResetTransientState();
+    updateHud();
+    save();
+    return;
+  }
+
+  v06Toast("Comando desconhecido", 1.8);
+}
+
+function v0645OpenDevPanel() {
+  modal(
+    "Painel de código / teste",
+    "",
+    [["Fechar", closeModal]]
+  );
+
+  const root = $("modalText");
+  root.replaceChildren();
+
+  const info = document.createElement("pre");
+  info.textContent =
+    "COMANDOS\n" +
+    "noite1      → primeira noite, prólogo concluído\n" +
+    "amanhecer   → Dia 1 às 06:50\n" +
+    "fome 55     → altera a fome do irmão\n" +
+    "pistas      → vai direto para a coleta de pistas\n" +
+    "casa        → teleporta para o quarto\n" +
+    "vila        → teleporta para o bairro";
+  info.style.whiteSpace = "pre-wrap";
+  root.append(info);
+
+  const input = document.createElement("input");
+  input.type = "text";
+  input.placeholder = "Digite um comando...";
+  input.autocomplete = "off";
+  input.style.width = "100%";
+  input.style.boxSizing = "border-box";
+  input.style.marginTop = "12px";
+  input.style.padding = "10px";
+  input.style.background = "#0b1116";
+  input.style.color = "#e1d5b8";
+  input.style.border = "1px solid #7f7358";
+
+  const run = document.createElement("button");
+  run.textContent = "Executar";
+  run.style.marginTop = "10px";
+
+  const execute = () => {
+    const value = input.value;
+    closeModal();
+    v0645RunDevCommand(value);
+  };
+
+  run.onclick = execute;
+  input.addEventListener("keydown", event => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      execute();
+    }
+  });
+
+  root.append(input, run);
+
+  setTimeout(() => input.focus(), 0);
+}
+
+const v0645DevKeys = new Set();
+
+window.addEventListener("keydown", event => {
+  const key = event.key.toLowerCase();
+
+  if (key === "x" || key === "y") {
+    v0645DevKeys.add(key);
+
+    if (
+      v0645DevKeys.has("x") &&
+      v0645DevKeys.has("y") &&
+      mode === "game" &&
+      state &&
+      $("overlay").hidden &&
+      !dialog &&
+      !transitionBusy
+    ) {
+      event.preventDefault();
+      v0645OpenDevPanel();
+    }
+  }
+
+  if (
+    key === "i" &&
+    !event.repeat &&
+    mode === "game" &&
+    state &&
+    !dialog &&
+    !transitionBusy &&
+    $("overlay").hidden
+  ) {
+    event.preventDefault();
+    v0645OpenInventory();
+  }
+}, true);
+
+window.addEventListener("keyup", event => {
+  const key = event.key.toLowerCase();
+
+  if (key === "x" || key === "y") {
+    v0645DevKeys.delete(key);
+  }
+}, true);
+
+// Agenda exatamente um evento quando o jogador sai da própria casa.
+function v0645ScheduleOutingEvent() {
+  prepareSystems();
+
+  const pool = [
+    "van",
+    "voices",
+    "knock",
+    "blackout"
+  ];
+
+  if (state.finished) {
+    pool.push("invasion");
+  }
+
+  state.randomEventState.pending = true;
+  state.randomEventState.timer = 7 + Math.random() * 9;
+  state.randomEventState.type =
+    pool[Math.floor(Math.random() * pool.length)];
+
+  save();
+}
+
+let v0645VanVisibleUntil = 0;
+let v0645BlackoutUntil = 0;
+
+function v0645TriggerRandomEvent() {
+  prepareSystems();
+
+  const event = state.randomEventState;
+
+  if (!event?.pending) return;
+
+  event.pending = false;
+
+  if (event.type === "van") {
+    state.storyEvents.vanSightings += 1;
+    v0645VanVisibleUntil = elapsed + 12;
+    v06Toast("Uma van preta parou perto da sua casa.", 2.4);
+
+    state.pendingBrotherRemark =
+      "Eu ouvi um carro parando lá fora. Depois ele foi embora.";
+  } else if (event.type === "voices") {
+    v06Toast("Alguém sussurrou seu nome atrás de você.", 2.4);
+
+    state.pendingBrotherRemark =
+      "Eu também ouvi uma voz. Achei que era você.";
+  } else if (event.type === "knock") {
+    v06Toast("Ouvi batidas vindo da direção de casa.", 2.4);
+
+    state.pendingBrotherRemark =
+      "Alguém bateu na porta enquanto você estava fora.";
+  } else if (event.type === "blackout") {
+    v0645BlackoutUntil = elapsed + 3.2;
+    v06Toast("As luzes da rua apagaram de uma vez.", 2.4);
+
+    state.pendingBrotherRemark =
+      "As luzes piscaram aqui dentro também.";
+  } else if (
+    event.type === "invasion" &&
+    state.danger?.phase === "safe"
+  ) {
+    v06Toast("Tem alguém se aproximando da casa.", 2.4);
+    startInvasion();
+
+    state.pendingBrotherRemark =
+      "Eu ouvi passos perto da entrada.";
+  }
+
+  save();
+}
+
+const v0645GoBase = go;
+go = function(nextRoom, x, y) {
+  const leavingHome =
+    state &&
+    state.room === "foyer" &&
+    nextRoom === "village" &&
+    state.stage !== "prologue";
+
+  const returningHome =
+    state &&
+    state.room === "village" &&
+    nextRoom === "foyer";
+
+  v0645GoBase(nextRoom, x, y);
+
+  if (leavingHome) {
+    v0645ScheduleOutingEvent();
+  }
+
+  if (returningHome && state?.randomEventState) {
+    state.randomEventState.pending = false;
+  }
+};
+
+const v0645GetNearBase = getNear;
+getNear = function() {
+  const target = v0645GetNearBase();
+
+  if (
+    target?.action?.startsWith("clue:")
+  ) {
+    const id = target.action.slice(5);
+    const q = chapter();
+
+    if (
+      !["list", "photo", "note"].includes(id) ||
+      q.clues.includes(id)
+    ) {
+      return null;
+    }
+
+    return {
+      ...target,
+      label: "Coletar pista"
+    };
+  }
+
+  return target;
+};
+
+const v0645InteractBase = interact;
+interact = function(action) {
+  prepareSystems();
+
+  if (action === "policeOfficer") {
+    say(
+      [["Policial", "O que houve?"]],
+      v0630OpenPoliceTopics
+    );
+    return;
+  }
+
+  if (
+    action === "vendor" &&
+    state.brotherFood >= 60
+  ) {
+    say([
+      ["Vizinha", "Seu irmão ainda tem comida suficiente."],
+      ["Você", "Melhor não pegar mais agora."]
+    ]);
+    return;
+  }
+
+  if (
+    action === "brother" &&
+    state.pendingBrotherRemark
+  ) {
+    const remark = state.pendingBrotherRemark;
+    state.pendingBrotherRemark = "";
+
+    say(
+      [["Irmão", remark]],
+      save
+    );
+    return;
+  }
+
+  if (action?.startsWith("clue:")) {
+    const id = action.slice(5);
+
+    if (["list", "photo", "note"].includes(id)) {
+      const q = chapter();
+
+      if (!q.clues.includes(id)) {
+        q.clues.push(id);
+
+        v06Toast(
+          "Pista coletada: " + v0645ClueName(id),
+          2.2
+        );
+
+        if (q.clues.length >= 3) {
+          q.phase = "cluesDone";
+        }
+
+        updateHud();
+        save();
+      }
+
+      return;
+    }
+  }
+
+  v0645InteractBase(action);
+};
+
+const v0645UpdateHudBase = updateHud;
+updateHud = function() {
+  v0645UpdateHudBase();
+
+  if (!state) return;
+
+  const q = state.investigation;
+
+  $("inventory").textContent =
+    "PORÇÃO " + state.food + "/1" +
+    " · FOME " + Math.round(state.brotherFood) + "%" +
+    (state.key ? " · CHAVE RESERVA" : "") +
+    (q?.clues?.length ? " · PISTAS " + q.clues.length + "/3" : "");
+
+  if (q?.phase === "clues") {
+    $("objective").textContent =
+      "Colete as pistas no quarto dos seus pais: " +
+      q.clues.length + "/3.";
+  } else if (q?.phase === "cluesDone") {
+    $("objective").textContent =
+      "As pistas foram guardadas no inventário.";
+  }
+};
+
+const v0645UpdateBase = update;
+update = function(dt) {
+  prepareSystems();
+
+  v0645UpdateBase(dt);
+
+  if (
+    !state ||
+    mode !== "game" ||
+    dialog ||
+    transitionBusy ||
+    !$("overlay").hidden ||
+    state.gameOver
+  ) {
+    return;
+  }
+
+  // Às 07:00 o relógio para imediatamente e o desmaio começa.
+  if (
+    state.stage !== "prologue" &&
+    state.day >= 1 &&
+    state.minutes >= 420 &&
+    !state.dawnCollapse?.active &&
+    !state.wakeUp?.active
+  ) {
+    state.minutes = 420;
+    state.dawnCollapseArmed = true;
+    v0632StartDawnCollapse();
+    return;
+  }
+
+  // Fome: -5 pontos a cada 60 segundos REAIS de jogo ativo,
+  // começando somente depois da primeira saída de casa.
+  if (
+    state.firstExit &&
+    !state.dawnCollapse?.active &&
+    !state.wakeUp?.active
+  ) {
+    state.hungerActiveSeconds += dt;
+    state.brotherFood = Math.max(
+      0,
+      state.brotherFood - dt * (5 / 60)
+    );
+
+    if (state.brotherFood <= 0) {
+      v06TriggerHungerDefeat();
+      return;
+    }
+  }
+
+  const randomEvent = state.randomEventState;
+
+  if (
+    randomEvent?.pending &&
+    state.room === "village" &&
+    state.danger?.phase === "safe"
+  ) {
+    randomEvent.timer -= dt;
+
+    if (randomEvent.timer <= 0) {
+      v0645TriggerRandomEvent();
+    }
+  }
+
+  updateHud();
+};
+
+const v0645DrawWorldBase = drawWorld;
+drawWorld = function() {
+  v0645DrawWorldBase();
+
+  if (!state) return;
+
+  if (
+    state.room === "village" &&
+    elapsed < v0645VanVisibleUntil
+  ) {
+    c.save();
+    c.translate(
+      -Math.floor(camera.x),
+      -Math.floor(camera.y)
+    );
+
+    const x = 525;
+    const y = 790;
+
+    rect(x, y, 54, 22, "#111416");
+    rect(x + 8, y - 10, 31, 12, "#161a1d");
+    rect(x + 12, y - 7, 11, 7, "#29333a");
+    rect(x + 26, y - 7, 10, 7, "#29333a");
+    rect(x + 7, y + 18, 10, 7, "#090b0d");
+    rect(x + 38, y + 18, 10, 7, "#090b0d");
+
+    c.restore();
+  }
+
+  if (elapsed < v0645BlackoutUntil) {
+    rect(0, 0, W, H, "rgba(2,4,7,0.72)");
+  }
+};
+
+$("help").onclick = () => modal(
+  "Como jogar",
+  "WASD / setas: andar. Shift: correr. E: interagir. I: inventário. Esc: pausar. ESPAÇO: soco perto de uma ameaça.\n\nA fome do irmão começa a cair depois da primeira saída e perde 5 pontos por minuto real de jogo ativo. A vizinha só entrega outra porção quando a fome estiver abaixo de 60%.\n\nSair de casa pode gerar acontecimentos diferentes. Nem todos são ataques; observe os avisos e converse com seu irmão depois.\n\nÀs 07:00, depois da primeira meia-noite, o protagonista perde os sentidos.",
+  [["Voltar", closeModal]]
+);
+
 // Recupera um save que tenha ficado dentro de um móvel reposicionado.
 const roomUpdateBeforeFix=update;
 let roomPositionChecked=false;
@@ -8173,7 +8910,7 @@ update=function(dt) {
   roomUpdateBeforeFix(dt);
 };
 
-$("version").textContent = "PROTÓTIPO · 0.6.44";
+$("version").textContent = "PROTÓTIPO · 0.6.45";
   
   requestAnimationFrame(frame);
   showBootSplash();
