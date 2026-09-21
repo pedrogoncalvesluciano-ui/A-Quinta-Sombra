@@ -7,7 +7,7 @@
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
 
-  Abertura, exploração da casa e primeira busca por alimento.
+  Abertura, exploração da casa e primeira investigação do desaparecimento.
   Arte provisória: personagens e cenários serão refinados depois.
 
   Continuaremos editando este mesmo arquivo.
@@ -4995,7 +4995,7 @@ const v06Base = {
 roomNames.shop = "Casa da vizinha";
 
 objectives.key = "Procure a chave reserva no relógio parado da sala.";
-objectives.supplies = "Bata na casa da vizinha e peça ajuda.";
+objectives.supplies = "Investigue o desaparecimento e converse com quem ainda está acordado.";
 objectives.return = "Leve a porção para seu irmão.";
 
 // Ajustes de cenário sem reescrever os mapas antigos.
@@ -7200,10 +7200,10 @@ updateHud = function () {
       "Siga pela rua principal para o norte.";
   } else if (state.stage === "supplies") {
     $("objective").textContent =
-      "Bata na casa da vizinha e peça algo para seu irmão.";
+      "Investigue o desaparecimento e converse com quem ainda está acordado.";
   } else if (state.stage === "return") {
     $("objective").textContent =
-      "Volte para casa e leve a comida ao seu irmão.";
+      "Volte para casa quando achar que já investigou o suficiente.";
   }
 };
 
@@ -8781,8 +8781,8 @@ interact = function(action) {
     state.brotherFood >= 60
   ) {
     say([
-      ["Vizinha", "Seu irmão ainda tem comida suficiente."],
-      ["Você", "Melhor não pegar mais agora."]
+      ["Florinda", "Se precisar de comida mais tarde, bate aqui."],
+      ["Você", "Por enquanto ele está bem. Não preciso levar nada."]
     ]);
     return;
   }
