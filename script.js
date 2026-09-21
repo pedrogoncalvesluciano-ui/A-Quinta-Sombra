@@ -2,7 +2,7 @@
 "use strict";
 
 /*
-  A QUINTA SOMBRA — 0.6.49
+  A QUINTA SOMBRA — 0.6.51
 
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
@@ -1164,7 +1164,11 @@ function drawCharacterSprite(
         rect(x + i, y + 47, 2, h - 59, "#ffffff10");
       }
 
-      if (type === "brotherbed" && state.stage !== "prologue") {
+      if (
+        type === "brotherbed" &&
+        state.stage !== "prologue" &&
+        !state.chapter7?.brotherFollowing
+      ) {
         person(x + w / 2, y + 58, "brother", 0, "down", 0.8);
       }
 
@@ -11592,7 +11596,7 @@ interact = function(action) {
     say(
       [
         "Uma placa de metal presa à base da fonte:",
-        "“Fonte da praça · reforma concluída em 1987.”"
+        "“Fonte da praça · inaugurada em 1987.”"
       ],
       () => {
         if (first) {
@@ -11610,9 +11614,9 @@ interact = function(action) {
 
     say(
       [
-        ["Morador", "Essa fonte é nova. Trocaram tudo aqui há dois anos."],
+        ["Morador", "Essa fonte não existia antes de dois anos atrás."],
         ["Você", "Tem certeza?"],
-        ["Morador", "Claro. Eu estava aqui no dia em que terminaram."]
+        ["Morador", "Tenho. Eu estava aqui no dia em que instalaram."]
       ],
       () => {
         if (first) {
@@ -11633,12 +11637,12 @@ interact = function(action) {
       [
         ["Você", "Você lembra que horas meus pais chegaram aqui?"],
         ["Funcionário", "Quase quatro da tarde. Tenho certeza."],
-        ["Você", "Mas você disse outra coisa quando eu vim antes."],
-        ["Funcionário", "Não disse, não."],
-        ["Funcionário", "Espera... o recibo ainda está no sistema."],
+        ["Você", "Dá para conferir o recibo?"],
+        ["Funcionário", "Espera... ele ainda está no sistema."],
         ["Funcionário", "14:20."],
         ["Você", "Então por que você lembra de quase quatro?"],
-        ["Funcionário", "...Eu não sei."]
+        ["Funcionário", "...Eu lembro de olhar para o relógio."],
+        ["Funcionário", "Mas o recibo não mudou."]
       ],
       () => {
         state.memoryFacts.marketTimeChecked = true;
@@ -11926,6 +11930,7 @@ function v0650TryCompleteChapter6() {
   if (
     state.chapter6.notebookRead &&
     state.chapter6.mapRead &&
+    state.chapter6.cabinetInspected &&
     !state.chapter6.complete
   ) {
     state.chapter6.complete = true;
@@ -11946,6 +11951,7 @@ function v0650InspectBasementCabinet() {
         "É pesado demais para mexer sem saber o que estou procurando."
       ],
       () => {
+        v0650TryCompleteChapter6();
         updateHud();
         save();
       }
@@ -12068,6 +12074,16 @@ updateHud = function() {
   prepareSystems();
 
   if (
+    state.chapter5.complete &&
+    state.day < 11 &&
+    !state.chapter6.complete
+  ) {
+    $("objective").textContent =
+      "As contradições formam um padrão. Continue registrando o que é físico e o que é lembrança.";
+    return;
+  }
+
+  if (
     state.day >= 11 &&
     !state.chapter6.basementUnlocked
   ) {
@@ -12092,6 +12108,17 @@ updateHud = function() {
   ) {
     $("objective").textContent =
       "Examine as outras anotações do porão.";
+    return;
+  }
+
+  if (
+    state.room === "basement" &&
+    state.chapter6.notebookRead &&
+    state.chapter6.mapRead &&
+    !state.chapter6.cabinetInspected
+  ) {
+    $("objective").textContent =
+      "Examine o armário antigo contra a parede.";
     return;
   }
 
@@ -12304,12 +12331,12 @@ function v0650CompareFatherPhoto() {
       ["Você", "Pai... lembra dessa foto?"],
       ["Pai", "Claro. Seu aniversário."],
       ["Você", "Onde foi?"],
-      ["Pai", "Na praça. Você fez treze naquele dia."],
-      ["Você", "Não foi na praça."],
-      "Ele pega a fotografia. A manga sobe por um instante.",
-      "Há uma tatuagem escura no antebraço.",
-      "Na fotografia, o braço do meu pai está completamente limpo.",
-      ["Você", "Meu pai nunca teve essa tatuagem."],
+      ["Pai", "Na praça."],
+      ["Você", "Não foi na praça. Foi perto da escada."],
+      ["Pai", "..."],
+      ["Você", "Você só olhou para a foto depois que eu corrigi."],
+      ["Pai", "Estevão. Guarda isso."],
+      ["Você", "Quem é você?"],
       ["Pai", "..."],
       ["Pai", "Você não devia ter comparado."]
     ],
@@ -12746,9 +12773,16 @@ updateHud = function() {
   if (
     !state ||
     state.stage === "prologue" ||
-    !v0650Chapter7Unlocked() ||
-    state.chapter7.complete
+    !v0650Chapter7Unlocked()
   ) {
+    return;
+  }
+
+  if (state.chapter7.complete) {
+    if (state.day < 17) {
+      $("objective").textContent =
+        "A cópia foi embora. A casa continua escondendo alguma coisa.";
+    }
     return;
   }
 
@@ -13048,7 +13082,7 @@ function v0650InspectBasementHole() {
     say(
       [
         "A passagem desce além do alcance da luz do porão.",
-        "Na poeira da entrada há uma pegada recente.",
+        "Na poeira da entrada há uma pegada menos coberta que o resto.",
         "O desenho da sola é igual ao das botas que minha mãe deixava perto da porta.",
         "Alguém passou por aqui depois do desaparecimento.",
         "Se foi ela... talvez ainda esteja viva."
@@ -13245,9 +13279,14 @@ updateHud = function() {
   if (
     !state ||
     state.stage === "prologue" ||
-    !v0650Chapter8Unlocked() ||
-    state.chapter8.complete
+    !v0650Chapter8Unlocked()
   ) {
+    return;
+  }
+
+  if (state.chapter8.complete) {
+    $("objective").textContent =
+      "A abertura atrás do armário leva ao subterrâneo. Preciso me preparar antes de descer.";
     return;
   }
 
@@ -13282,7 +13321,7 @@ updateHud = function() {
 };
 
 
-$("version").textContent = "PROTÓTIPO · 0.6.50";
+$("version").textContent = "PROTÓTIPO · 0.6.51";
   
   requestAnimationFrame(frame);
   showBootSplash();
