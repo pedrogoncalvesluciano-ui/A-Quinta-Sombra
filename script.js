@@ -474,10 +474,7 @@
         "policeStation"
       ),
       obj(120, 870, 180, 135, "building"),
-      obj(835, 870, 190, 135, "building"),
-
-      // Casa isolada ao sul: destino visual do caminho do velho.
-      obj(805, 1580, 205, 150, "oldHouse")
+      obj(835, 870, 190, 135, "building")
 
       // Oeste, leste e norte continuam como ruas normais, sem portões.
       // O bloqueio é lógico e só exibe uma mensagem ao tentar atravessar.
@@ -489,6 +486,20 @@
       door(1098, 708, null, 0, 0, "Entrar na delegacia", "policeDoor")
     ]
   };
+
+  // Área separada ao sul: estrada de terra e casa do velho.
+  maps.oldRoad = {
+    w: 960,
+    h: 1220,
+
+    objects: [
+      obj(565, 815, 245, 165, "oldHouse")
+    ],
+
+    doors: []
+  };
+
+  roomNames.oldRoad = "Estrada de terra · sul do bairro";
 
   // =========================================================
   // FERRAMENTAS DE DESENHO
@@ -1390,8 +1401,8 @@ function drawCharacterSprite(
       rect(610, 0, 78, 1020, "#706b5f");
       rect(610, 1020, 78, m.h - 1020, "#655442");
 
-      // Pequena abertura de terra em direção à casa isolada.
-      rect(688, 1560, 160, 58, "#655442");
+      // A estrada de terra segue até o limite sul do bairro.
+      // No fim, o jogador escolhe avançar para a área seguinte.
 
       // Cruzamento superior.
       rect(0, 385, 1280, 78, "#706b5f");
@@ -2735,7 +2746,11 @@ function drawCharacterSprite(
       (keys.has("s") || keys.has("arrowdown") ? 1 : 0) -
       (keys.has("w") || keys.has("arrowup") ? 1 : 0);
 
-    const speed = keys.has("shift") ? 130 : 90;
+    const speed =
+      state.oldManEvent?.runUnlocked &&
+      (keys.has("shift") || keys.has("f"))
+        ? 150
+        : 90;
     const length = Math.hypot(dx, dy) || 1;
 
     dx = dx / length * speed * dt;
@@ -8173,7 +8188,11 @@ update = function(dt) {
     Math.abs(state.y - beforeY) < 0.001
   ) {
     const len = Math.hypot(wantedDx, wantedDy) || 1;
-    const speed = keys.has("shift") ? 130 : 90;
+    const speed =
+      state.oldManEvent?.runUnlocked &&
+      (keys.has("shift") || keys.has("f"))
+        ? 150
+        : 90;
     const dx = wantedDx / len * speed * dt;
     const dy = wantedDy / len * speed * dt;
 
@@ -8891,6 +8910,559 @@ $("help").onclick = () => modal(
   [["Voltar", closeModal]]
 );
 
+// =========================================================
+// 0.6.46 — ESTRADA DO VELHO / ÁREA SUL SEPARADA
+// =========================================================
+
+const v0646PrepareBase = prepareSystems;
+prepareSystems = function() {
+  v0646PrepareBase();
+
+  if (!state) return;
+
+  if (!state.oldManEvent || typeof state.oldManEvent !== "object") {
+    state.oldManEvent = {
+      phase: "waiting",
+      x: 625,
+      y: 785,
+      runUnlocked: false,
+      counted: false,
+      caught: false
+    };
+  }
+
+  if (!Number.isFinite(state.oldManEvent.x)) state.oldManEvent.x = 625;
+  if (!Number.isFinite(state.oldManEvent.y)) state.oldManEvent.y = 785;
+  if (typeof state.oldManEvent.runUnlocked !== "boolean") state.oldManEvent.runUnlocked = false;
+  if (typeof state.oldManEvent.counted !== "boolean") state.oldManEvent.counted = false;
+  if (typeof state.oldManEvent.caught !== "boolean") state.oldManEvent.caught = false;
+
+  // A missão antiga do oeste continua definitivamente desativada.
+  if (state.westMission) {
+    state.westMission.status = "disabled";
+    state.westMission.targetHp = 0;
+  }
+};
+
+function v0646CountOldManEncounter() {
+  prepareSystems();
+
+  if (state.oldManEvent.counted) return;
+
+  state.oldManEvent.counted = true;
+  state.storyEvents.oldManEncounters += 1;
+  save();
+}
+
+function v0646GoOldRoad() {
+  prepareSystems();
+
+  fade(
+    "Estrada de terra",
+    "",
+    () => {
+      state.room = "oldRoad";
+      state.x = 468;
+      state.y = 92;
+      state.facing = "down";
+      state.walk = 0;
+
+      keys.clear();
+      near = null;
+      updateHud();
+    }
+  );
+}
+
+function v0646ReturnVillage(escaped = false) {
+  prepareSystems();
+
+  if (escaped) {
+    state.oldManEvent.phase = "escaped";
+    state.oldManEvent.caught = false;
+    v0646CountOldManEncounter();
+
+    state.pendingBrotherRemark =
+      "Você voltou correndo... tinha alguém atrás de você?";
+  }
+
+  fade(
+    "",
+    "",
+    () => {
+      state.room = "village";
+      state.x = 650;
+      state.y = maps.village.h - 76;
+      state.facing = "up";
+      state.walk = 0;
+
+      keys.clear();
+      near = null;
+      updateHud();
+
+      if (escaped) {
+        v06Toast("Consegui voltar para o bairro.", 2.1);
+      }
+    }
+  );
+}
+
+function v0646StartOldManChoice() {
+  say(
+    [
+      ["Velho", "Seus pais sabem que você está essa hora andando por aqui?"],
+      ["Você", "O senhor conhece meus pais?"],
+      ["Velho", "Conheço. Já vi os dois por esta estrada algumas vezes."],
+      ["Velho", "Está ficando tarde. Se quiser, pode passar a noite aqui."]
+    ],
+    () => {
+      modal(
+        "O que fazer?",
+        "",
+        [
+          [
+            "Aceitar",
+            () => {
+              closeModal();
+
+              state.oldManEvent.phase = "chase";
+              state.oldManEvent.runUnlocked = true;
+              state.oldManEvent.caught = false;
+              state.oldManEvent.x = 625;
+              state.oldManEvent.y = 785;
+
+              v0646CountOldManEncounter();
+
+              say(
+                [["Velho", "Então venha. É melhor sair da estrada."]],
+                () => {
+                  v06Toast(
+                    "Ele vai te alcançar. Segure F para correr.",
+                    3
+                  );
+                  save();
+                }
+              );
+            }
+          ],
+          [
+            "Recusar",
+            () => {
+              closeModal();
+
+              state.oldManEvent.phase = "refused";
+              v0646CountOldManEncounter();
+
+              say([
+                ["Você", "Não. Eu preciso voltar para casa."],
+                ["Velho", "Então não fique parado por aqui."]
+              ]);
+            }
+          ]
+        ]
+      );
+    }
+  );
+}
+
+function v0646OldManCaught() {
+  const event = state.oldManEvent;
+
+  if (event.caught) return;
+
+  event.caught = true;
+  keys.clear();
+
+  modal(
+    "Ele te alcançou",
+    "Você não conseguiu voltar para o bairro a tempo.",
+    [
+      [
+        "Tentar novamente",
+        () => {
+          closeModal();
+
+          event.phase = "chase";
+          event.caught = false;
+          event.x = 625;
+          event.y = 785;
+          state.x = 540;
+          state.y = 755;
+          state.facing = "up";
+          state.walk = 0;
+
+          keys.clear();
+          v06Toast(
+            "Segure F para correr e volte pelo caminho.",
+            2.5
+          );
+        }
+      ],
+      [
+        "Voltar para o bairro",
+        () => {
+          closeModal();
+
+          event.phase = "escaped";
+          event.caught = false;
+          v0646ReturnVillage(false);
+        }
+      ]
+    ]
+  );
+}
+
+const v0646GetNearBase = getNear;
+getNear = function() {
+  prepareSystems();
+
+  // Fim da estrada de terra no bairro principal.
+  if (
+    state?.room === "village" &&
+    state.stage !== "prologue" &&
+    state.y >= maps.village.h - 88 &&
+    state.x >= 585 &&
+    state.x <= 715
+  ) {
+    return {
+      label: "Avançar",
+      action: "oldRoadAdvance"
+    };
+  }
+
+  if (state?.room === "oldRoad") {
+    // Volta pelo mesmo caminho.
+    if (
+      state.y <= 92 &&
+      state.x >= 405 &&
+      state.x <= 535
+    ) {
+      return {
+        label: state.oldManEvent.phase === "chase"
+          ? "Escapar para o bairro"
+          : "Voltar para o bairro",
+        action: "oldRoadBack"
+      };
+    }
+
+    if (
+      ["waiting", "refused"].includes(state.oldManEvent.phase) &&
+      Math.hypot(
+        state.x - 625,
+        state.y - 785
+      ) < 50
+    ) {
+      return {
+        label: "Falar com o senhor",
+        action: "oldManTalk"
+      };
+    }
+  }
+
+  return v0646GetNearBase();
+};
+
+const v0646InteractBase = interact;
+interact = function(action) {
+  prepareSystems();
+
+  if (action === "oldRoadAdvance") {
+    v0646GoOldRoad();
+    return;
+  }
+
+  if (action === "oldRoadBack") {
+    const escaped =
+      state.oldManEvent.phase === "chase";
+
+    v0646ReturnVillage(escaped);
+    return;
+  }
+
+  if (action === "oldManTalk") {
+    if (state.oldManEvent.phase === "waiting") {
+      v0646StartOldManChoice();
+    } else {
+      say([
+        ["Velho", "Você ainda está aqui? Achei que fosse voltar para casa."]
+      ]);
+    }
+
+    return;
+  }
+
+  v0646InteractBase(action);
+};
+
+function v0646ApplyOutdoorLight() {
+  const lightMinutes =
+    ((state.minutes % 1440) + 1440) % 1440;
+
+  let night = 0.03;
+
+  if (lightMinutes < 300) {
+    night = 0.34;
+  } else if (lightMinutes < 420) {
+    const p = (lightMinutes - 300) / 120;
+    night = 0.34 - p * 0.29;
+  } else if (lightMinutes < 1020) {
+    night = 0.03;
+  } else if (lightMinutes < 1260) {
+    const p = (lightMinutes - 1020) / 240;
+    night = 0.03 + p * 0.29;
+  } else {
+    night = 0.34;
+  }
+
+  rect(0, 0, W, H, `rgba(6,16,37,${night})`);
+}
+
+function v0646DrawOldRoad() {
+  const m = maps.oldRoad;
+
+  camera.x = Math.max(
+    0,
+    Math.min(m.w - W, state.x - W / 2)
+  );
+
+  camera.y = Math.max(
+    0,
+    Math.min(m.h - H, state.y - H / 2)
+  );
+
+  c.save();
+  c.translate(
+    -Math.floor(camera.x),
+    -Math.floor(camera.y)
+  );
+
+  // Terreno.
+  rect(0, 0, m.w, m.h, "#273d32");
+
+  for (let y = 0; y < m.h; y += 18) {
+    for (let x = 0; x < m.w; x += 22) {
+      const z = hash(x + 17, y + 91);
+
+      if (z > 0.72) {
+        rect(
+          x,
+          y,
+          z > 0.86 ? 4 : 2,
+          2,
+          z > 0.84 ? "#566849" : "#1f342d"
+        );
+      }
+    }
+  }
+
+  // Estrada principal, um pouco irregular.
+  rect(425, 0, 94, 480, "#665442");
+  rect(442, 450, 108, 320, "#665442");
+  rect(478, 735, 170, 86, "#665442");
+
+  // Trilha até a casa.
+  rect(615, 775, 110, 74, "#665442");
+
+  // Marcas de roda e terra mais clara.
+  for (let y = 18; y < 730; y += 34) {
+    const drift = Math.sin(y * 0.05) * 8;
+    rect(448 + drift, y, 13, 4, "#796650");
+    rect(493 + drift, y + 12, 11, 3, "#514234");
+  }
+
+  // Cerca baixa perto da casa.
+  for (let x = 525; x < 850; x += 34) {
+    rect(x, 745, 4, 34, "#554538");
+  }
+  rect(525, 756, 325, 5, "#6b5844");
+
+  // Árvores emoldurando o caminho, sem fechar a estrada.
+  for (let i = 0; i < 34; i++) {
+    const side = i % 2 === 0 ? 1 : -1;
+    const y = 70 + i * 31;
+    const baseX =
+      side < 0
+        ? 270 + hash(i, 33) * 110
+        : 640 + hash(i, 44) * 120;
+
+    if (y > 760 && baseX > 520) continue;
+
+    rect(baseX, y, 8, 35, "#493c31");
+    rect(baseX - 20, y - 24, 48, 35, "#1e352b");
+    rect(baseX - 13, y - 34, 34, 31, "#2c4a38");
+  }
+
+  // Casa isolada.
+  for (const o of m.objects) {
+    building(o);
+  }
+
+  // Velho do lado de fora até a perseguição começar.
+  if (
+    !["escaped"].includes(state.oldManEvent.phase)
+  ) {
+    const ox =
+      state.oldManEvent.phase === "chase"
+        ? state.oldManEvent.x
+        : 625;
+
+    const oy =
+      state.oldManEvent.phase === "chase"
+        ? state.oldManEvent.y
+        : 785;
+
+    person(
+      ox,
+      oy,
+      "npcMale",
+      state.oldManEvent.phase === "chase"
+        ? elapsed * 10
+        : 0,
+      state.oldManEvent.phase === "chase"
+        ? (
+            Math.abs(state.x - ox) >
+            Math.abs(state.y - oy)
+              ? (state.x > ox ? "right" : "left")
+              : (state.y > oy ? "down" : "up")
+          )
+        : "left",
+      0.92
+    );
+
+    if (state.oldManEvent.phase !== "chase") {
+      txt(
+        "SENHOR",
+        ox - 21,
+        oy - 37,
+        "#b8aa8d",
+        7
+      );
+    }
+  }
+
+  // Player.
+  person(
+    state.x,
+    state.y,
+    "player",
+    state.walk,
+    state.facing
+  );
+
+  c.restore();
+
+  v0646ApplyOutdoorLight();
+
+  if (
+    state.oldManEvent.phase === "chase" &&
+    !state.oldManEvent.caught
+  ) {
+    txt(
+      "F · CORRER",
+      18,
+      H - 22,
+      "#dbc8a0",
+      8
+    );
+  }
+}
+
+const v0646DrawWorldBase = drawWorld;
+drawWorld = function() {
+  if (state?.room === "oldRoad") {
+    v0646DrawOldRoad();
+    return;
+  }
+
+  v0646DrawWorldBase();
+};
+
+const v0646UpdateBase = update;
+update = function(dt) {
+  v0646UpdateBase(dt);
+
+  if (
+    !state ||
+    mode !== "game" ||
+    state.room !== "oldRoad" ||
+    dialog ||
+    transitionBusy ||
+    !$("overlay").hidden ||
+    state.gameOver
+  ) {
+    return;
+  }
+
+  const event = state.oldManEvent;
+
+  if (event.phase !== "chase" || event.caught) {
+    return;
+  }
+
+  const dx = state.x - event.x;
+  const dy = state.y - event.y;
+  const distance = Math.hypot(dx, dy);
+
+  if (distance < 20) {
+    v0646OldManCaught();
+    return;
+  }
+
+  const step = Math.min(distance, 102 * dt);
+
+  event.x += dx / distance * step;
+  event.y += dy / distance * step;
+};
+
+const v0646DevCommandBase = v0645RunDevCommand;
+v0645RunDevCommand = function(raw) {
+  const command = String(raw || "").trim().toLowerCase();
+
+  if (command === "velho") {
+    prepareSystems();
+
+    state.stage =
+      state.stage === "prologue"
+        ? "free"
+        : state.stage;
+
+    state.day = Math.max(1, state.day || 1);
+    state.room = "oldRoad";
+    state.x = 468;
+    state.y = 180;
+    state.facing = "down";
+    state.walk = 0;
+
+    state.oldManEvent.phase = "waiting";
+    state.oldManEvent.x = 625;
+    state.oldManEvent.y = 785;
+    state.oldManEvent.runUnlocked = false;
+    state.oldManEvent.caught = false;
+
+    v0645ResetTransientState();
+    updateHud();
+    save();
+    v06Toast("TESTE: estrada do velho", 2);
+    return;
+  }
+
+  v0646DevCommandBase(raw);
+};
+
+// Inclui o novo comando no painel de teste.
+const v0646DevPanelBase = v0645OpenDevPanel;
+v0645OpenDevPanel = function() {
+  v0646DevPanelBase();
+
+  const root = $("modalText");
+  const pre = root.querySelector("pre");
+
+  if (pre && !pre.textContent.includes("velho")) {
+    pre.textContent +=
+      "\nvelho       → vai direto para a estrada do velho";
+  }
+};
+
 // Recupera um save que tenha ficado dentro de um móvel reposicionado.
 const roomUpdateBeforeFix=update;
 let roomPositionChecked=false;
@@ -8910,7 +9482,7 @@ update=function(dt) {
   roomUpdateBeforeFix(dt);
 };
 
-$("version").textContent = "PROTÓTIPO · 0.6.45";
+$("version").textContent = "PROTÓTIPO · 0.6.46";
   
   requestAnimationFrame(frame);
   showBootSplash();
