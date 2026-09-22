@@ -2,12 +2,12 @@
 "use strict";
 
 /*
-  A QUINTA SOMBRA — 0.7.1
+  A QUINTA SOMBRA — 0.7.4
 
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
 
-  Abertura, exploração da casa e primeira busca por alimento.
+  Abertura, exploração da casa e primeira investigação do desaparecimento.
   Arte provisória: personagens e cenários serão refinados depois.
 
   Continuaremos editando este mesmo arquivo.
@@ -2333,8 +2333,8 @@ function drawCharacterSprite(
       ? state.forcedSleepDue
         ? "14:00 · VOCÊ PRECISA DORMIR"
         : state.minutes >= 360
-          ? "DIA · TEMPO 2× · 1 HORA = 00:40"
-          : "NOITE · 1 HORA = 01:20"
+          ? "DIA · 1 HORA = 01:00"
+          : "NOITE · 1 HORA = 01:00"
       : "TEMPO PARADO · INTRODUÇÃO";
 
     $("inventory").textContent =
@@ -2401,8 +2401,11 @@ function drawCharacterSprite(
           );
         } else if (state.stage === "check") {
           say(
-            ["Ainda vazia. Não há nenhum sinal deles."],
-            () => stage("empty")
+            [
+              "Ainda vazia. Não há nenhum sinal deles.",
+              "Se saíram só para comprar mantimentos, alguma coisa aconteceu depois que deixaram o mercado."
+            ],
+            () => stage("talk")
           );
         } else {
           say(["Tudo ficou exatamente como estava."]);
@@ -2420,7 +2423,10 @@ function drawCharacterSprite(
           );
         } else if (state.stage === "empty") {
           say(
-            ["Não sobrou nada. Nem no armário."],
+            [
+              "Ainda tem o suficiente para esta noite.",
+              "Meu irmão acabou de comer. Procurar mais comida agora não vai ajudar a encontrar meus pais."
+            ],
             () => stage("talk")
           );
         } else {
@@ -2453,13 +2459,16 @@ function drawCharacterSprite(
         } else if (state.stage === "talk") {
           say(
             [
-              ["Irmão", "Estou com fome de novo… Eles voltaram?"],
-              ["Você", "Ainda não. Vou encontrar alguma coisa."],
-              ["Irmão", "Mas a porta está trancada."],
+              ["Irmão", "Eles ainda não voltaram?"],
+              ["Você", "Ainda não."],
+              ["Irmão", "Você vai sair pra procurar?"],
+              ["Você", "Primeiro vou ver se eles deixaram alguma coisa que ajude."],
+              ["Irmão", "A porta está trancada."],
               [
                 "Você",
                 "Tem uma chave reserva. Acho que o pai escondia ela atrás do relógio parado da sala."
-              ]
+              ],
+              ["Irmão", "Só volta antes de amanhecer, tá?"]
             ],
             () => stage("key")
           );
@@ -2597,11 +2606,11 @@ function drawCharacterSprite(
         } else if (!state.firstExit) {
           fade(
             "A primeira saída",
-            "A vizinha mora logo adiante. Talvez ela tenha alguma comida.",
+            "00:00 · Forgotten está quase vazia. A casa de Florinda ainda tem luz; a delegacia também.",
             () => {
               state.firstExit = true;
               go("village", 442, 742);
-              stage("supplies");
+              stage("free");
             }
           );
         } else {
@@ -2789,12 +2798,11 @@ function drawCharacterSprite(
     if (state.firstExit) {
       const old = state.minutes;
 
-      // NOVO CICLO:
-      // 00:00–05:59 -> 1 hora do jogo = 1m20s reais.
-      // 06:00–14:00 -> tempo 2x mais rápido = 40s reais por hora.
-      // Às 14:00 o relógio para até o player dormir.
-      const timeRate =
-        state.minutes >= 360 ? 1.5 : 0.75;
+      // CICLO DE TEMPO:
+      // 1 hora do jogo = 1 minuto real, em qualquer horário ativo.
+      // Isso deixa 00:00–07:00 em aproximadamente 7 minutos reais.
+      // Às 14:00 o relógio continua parando até o player dormir.
+      const timeRate = 1;
 
       state.minutes += dt * timeRate;
 
@@ -4986,7 +4994,7 @@ const v06Base = {
 roomNames.shop = "Casa da vizinha";
 
 objectives.key = "Procure a chave reserva no relógio parado da sala.";
-objectives.supplies = "Bata na casa da vizinha e peça ajuda.";
+objectives.supplies = "Investigue o desaparecimento e converse com quem ainda está acordado.";
 objectives.return = "Leve a porção para seu irmão.";
 
 // Ajustes de cenário sem reescrever os mapas antigos.
@@ -5778,6 +5786,8 @@ interact = function (action) {
       () => {
         v06FeedBrother();
         state.firstBrotherMealDone = true;
+        state.brotherFood = 100;
+        state.firstNightFoodInitialized = true;
         state.stage = "sleep";
         updateHud();
         save();
@@ -5794,7 +5804,9 @@ interact = function (action) {
     ) &&
     state.food > 0
   ) {
-    const firstDelivery = !state.finished;
+    const firstDelivery =
+      !state.finished &&
+      state.day !== 1;
 
     say(
       firstDelivery
@@ -6647,10 +6659,10 @@ updateHud = function () {
       "14:00 · TEMPO PARADO · DURMA";
   } else if (state.minutes >= 360) {
     $("timeNote").textContent =
-      "DIA · TEMPO 2× · 1 HORA = 00:40";
+      "DIA · 1 HORA = 01:00";
   } else {
     $("timeNote").textContent =
-      "NOITE · 1 HORA = 01:20";
+      "NOITE · 1 HORA = 01:00";
   }
 };
 
@@ -7187,10 +7199,10 @@ updateHud = function () {
       "Siga pela rua principal para o norte.";
   } else if (state.stage === "supplies") {
     $("objective").textContent =
-      "Bata na casa da vizinha e peça algo para seu irmão.";
+      "Investigue o desaparecimento e converse com quem ainda está acordado.";
   } else if (state.stage === "return") {
     $("objective").textContent =
-      "Volte para casa e leve a comida ao seu irmão.";
+      "Volte para casa quando achar que já investigou o suficiente.";
   }
 };
 
@@ -7957,61 +7969,73 @@ function v0639FinishPrologueAtNorth() {
 
   keys.clear();
 
-  // Pai e mãe param juntos no fim da rua antes de desaparecerem.
-  state.x = 636;
-  state.y = 58;
-  state.facing = "down";
-  state.walk = 0;
+  // A chegada ao portão usa um fade antes de reposicionar os pais.
+  // Isso evita o corte seco e transforma o fim do trajeto em uma cena.
+  fade(
+    "",
+    "",
+    () => {
+      // O pai mantém a posição que já funcionava, olhando para baixo.
+      state.x = 636;
+      state.y = 58;
+      state.facing = "down";
+      state.walk = 0;
 
-  prepareMother();
-  state.mother.x = 672;
-  state.mother.y = 58;
-  state.mother.facing = "down";
-  state.mother.walk = 0;
-  state.mother.targetX = 672;
-  state.mother.targetY = 58;
+      // A mãe fica logo abaixo dele, olhando diretamente para o pai.
+      prepareMother();
+      state.mother.x = 636;
+      state.mother.y = 104;
+      state.mother.facing = "up";
+      state.mother.walk = 0;
+      state.mother.targetX = 636;
+      state.mother.targetY = 104;
+      state.mother.think = 999;
+      state.mother.pause = 999;
+      state.mother.lastFatherX = state.x;
+      state.mother.lastFatherY = state.y;
 
-  say(
-    [
-      ["Pai", "Vamos comprar as coisas rápido e já voltar."],
-      ["Mãe", "Vamos. Não deve demorar."]
-    ],
-    () => fade(
-      "",
-      "",
-      () => {
-        // A troca ocorre com a tela preta para o jogador não ver o teleporte.
-        state.day = 0;
-        state.minutes = 1380;
-        state.dawnCollapseArmed = false;
+      say(
+        [
+          ["Pai", "Vamos comprar as coisas rápido e já voltar."],
+          ["Mãe", "Vamos. Não deve demorar."]
+        ],
+        () => fade(
+          "",
+          "",
+          () => {
+            // A passagem para 23:00 também ocorre com a tela preta.
+            state.day = 0;
+            state.minutes = 1380;
+            state.dawnCollapseArmed = false;
 
-        if (state.dawnCollapse) {
-          state.dawnCollapse.active = false;
-          state.dawnCollapse.phase = "idle";
-          state.dawnCollapse.time = 0;
-        }
+            if (state.dawnCollapse) {
+              state.dawnCollapse.active = false;
+              state.dawnCollapse.phase = "idle";
+              state.dawnCollapse.time = 0;
+            }
 
-        if (state.wakeUp) {
-          state.wakeUp.active = false;
-          state.wakeUp.time = 0;
-        }
+            if (state.wakeUp) {
+              state.wakeUp.active = false;
+              state.wakeUp.time = 0;
+            }
 
-        state.stage = "parents";
-        state.room = "bedroom";
-        state.x = housePoint(180);
-        state.y = housePoint(235);
-        state.facing = "down";
-        state.walk = 0;
-        delete state.mother;
+            state.stage = "parents";
+            state.room = "bedroom";
+            state.x = housePoint(180);
+            state.y = housePoint(235);
+            state.facing = "down";
+            state.walk = 0;
+            delete state.mother;
 
-        keys.clear();
-        near = null;
+            keys.clear();
+            near = null;
 
-        updateHud();
-      }
-    )
+            updateHud();
+          }
+        )
+      );
+    }
   );
-
 }
 
 const v0639UpdateBase = update;
@@ -8768,8 +8792,8 @@ interact = function(action) {
     state.brotherFood >= 60
   ) {
     say([
-      ["Vizinha", "Seu irmão ainda tem comida suficiente."],
-      ["Você", "Melhor não pegar mais agora."]
+      ["Florinda", "Se precisar de comida mais tarde, bate aqui."],
+      ["Você", "Por enquanto ele está bem. Não preciso levar nada."]
     ]);
     return;
   }
@@ -16567,7 +16591,328 @@ drawWorld = function() {
   c.restore();
 };
 
-$("version").textContent = "PROTÓTIPO · 0.7.1";
+
+// =========================================================
+// 0.7.2 — PRIMEIRA NOITE / DIA 1
+// INVESTIGAÇÃO PRIMEIRO, FOME QUANDO FIZER SENTIDO
+// =========================================================
+
+function v072EnsureDay1State() {
+  if (!state) return;
+
+  if (!state.day1Progress || typeof state.day1Progress !== "object") {
+    state.day1Progress = {
+      neighborVisited: false,
+      policeVisited: false,
+      vanSeen: false,
+      completed: false
+    };
+  }
+
+  for (const key of [
+    "neighborVisited",
+    "policeVisited",
+    "vanSeen",
+    "completed"
+  ]) {
+    if (typeof state.day1Progress[key] !== "boolean") {
+      state.day1Progress[key] = false;
+    }
+  }
+
+  // Migração do fluxo antigo: os estágios supplies/return eram uma
+  // missão obrigatória de comida. Agora a primeira noite é investigação.
+  if (
+    state.day === 1 &&
+    ["supplies", "return"].includes(state.stage)
+  ) {
+    state.stage = "free";
+  }
+}
+
+const v072PrepareBase = prepareSystems;
+prepareSystems = function() {
+  v072PrepareBase();
+  v072EnsureDay1State();
+};
+
+function v072Day1CluesDone() {
+  const q = chapter();
+
+  return Boolean(
+    q &&
+    Array.isArray(q.clues) &&
+    q.clues.length >= 3
+  );
+}
+
+function v072TryCompleteDay1() {
+  prepareSystems();
+
+  if (
+    state.day !== 1 ||
+    state.day1Progress.completed
+  ) {
+    return false;
+  }
+
+  if (
+    !v072Day1CluesDone() ||
+    !state.day1Progress.neighborVisited ||
+    !state.day1Progress.policeVisited
+  ) {
+    return false;
+  }
+
+  state.day1Progress.completed = true;
+  state.finished = true;
+  state.stage = "free";
+
+  v06Toast(
+    "Você fez o que podia por enquanto. Continue atento até amanhecer.",
+    2.8
+  );
+
+  updateHud();
+  save();
+
+  return true;
+}
+
+function v072FlorindaStoryPending() {
+  if (!state) return false;
+
+  if (
+    state.day === 1 &&
+    !state.day1Progress?.neighborVisited
+  ) {
+    return true;
+  }
+
+  if (
+    state.storyFlags?.florindaChapter4Concern &&
+    !state.storyFlags?.florindaChapter4ConcernSeen
+  ) {
+    return true;
+  }
+
+  if (
+    state.chapter8 &&
+    state.chapter7?.complete &&
+    state.day >= 17 &&
+    !state.chapter8.florindaConfronted
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+function v072NeighborDoorAvailable() {
+  prepareSystems();
+
+  return Boolean(
+    state.stage === "prologue" ||
+    v072FlorindaStoryPending() ||
+    (
+      state.brotherFood < 60 &&
+      state.food <= 0
+    )
+  );
+}
+
+function v072FirstNeighborVisit() {
+  say(
+    [
+      ["Florinda", "Estevão? O que você está fazendo fora a essa hora?"],
+      ["Você", "Meus pais ainda não voltaram do mercado."],
+      ["Florinda", "Ainda não?"],
+      ["Você", "Não. Eu queria saber se a senhora viu eles voltando."],
+      ["Florinda", "Não vi."],
+      ["Florinda", "Se eles continuarem desaparecidos, fala com o Anísio na delegacia. E não deixa seu irmão sozinho por muito tempo."],
+      ["Você", "Ele acabou de comer. Está bem por enquanto."],
+      ["Florinda", "Então não leva comida sem precisar. Se faltar mais tarde, bate aqui."]
+    ],
+    () => {
+      state.day1Progress.neighborVisited = true;
+      updateHud();
+      save();
+      v072TryCompleteDay1();
+    }
+  );
+}
+
+const v072PoliceParentsBase = v0630PoliceParents;
+v0630PoliceParents = function() {
+  prepareSystems();
+
+  if (
+    state.day === 1 &&
+    !state.day1Progress.policeVisited
+  ) {
+    state.day1Progress.policeVisited = true;
+    save();
+  }
+
+  v072PoliceParentsBase();
+
+  // O diálogo é linear; registrar a visita aqui não antecipa nenhuma
+  // recompensa nem libera capítulos fora de ordem.
+  v072TryCompleteDay1();
+};
+
+const v072ScheduleOutingBase = v0645ScheduleOutingEvent;
+v0645ScheduleOutingEvent = function() {
+  prepareSystems();
+
+  // A Bíblia pede que a primeira noite plante apenas desconforto.
+  // A primeira saída do Dia 1 força a van à distância, sem invasão.
+  if (
+    state.day === 1 &&
+    !state.day1Progress.vanSeen
+  ) {
+    state.randomEventState.pending = true;
+    state.randomEventState.timer =
+      5 + Math.random() * 3;
+    state.randomEventState.type = "van";
+
+    save();
+    return;
+  }
+
+  v072ScheduleOutingBase();
+};
+
+const v072TriggerRandomBase = v0645TriggerRandomEvent;
+v0645TriggerRandomEvent = function() {
+  const type =
+    state?.randomEventState?.type;
+
+  v072TriggerRandomBase();
+
+  if (
+    state &&
+    state.day === 1 &&
+    type === "van"
+  ) {
+    prepareSystems();
+    state.day1Progress.vanSeen = true;
+    save();
+  }
+};
+
+const v072InteractBase = interact;
+interact = function(action) {
+  prepareSystems();
+
+  if (action === "neighborDoor") {
+    if (state.stage === "prologue") {
+      v072InteractBase(action);
+      return;
+    }
+
+    if (!v072NeighborDoorAvailable()) {
+      say([
+        state.brotherFood >= 60
+          ? "Não preciso incomodar Florinda agora. Meu irmão ainda está bem alimentado."
+          : "Já estou levando uma porção. Primeiro preciso voltar para casa."
+      ]);
+      return;
+    }
+
+    v072InteractBase(action);
+    return;
+  }
+
+  if (
+    action === "vendor" &&
+    state.day === 1 &&
+    !state.day1Progress.neighborVisited
+  ) {
+    v072FirstNeighborVisit();
+    return;
+  }
+
+  v072InteractBase(action);
+};
+
+const v072UpdateBase = update;
+update = function(dt) {
+  prepareSystems();
+
+  v072UpdateBase(dt);
+
+  if (!state) return;
+
+  if (
+    state.day === 1 &&
+    !state.day1Progress.completed
+  ) {
+    v072TryCompleteDay1();
+  }
+};
+
+const v072HudBase = updateHud;
+updateHud = function() {
+  v072HudBase();
+
+  if (
+    !state ||
+    state.stage === "prologue" ||
+    state.day !== 1
+  ) {
+    return;
+  }
+
+  prepareSystems();
+
+  const q = chapter();
+  const clueCount =
+    Array.isArray(q?.clues)
+      ? q.clues.length
+      : 0;
+
+  if (clueCount < 3) {
+    $("objective").textContent =
+      "Investigue o quarto dos seus pais · pistas " +
+      clueCount +
+      "/3.";
+    return;
+  }
+
+  if (
+    !state.day1Progress.neighborVisited &&
+    !state.day1Progress.policeVisited
+  ) {
+    $("objective").textContent =
+      "Converse com Florinda e registre o desaparecimento na delegacia.";
+    return;
+  }
+
+  if (!state.day1Progress.neighborVisited) {
+    $("objective").textContent =
+      "Fale com Florinda na casa vizinha.";
+    return;
+  }
+
+  if (!state.day1Progress.policeVisited) {
+    $("objective").textContent =
+      "Registre o desaparecimento na delegacia.";
+    return;
+  }
+
+  $("objective").textContent =
+    "Continue explorando o bairro até o amanhecer.";
+};
+
+// Ajuda atualizada: Florinda é apoio condicionado, não objetivo fixo.
+$("help").onclick = () => modal(
+  "Como jogar",
+  "WASD / setas: andar. Shift/F: correr. E: interagir. I: inventário. J: diário. L: ligar/desligar a lanterna. Esc: pausar. ESPAÇO: soco apenas contra ameaças físicas compatíveis.\n\nNo Dia 1, o foco é investigar o desaparecimento: procure pistas, fale com Florinda e registre o caso. A casa de Florinda não funciona como estoque infinito: depois da primeira conversa, só faz sentido pedir comida quando a alimentação do seu irmão estiver abaixo de 60%, salvo quando a história exigir falar com ela.\n\nÀs 07:00, Estevão perde os sentidos.",
+  [["Voltar", closeModal]]
+);
+
+$("version").textContent = "PROTÓTIPO · 0.7.4";
   
   requestAnimationFrame(frame);
   showBootSplash();
