@@ -19073,7 +19073,7 @@ function v079SleepUntilNextNight() {
     "Dormir até a próxima noite?",
     "Já passou das 03:00.\n\nDormir agora encerra esta noite e você acorda às 00:00 do DIA " +
       nextDay +
-      ".\n\nEventos ainda não vistos desta noite serão perdidos.",
+      ".\n\nAcontecimentos aleatórios desta noite podem se encerrar, mas investigações iniciadas continuam no próximo dia.",
     [
       [
         "Dormir",
@@ -19219,7 +19219,1211 @@ updateHud = function() {
   }
 };
 
-$("version").textContent = "PROTÓTIPO · 0.7.9";
+// =========================================================
+// 0.8.0 — FORGOTTEN VIVA
+// FRAGMENTOS PÓS-RAIMUNDO + EXPLORAÇÃO COM PROGRESSO
+// =========================================================
+
+const V080_OSMAR_POS = {
+  x: 592,
+  y: 750
+};
+
+const V080_NEWSPAPER_POS = {
+  // Reaproveita o papel que já existia visualmente na rua do mercado.
+  x: 325,
+  y: 825
+};
+
+const V080_YARD_TRACE_POS = {
+  x: 586,
+  y: 620
+};
+
+const V080_OUTDOOR_ROOMS = [
+  "village",
+  "northRoad",
+  "squareRoad",
+  "square",
+  "oldRoad"
+];
+
+const V080_AMBIENT_TEXTURES = [
+  {
+    id: "curtain",
+    text: "Uma cortina se fecha assim que você olha para a janela."
+  },
+  {
+    id: "festivalPoster",
+    text: "Um cartaz antigo de festival tem duas datas impressas uma sobre a outra."
+  },
+  {
+    id: "emptyPorch",
+    text: "A varanda de uma casa vazia está molhada. A rua ao redor continua seca."
+  },
+  {
+    id: "residentAvoids",
+    text: "Um morador atravessa para o outro lado da rua antes de passar por você."
+  },
+  {
+    id: "wrongLamp",
+    text: "Uma janela acende por alguns segundos numa casa que parece abandonada."
+  }
+];
+
+let v080WestPresenceUntil = 0;
+let v080WestStaticUntil = 0;
+let v080WestPresenceY = 420;
+
+function v080EnsureForgottenAlive() {
+  if (!state) return;
+
+  if (
+    !state.forgottenAlive ||
+    typeof state.forgottenAlive !== "object"
+  ) {
+    state.forgottenAlive = {};
+  }
+
+  const f =
+    state.forgottenAlive;
+
+  if (typeof f.started !== "boolean") {
+    f.started = false;
+  }
+
+  if (!Number.isFinite(f.startedDay)) {
+    f.startedDay = -1;
+  }
+
+  if (!f.completed || typeof f.completed !== "object") {
+    f.completed = {};
+  }
+
+  for (const id of [
+    "marketDrift",
+    "osmar",
+    "brotherYard",
+    "mineNewspaper"
+  ]) {
+    if (typeof f.completed[id] !== "boolean") {
+      f.completed[id] = false;
+    }
+  }
+
+  if (!Number.isFinite(f.marketDriftStage)) {
+    f.marketDriftStage = 0;
+  }
+
+  if (!Number.isFinite(f.marketDriftDay)) {
+    f.marketDriftDay = -1;
+  }
+
+  if (!Number.isFinite(f.osmarStage)) {
+    f.osmarStage = 0;
+  }
+
+  if (!Number.isFinite(f.osmarAttempts)) {
+    f.osmarAttempts = 0;
+  }
+
+  if (!Number.isFinite(f.brotherYardStage)) {
+    f.brotherYardStage = 0;
+  }
+
+  if (typeof f.mineNewspaperSeen !== "boolean") {
+    f.mineNewspaperSeen = false;
+  }
+
+  if (typeof f.westPresenceArmed !== "boolean") {
+    f.westPresenceArmed = false;
+  }
+
+  if (typeof f.westPresenceSeen !== "boolean") {
+    f.westPresenceSeen = false;
+  }
+
+  if (typeof f.westHintShown !== "boolean") {
+    f.westHintShown = false;
+  }
+
+  if (!Number.isFinite(f.explorationDay)) {
+    f.explorationDay = state.day;
+  }
+
+  if (!Array.isArray(f.seenCells)) {
+    f.seenCells = [];
+  }
+
+  if (!Number.isFinite(f.cellsSinceAmbient)) {
+    f.cellsSinceAmbient = 0;
+  }
+
+  if (!Number.isFinite(f.ambientCount)) {
+    f.ambientCount = 0;
+  }
+
+  if (!Array.isArray(f.ambientRecent)) {
+    f.ambientRecent = [];
+  }
+
+  if (!Number.isFinite(f.ambientSilence)) {
+    f.ambientSilence = 0;
+  }
+
+  if (
+    state.storyFlags?.raimundoMet &&
+    !f.started
+  ) {
+    f.started = true;
+    f.startedDay = state.day;
+  }
+
+  // Saves que já chegaram à Rua Oeste nunca são obrigados
+  // a refazer os novos Fragmentos.
+  const alreadyPastForgottenAlive =
+    Boolean(
+      state.storyFlags?.chapter4Complete ||
+      state.chapter4?.bodySeen ||
+      state.chapter4?.bodyReported ||
+      state.room === "westRoad" ||
+      (
+        state.day >= 6 &&
+        state.storyFlags?.raimundoMet &&
+        state.storyFlags?.mineExteriorSeen &&
+        state.storyFlags?.observerFirstSeen
+      )
+    );
+
+  if (alreadyPastForgottenAlive) {
+    f.westPresenceSeen = true;
+    f.westPresenceArmed = false;
+  }
+
+  // O sono nunca apaga Fragmentos. Só reinicia o orçamento ambiental
+  // da sessão de exploração do novo dia.
+  if (f.explorationDay !== state.day) {
+    f.explorationDay = state.day;
+    f.seenCells = [];
+    f.cellsSinceAmbient = 0;
+    f.ambientCount = 0;
+    f.ambientSilence = 0;
+  }
+}
+
+const v080PrepareBase = prepareSystems;
+prepareSystems = function() {
+  v080PrepareBase();
+  v080EnsureForgottenAlive();
+
+  if (!state?.forgottenAlive) return;
+
+  v080UpdateWestPresenceArming(false);
+};
+
+function v080ForgottenAliveActive() {
+  const f =
+    state?.forgottenAlive;
+
+  return Boolean(
+    state &&
+    state.stage !== "prologue" &&
+    state.storyFlags?.raimundoMet &&
+    f?.started &&
+    !f.westPresenceSeen &&
+    !state.storyFlags?.chapter4Complete
+  );
+}
+
+function v080FragmentCount() {
+  const completed =
+    state?.forgottenAlive?.completed || {};
+
+  return [
+    completed.marketDrift,
+    completed.osmar,
+    completed.brotherYard,
+    completed.mineNewspaper
+  ].filter(Boolean).length;
+}
+
+function v080UpdateWestPresenceArming(showToast = true) {
+  if (!state?.forgottenAlive) return false;
+
+  const f =
+    state.forgottenAlive;
+
+  if (
+    f.westPresenceSeen ||
+    f.westPresenceArmed ||
+    !state.storyFlags?.raimundoMet ||
+    !state.storyFlags?.mineExteriorSeen ||
+    v080FragmentCount() < 3
+  ) {
+    return false;
+  }
+
+  f.westPresenceArmed = true;
+
+  if (showToast && !f.westHintShown) {
+    f.westHintShown = true;
+
+    v06Toast(
+      "As novas informações começam a apontar para o lado oeste de Forgotten.",
+      3
+    );
+  }
+
+  return true;
+}
+
+function v080CompleteFragment(id, title) {
+  prepareSystems();
+
+  const f =
+    state.forgottenAlive;
+
+  if (f.completed[id]) {
+    return false;
+  }
+
+  f.completed[id] = true;
+
+  v06Toast(
+    "Fragmento de Forgotten · " + title,
+    2.8
+  );
+
+  const armed =
+    v080UpdateWestPresenceArming(true);
+
+  updateHud();
+  save();
+
+  if (armed) {
+    // O toast de liberação é mais importante que o nome do Fragmento.
+    // Ele é exibido pelo armamento logo após a descoberta.
+  }
+
+  return true;
+}
+
+function v080MarketDrift() {
+  prepareSystems();
+
+  const f =
+    state.forgottenAlive;
+
+  if (f.marketDriftStage === 0) {
+    say(
+      [
+        ["Você", "Você ainda lembra de quando meus pais saíram daqui?"],
+        ["Funcionário", "Lembro... quer dizer, achei que lembrava."],
+        ["Funcionário", "Eu te disse que os dois saíram juntos, não disse?"],
+        ["Você", "Disse."],
+        ["Funcionário", "Pensando melhor, seu pai ficou alguns segundos perto da porta. Sua mãe ainda estava no caixa."],
+        ["Você", "Então eles não saíram juntos?"],
+        ["Funcionário", "Eu não sei. Isso é que está me incomodando. Ontem eu tinha certeza."]
+      ],
+      () => {
+        f.marketDriftStage = 1;
+        f.marketDriftDay = state.day;
+
+        v080CompleteFragment(
+          "marketDrift",
+          "O relato que muda"
+        );
+      }
+    );
+
+    return true;
+  }
+
+  if (
+    f.marketDriftStage === 1 &&
+    state.day > f.marketDriftDay
+  ) {
+    say(
+      [
+        ["Você", "Conseguiu lembrar melhor daquele dia?"],
+        ["Funcionário", "Piorou."],
+        ["Funcionário", "Hoje eu lembro sua mãe saindo primeiro."],
+        ["Você", "Ontem você falou do meu pai perto da porta."],
+        ["Funcionário", "Eu sei."],
+        ["Funcionário", "Não escreve nenhuma dessas versões como verdade. Eu não confio mais na minha própria lembrança."]
+      ],
+      () => {
+        f.marketDriftStage = 2;
+        save();
+      }
+    );
+
+    return true;
+  }
+
+  return false;
+}
+
+function v080SeedOsmar() {
+  prepareSystems();
+
+  const f =
+    state.forgottenAlive;
+
+  if (
+    !v080ForgottenAliveActive() ||
+    f.osmarStage !== 0
+  ) {
+    return false;
+  }
+
+  say(
+    [
+      ["Florinda", "Fiquei pensando depois que você saiu... talvez eu consiga ajudar de verdade."],
+      ["Você", "Como?"],
+      ["Florinda", "Meu filho, Osmar, mora na rua do mercado. Ele passa muito tempo olhando o movimento dali."],
+      ["Você", "Por que não falou dele antes?"],
+      ["Florinda", "Porque não gosto de colocar ele no meio dos problemas dos outros."],
+      ["Florinda", "Mas seus pais sumiram. Pergunta por ele naquela rua. A casa fica do lado direito, perto de uma caixa de correio velha."]
+    ],
+    () => {
+      f.osmarStage = 1;
+      updateHud();
+      save();
+    }
+  );
+
+  return true;
+}
+
+function v080OsmarHomeNow() {
+  // Conteúdo importante fica concentrado antes das 03:00.
+  return Boolean(
+    state &&
+    state.minutes >= 0 &&
+    state.minutes < 180
+  );
+}
+
+function v080TalkOsmar() {
+  prepareSystems();
+
+  const f =
+    state.forgottenAlive;
+
+  if (f.osmarStage <= 0) {
+    return;
+  }
+
+  if (f.completed.osmar) {
+    say([
+      ["Você", "Lembrou de mais alguma coisa?"],
+      ["Osmar", "Não. Eu vi os dois entrando no mercado. Depois disso, não prestei atenção."],
+      ["Osmar", "Se eu lembrar de algo diferente, eu mesmo falo com minha mãe."]
+    ]);
+    return;
+  }
+
+  if (!v080OsmarHomeNow()) {
+    f.osmarAttempts += 1;
+
+    say(
+      f.osmarAttempts <= 1
+        ? [
+            "A casa está escura. Parece que Osmar não está em casa."
+          ]
+        : [
+            "Ninguém atende.",
+            "Na caixa de correio há um papel preso: “Chego depois da meia-noite. Se precisar, venha antes das três.”"
+          ],
+      save
+    );
+
+    return;
+  }
+
+  say(
+    [
+      ["Osmar", "Oi? Precisa de alguma coisa?"],
+      ["Você", "A Florinda é sua mãe?"],
+      ["Osmar", "É. Aconteceu alguma coisa com ela?"],
+      ["Você", "Não. Meus pais desapareceram. Ela disse que talvez você tivesse visto eles."],
+      ["Osmar", "Os Lancaster?"],
+      ["Você", "Foi por volta das duas da tarde, alguns dias atrás."],
+      ["Osmar", "Eu vi um homem e uma mulher subindo essa rua. Não posso jurar que eram seus pais."],
+      ["Você", "Para onde eles foram?"],
+      ["Osmar", "Entraram no mercado. Eu não vi quando saíram."],
+      ["Osmar", "Desculpa. É só isso que eu consigo afirmar sem inventar."]
+    ],
+    () => {
+      f.osmarStage = 2;
+
+      v080CompleteFragment(
+        "osmar",
+        "O filho de Florinda"
+      );
+    }
+  );
+}
+
+function v080SeedBrotherYard() {
+  prepareSystems();
+
+  const f =
+    state.forgottenAlive;
+
+  if (
+    !v080ForgottenAliveActive() ||
+    f.brotherYardStage !== 0
+  ) {
+    return false;
+  }
+
+  if (
+    state.pendingBrotherRemark ||
+    (
+      state.sideQuests?.brotherToy?.found &&
+      !state.sideQuests.brotherToy.returned
+    ) ||
+    state.food > 0 ||
+    state.dawnCollapseCount > state.brotherDawnTalkCount
+  ) {
+    return false;
+  }
+
+  say(
+    [
+      ["Irmão", "Posso te contar uma coisa sem você achar que eu inventei?"],
+      ["Você", "Pode."],
+      ["Irmão", "Tinha alguém no quintal quando você estava fora."],
+      ["Você", "Você viu quem era?"],
+      ["Irmão", "Não direito. Eu vi uma parte escura passando perto do muro."],
+      ["Irmão", "Depois eu olhei de novo e não tinha ninguém."],
+      ["Você", "Fica dentro de casa. Eu vou olhar."]
+    ],
+    () => {
+      f.brotherYardStage = 1;
+      updateHud();
+      save();
+    }
+  );
+
+  return true;
+}
+
+function v080InspectYardTrace() {
+  prepareSystems();
+
+  const f =
+    state.forgottenAlive;
+
+  if (f.brotherYardStage !== 1) {
+    return;
+  }
+
+  say(
+    [
+      "A terra perto do muro está remexida.",
+      "Há uma marca funda, como se alguma coisa pesada tivesse parado aqui por alguns segundos.",
+      "Preso numa farpa da madeira existe um fio escuro. Não parece tecido de nenhuma roupa da casa.",
+      "Isso não prova que meu irmão viu uma pessoa. Mas alguma coisa esteve aqui."
+    ],
+    () => {
+      f.brotherYardStage = 2;
+
+      v080CompleteFragment(
+        "brotherYard",
+        "Alguém no quintal"
+      );
+    }
+  );
+}
+
+function v080ReadMineNewspaper() {
+  prepareSystems();
+
+  const f =
+    state.forgottenAlive;
+
+  if (f.mineNewspaperSeen) {
+    say([
+      "O jornal está encharcado. Eu já anotei o que ainda dava para ler."
+    ]);
+    return;
+  }
+
+  say(
+    [
+      "É uma página velha de jornal, dobrada e presa no meio-fio.",
+      "A manchete ainda pode ser lida:",
+      "“DESABAMENTO NA MINA DE FORGOTTEN — buscas continuam após acidente.”",
+      "A data é de quase quarenta anos atrás.",
+      "O restante fala em turnos noturnos, galerias interditadas e famílias esperando notícias.",
+      "Não cita meus pais. Mas confirma que Raimundo não exagerou sobre o tamanho do acidente."
+    ],
+    () => {
+      f.mineNewspaperSeen = true;
+
+      v080CompleteFragment(
+        "mineNewspaper",
+        "Jornal da mina"
+      );
+    }
+  );
+}
+
+function v080TriggerWestPresence() {
+  prepareSystems();
+
+  const f =
+    state.forgottenAlive;
+
+  if (
+    !f.westPresenceArmed ||
+    f.westPresenceSeen
+  ) {
+    return;
+  }
+
+  f.westPresenceArmed = false;
+  f.westPresenceSeen = true;
+
+  v080WestPresenceY =
+    Math.max(
+      330,
+      Math.min(520, state.y)
+    );
+
+  v080WestPresenceUntil =
+    elapsed + 1.05;
+
+  v080WestStaticUntil =
+    elapsed + 1.35;
+
+  keys.clear();
+
+  v06Toast(
+    "A mesma presença escura aparece na direção da Rua Oeste — e some quando você olha direto.",
+    3
+  );
+
+  updateHud();
+  save();
+}
+
+// Capítulo 4 não depende mais de simplesmente esperar chegar ao Dia 6.
+// Saves antigos continuam válidos pelo resultado da função-base.
+const v080Chapter4UnlockedBase =
+  v0649Chapter4Unlocked;
+
+v0649Chapter4Unlocked = function() {
+  const legacy =
+    v080Chapter4UnlockedBase();
+
+  if (legacy) return true;
+
+  const f =
+    state?.forgottenAlive;
+
+  return Boolean(
+    state &&
+    state.stage !== "prologue" &&
+    state.storyFlags?.raimundoMet &&
+    state.storyFlags?.mineExteriorSeen &&
+    f?.westPresenceSeen
+  );
+};
+
+const v080ScheduleOutingBase =
+  v0645ScheduleOutingEvent;
+
+v0645ScheduleOutingEvent = function() {
+  v080ScheduleOutingBase();
+
+  if (!state) return;
+
+  prepareSystems();
+
+  // Durante os Fragmentos, ataques grandes não caem soltos por sorte.
+  // Presenças e atmosfera continuam possíveis; invasões/emboscadas
+  // voltam ao pool depois que a thread da Rua Oeste foi concluída.
+  if (
+    v080ForgottenAliveActive() &&
+    state.randomEventState?.pending &&
+    ["ambush", "invasion"].includes(
+      state.randomEventState.type
+    )
+  ) {
+    state.randomEventState.type =
+      Math.random() < 0.5
+        ? "voices"
+        : "blackout";
+  }
+};
+
+function v080AmbientCandidate() {
+  const f =
+    state.forgottenAlive;
+
+  const candidates =
+    V080_AMBIENT_TEXTURES.filter(item =>
+      !f.ambientRecent.includes(item.id)
+    );
+
+  const pool =
+    candidates.length
+      ? candidates
+      : V080_AMBIENT_TEXTURES;
+
+  return pool[
+    Math.floor(Math.random() * pool.length)
+  ];
+}
+
+function v080RegisterExplorationCell() {
+  if (
+    !v080ForgottenAliveActive() ||
+    !V080_OUTDOOR_ROOMS.includes(state.room)
+  ) {
+    return;
+  }
+
+  const f =
+    state.forgottenAlive;
+
+  const cell =
+    state.room +
+    ":" +
+    Math.floor(state.x / 240) +
+    ":" +
+    Math.floor(state.y / 240);
+
+  if (f.seenCells.includes(cell)) {
+    return;
+  }
+
+  f.seenCells.push(cell);
+  f.cellsSinceAmbient += 1;
+
+  // Protege o save de listas que cresçam para sempre.
+  if (f.seenCells.length > 80) {
+    f.seenCells =
+      f.seenCells.slice(-80);
+  }
+}
+
+function v080TryAmbientTexture() {
+  if (
+    !v080ForgottenAliveActive() ||
+    state.forgottenAlive.westPresenceArmed ||
+    dialog ||
+    transitionBusy ||
+    !$("overlay").hidden ||
+    dangerActive() ||
+    state.eventDirector?.hunter?.active
+  ) {
+    return;
+  }
+
+  const f =
+    state.forgottenAlive;
+
+  if (f.ambientSilence > 0) {
+    return;
+  }
+
+  // Antes das 03:00, Forgotten oferece mais textura.
+  // Depois das 03:00 o limiar sobe: ficar acordado pode render algo,
+  // mas dormir cedo não elimina Fragmentos.
+  const threshold =
+    state.minutes < 180
+      ? 4
+      : 6;
+
+  const maxPerNight =
+    state.minutes < 180
+      ? 2
+      : 1;
+
+  if (
+    f.cellsSinceAmbient < threshold ||
+    f.ambientCount >= maxPerNight
+  ) {
+    return;
+  }
+
+  const event =
+    v080AmbientCandidate();
+
+  if (!event) return;
+
+  f.cellsSinceAmbient = 0;
+  f.ambientCount += 1;
+  f.ambientSilence = 28;
+
+  f.ambientRecent.push(event.id);
+  f.ambientRecent =
+    f.ambientRecent.slice(-3);
+
+  v06Toast(
+    event.text,
+    2.7
+  );
+
+  save();
+}
+
+const v080GetNearBase = getNear;
+getNear = function() {
+  prepareSystems();
+
+  const f =
+    state?.forgottenAlive;
+
+  if (
+    f &&
+    state.room === "northRoad" &&
+    f.started &&
+    !f.mineNewspaperSeen &&
+    Math.hypot(
+      state.x - V080_NEWSPAPER_POS.x,
+      state.y - V080_NEWSPAPER_POS.y
+    ) < 46
+  ) {
+    return {
+      label: "Examinar o jornal molhado",
+      action: "v080MineNewspaper"
+    };
+  }
+
+  if (
+    f &&
+    state.room === "northRoad" &&
+    f.osmarStage >= 1 &&
+    Math.hypot(
+      state.x - V080_OSMAR_POS.x,
+      state.y - V080_OSMAR_POS.y
+    ) < 48
+  ) {
+    return {
+      label: f.completed.osmar
+        ? "Falar com Osmar"
+        : "Bater na casa de Osmar",
+      action: "v080Osmar"
+    };
+  }
+
+  if (
+    f &&
+    state.room === "village" &&
+    f.brotherYardStage === 1 &&
+    Math.hypot(
+      state.x - V080_YARD_TRACE_POS.x,
+      state.y - V080_YARD_TRACE_POS.y
+    ) < 48
+  ) {
+    return {
+      label: "Examinar o quintal",
+      action: "v080YardTrace"
+    };
+  }
+
+  return v080GetNearBase();
+};
+
+const v080InteractBase = interact;
+interact = function(action) {
+  prepareSystems();
+
+  if (action === "v080MineNewspaper") {
+    v080ReadMineNewspaper();
+    return;
+  }
+
+  if (action === "v080Osmar") {
+    v080TalkOsmar();
+    return;
+  }
+
+  if (action === "v080YardTrace") {
+    v080InspectYardTrace();
+    return;
+  }
+
+  if (
+    action === "marketClerk" &&
+    state.storyFlags?.raimundoMet &&
+    !state.forgottenAlive.westPresenceSeen
+  ) {
+    if (v080MarketDrift()) {
+      return;
+    }
+  }
+
+  if (
+    action === "vendor" &&
+    state.storyFlags?.raimundoMet &&
+    !state.forgottenAlive.westPresenceSeen
+  ) {
+    if (v080SeedOsmar()) {
+      return;
+    }
+  }
+
+  if (
+    action === "brother" &&
+    state.storyFlags?.raimundoMet &&
+    !state.forgottenAlive.westPresenceSeen
+  ) {
+    if (v080SeedBrotherYard()) {
+      return;
+    }
+  }
+
+  v080InteractBase(action);
+};
+
+const v080UpdateBase = update;
+update = function(dt) {
+  v080UpdateBase(dt);
+
+  if (
+    !state ||
+    mode !== "game" ||
+    dialog ||
+    transitionBusy ||
+    !$("overlay").hidden ||
+    state.gameOver ||
+    state.dawnCollapse?.active ||
+    state.wakeUp?.active
+  ) {
+    return;
+  }
+
+  prepareSystems();
+
+  const f =
+    state.forgottenAlive;
+
+  if (!f) return;
+
+  f.ambientSilence =
+    Math.max(
+      0,
+      f.ambientSilence - dt
+    );
+
+  if (v080ForgottenAliveActive()) {
+    v080RegisterExplorationCell();
+    v080TryAmbientTexture();
+
+    if (
+      f.westPresenceArmed &&
+      state.room === "village" &&
+      state.x <= 270
+    ) {
+      v080TriggerWestPresence();
+      return;
+    }
+  }
+};
+
+function v080DrawForgottenAliveWorld() {
+  const f =
+    state?.forgottenAlive;
+
+  if (!f) return;
+
+  if (
+    state.room === "northRoad" &&
+    f.osmarStage >= 1
+  ) {
+    c.save();
+    c.translate(
+      -Math.floor(camera.x),
+      -Math.floor(camera.y)
+    );
+
+    // Caixa de correio e pequena luz na casa de Osmar:
+    // orientação visual sem criar HUD/checklist.
+    rect(
+      576,
+      744,
+      7,
+      24,
+      "#4a4338"
+    );
+    rect(
+      570,
+      739,
+      20,
+      10,
+      "#6c6250"
+    );
+    rect(
+      618,
+      724,
+      10,
+      16,
+      v080OsmarHomeNow()
+        ? "#b69a63"
+        : "#3c3933"
+    );
+
+    c.restore();
+  }
+
+  if (
+    state.room === "village" &&
+    f.brotherYardStage === 1
+  ) {
+    c.save();
+    c.translate(
+      -Math.floor(camera.x),
+      -Math.floor(camera.y)
+    );
+
+    // Marca discreta no solo, visível apenas após o relato do irmão.
+    rect(
+      V080_YARD_TRACE_POS.x - 8,
+      V080_YARD_TRACE_POS.y - 3,
+      17,
+      5,
+      "#342f2a"
+    );
+    rect(
+      V080_YARD_TRACE_POS.x + 4,
+      V080_YARD_TRACE_POS.y - 6,
+      5,
+      3,
+      "#151719"
+    );
+
+    c.restore();
+  }
+
+  if (
+    state.room === "village" &&
+    elapsed < v080WestPresenceUntil
+  ) {
+    c.save();
+    c.translate(
+      -Math.floor(camera.x),
+      -Math.floor(camera.y)
+    );
+
+    const x = 125;
+    const y = v080WestPresenceY;
+    const jitter =
+      Math.sin(elapsed * 48) * 2;
+
+    rect(
+      x - 14 + jitter,
+      y - 32,
+      27,
+      19,
+      "#020303"
+    );
+    rect(
+      x - 21,
+      y - 15,
+      42,
+      13,
+      "#010202"
+    );
+    rect(
+      x - 15,
+      y - 3,
+      8,
+      17,
+      "#010202"
+    );
+    rect(
+      x + 7,
+      y - 4,
+      8,
+      18,
+      "#010202"
+    );
+
+    c.restore();
+  }
+
+  if (elapsed < v080WestStaticUntil) {
+    const strength =
+      Math.min(
+        1,
+        Math.max(
+          v080WestStaticUntil - elapsed,
+          0
+        ) / 0.9
+      );
+
+    for (let i = 0; i < 30; i++) {
+      const y =
+        (
+          i * 19 +
+          Math.floor(elapsed * 720)
+        ) % H;
+
+      rect(
+        -5,
+        y,
+        W + 10,
+        1 + (i % 4 === 0 ? 2 : 0),
+        "rgba(224,228,220," +
+          (0.04 + strength * 0.14) +
+          ")"
+      );
+    }
+  }
+}
+
+const v080DrawBase = drawWorld;
+drawWorld = function() {
+  v080DrawBase();
+  v080DrawForgottenAliveWorld();
+};
+
+const v080HudBase = updateHud;
+updateHud = function() {
+  v080HudBase();
+
+  if (
+    !state ||
+    state.stage === "prologue"
+  ) {
+    return;
+  }
+
+  prepareSystems();
+
+  const f =
+    state.forgottenAlive;
+
+  if (
+    !f?.started ||
+    f.westPresenceSeen ||
+    state.storyFlags?.chapter4Complete
+  ) {
+    return;
+  }
+
+  // Primeiro fecha o que Raimundo acabou de apresentar.
+  if (!state.storyFlags?.mineExteriorSeen) {
+    $("objective").textContent =
+      "Antes de voltar para a cidade, examine a entrada da antiga mina perto da estrada de Raimundo.";
+    return;
+  }
+
+  if (f.brotherYardStage === 1) {
+    $("objective").textContent =
+      "Seu irmão viu alguma coisa no quintal. Examine a área perto do muro.";
+    return;
+  }
+
+  if (
+    state.room === "northRoad" &&
+    f.osmarStage === 1 &&
+    !f.completed.osmar
+  ) {
+    $("objective").textContent =
+      "Florinda disse que Osmar mora nesta rua. Procure a casa com a caixa de correio velha.";
+    return;
+  }
+
+  const count =
+    v080FragmentCount();
+
+  if (count === 0) {
+    $("objective").textContent =
+      "Continue investigando Forgotten. Volte a conversar com pessoas e observe as ruas.";
+    return;
+  }
+
+  if (count === 1) {
+    $("objective").textContent =
+      "Uma nova informação não combina com o que você já sabia. Continue explorando Forgotten.";
+    return;
+  }
+
+  if (count === 2) {
+    $("objective").textContent =
+      "As histórias estão começando a se cruzar. Procure mais uma informação antes de seguir adiante.";
+    return;
+  }
+
+  if (f.westPresenceArmed) {
+    $("objective").textContent =
+      "As novas informações apontam para o lado oeste da cidade. Vá até a saída oeste do bairro.";
+  }
+};
+
+// Comando de teste focado na nova camada sem alterar a progressão normal.
+const v080DevCommandBase =
+  v0645RunDevCommand;
+
+v0645RunDevCommand = function(raw) {
+  const command =
+    String(raw || "")
+      .trim()
+      .toLowerCase();
+
+  if (command === "forgotten" || command === "viva") {
+    prepareSystems();
+
+    state.stage = "free";
+    state.day = Math.max(
+      3,
+      state.day || 3
+    );
+
+    state.finished = true;
+    state.storyFlags.marketParentsConfirmed = true;
+    state.squareManFirstSpeechDone = true;
+    state.storyFlags.squareObserverSeen = true;
+    state.storyFlags.squareObserverReported = true;
+    state.storyFlags.raimundoMet = true;
+    state.storyFlags.mineExteriorSeen = true;
+    state.storyFlags.observerFirstSeen = true;
+
+    state.forgottenAlive.started = true;
+    state.forgottenAlive.startedDay = state.day;
+    state.forgottenAlive.westPresenceArmed = false;
+    state.forgottenAlive.westPresenceSeen = false;
+    state.forgottenAlive.completed.marketDrift = false;
+    state.forgottenAlive.completed.osmar = false;
+    state.forgottenAlive.completed.brotherYard = false;
+    state.forgottenAlive.completed.mineNewspaper = false;
+    state.forgottenAlive.marketDriftStage = 0;
+    state.forgottenAlive.osmarStage = 0;
+    state.forgottenAlive.brotherYardStage = 0;
+    state.forgottenAlive.mineNewspaperSeen = false;
+
+    state.room = "village";
+    state.x = 650;
+    state.y = 760;
+    state.facing = "up";
+    state.walk = 0;
+
+    keys.clear();
+    near = null;
+
+    updateHud();
+    save();
+
+    v06Toast(
+      "TESTE: Forgotten Viva · pós-Raimundo",
+      2.4
+    );
+
+    return;
+  }
+
+  v080DevCommandBase(raw);
+};
+
+$("version").textContent = "PROTÓTIPO · 0.8.0";
   
   requestAnimationFrame(frame);
   showBootSplash();
