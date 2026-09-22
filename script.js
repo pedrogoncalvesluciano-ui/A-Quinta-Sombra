@@ -4316,7 +4316,7 @@ function chapterObjective() {
 
     clues:
       "Investigue o quarto dos pais: " +
-      q.clues.length + "/3 pistas. J: diário.",
+      q.clues.length + "/3 pistas. C: celular.",
 
     chest:
       "Abra o segundo baú no sótão. " +
@@ -4327,7 +4327,7 @@ function chapterObjective() {
 
     done:
       "Registro salvo. O caminho oeste será a próxima " +
-      "investigação. J: diário."
+      "investigação. C: celular."
   }[q.phase];
 }
 
@@ -4540,7 +4540,7 @@ function enlargeClue(id) {
     "",
     [
       [
-        "Voltar ao diário",
+        "Voltar ao celular",
         () => renderJournalView(id)
       ],
       ["Fechar", closeModal]
@@ -11866,7 +11866,7 @@ updateHud = function() {
       $("objective").textContent =
         "Compare relatos e registros em Forgotten: " +
         count +
-        "/3 contradições. J: diário.";
+        "/3 contradições. C: celular.";
     } else {
       $("objective").textContent =
         "Converse com seu irmão sobre o que você registrou.";
@@ -12018,7 +12018,7 @@ function v0650ReadFatherNotebook() {
     () => {
       state.chapter6.notebookRead = true;
       v0650EnsureInvestigationLog().keyClues.fatherNotebook = true;
-      v06Toast("Caderno do pai registrado no diário.", 2.2);
+      v06Toast("Caderno do pai salvo nas notas do celular.", 2.2);
       v0650TryCompleteChapter6();
       updateHud();
       save();
@@ -16323,7 +16323,7 @@ window.addEventListener(
 
 $("help").onclick = () => modal(
   "Como jogar",
-  "WASD / setas: andar. Shift/F: correr. E: interagir. I: inventário. J: diário. L: ligar/desligar a lanterna. Esc: pausar. ESPAÇO: soco apenas contra ameaças físicas compatíveis.\n\nAs contradições importantes ficam registradas sem mostrar pontuação de final. Cuidar do seu irmão, conferir pistas físicas e não aceitar memórias fáceis altera o que Estevão consegue defender no clímax.\n\nA partir da descida para a mina, o relógio para: o confronto final não é interrompido pelas 07:00.",
+  "WASD / setas: andar. Shift/F: correr. E: interagir. I: inventário. C: celular. L: ligar/desligar a lanterna. Esc: pausar. ESPAÇO: soco apenas contra ameaças físicas compatíveis.\n\nAs contradições importantes ficam registradas sem mostrar pontuação de final. Cuidar do seu irmão, conferir pistas físicas e não aceitar memórias fáceis altera o que Estevão consegue defender no clímax.\n\nA partir da descida para a mina, o relógio para: o confronto final não é interrompido pelas 07:00.",
   [["Voltar", closeModal]]
 );
 
@@ -17087,7 +17087,7 @@ updateHud = function() {
 // Ajuda atualizada: a primeira noite é mais curta e não pula etapas.
 $("help").onclick = () => modal(
   "Como jogar",
-  "WASD / setas: andar. Shift/F: correr. E: interagir. I: inventário. J: diário. L: ligar/desligar a lanterna. Esc: pausar. ESPAÇO: soco apenas contra ameaças físicas compatíveis.\n\nNa primeira noite, cada hora do jogo leva 30 segundos reais. Depois das três pistas, fale com seu irmão, pegue a chave reserva, saia de casa, converse com Florinda e registre o desaparecimento na delegacia. A primeira saída ainda pode mostrar a van à distância.\n\nNas noites seguintes, o ritmo volta para 1 hora do jogo por 1 minuto real. Às 07:00, Estevão perde os sentidos.",
+  "WASD / setas: andar. Shift/F: correr. E: interagir. I: inventário. C: celular. L: ligar/desligar a lanterna. Esc: pausar. ESPAÇO: soco apenas contra ameaças físicas compatíveis.\n\nNa primeira noite, cada hora do jogo leva 30 segundos reais. Depois das três pistas, fale com seu irmão, pegue a chave reserva, saia de casa, converse com Florinda e registre o desaparecimento na delegacia. A primeira saída ainda pode mostrar a van à distância.\n\nNas noites seguintes, o ritmo volta para 1 hora do jogo por 1 minuto real. Às 07:00, Estevão perde os sentidos.",
   [["Voltar", closeModal]]
 );
 
@@ -17217,10 +17217,6 @@ function v076DrawNorthRoad() {
     rect(x - 4, y - 3, 12, 5, "#4d5350");
     rect(x - 2, y - 1, 8, 3, "#d2b777");
   }
-
-  // Papel velho no meio-fio: detalhe ambiental, não é pista ainda.
-  rect(318, 825, 14, 9, "#c3bca9");
-  rect(321, 823, 9, 3, "#ded8c7");
 
   for (const o of m.objects) {
     building(o);
@@ -20494,6 +20490,10 @@ v0645RunDevCommand = function(raw) {
     state.forgottenAlive.completed.osmar = false;
     state.forgottenAlive.completed.brotherYard = false;
     state.forgottenAlive.completed.mineNewspaper = false;
+    state.forgottenAlive.completed.mineArchive = false;
+    if (state.phone) {
+      state.phone.mineArchiveRead = false;
+    }
     state.forgottenAlive.marketDriftStage = 0;
     state.forgottenAlive.osmarStage = 0;
     state.forgottenAlive.brotherYardStage = 0;
@@ -20522,7 +20522,1788 @@ v0645RunDevCommand = function(raw) {
   v080DevCommandBase(raw);
 };
 
-$("version").textContent = "PROTÓTIPO · 0.8.0";
+// =========================================================
+// 0.8.1 — CELULAR TIJOLÃO
+// NOTAS + MENSAGENS + INTERNET RESIDENCIAL + COBRINHA
+// =========================================================
+
+const V081_CONNECTED_ROOMS = new Set([
+  "bedroom",
+  "brother",
+  "parents",
+  "hall",
+  "foyer",
+  "kitchen",
+  "living",
+  "attic",
+  "basement",
+  "shop"
+]);
+
+const V081_BROTHER_SCENES = {
+  checkIn: {
+    incoming:
+      "Você vai demorar? Tá tudo quieto aqui, mas eu não gosto quando você some sem falar nada.",
+    options: [
+      {
+        text: "Fica no quarto. Eu volto assim que terminar de olhar umas coisas.",
+        reply: "Tá. Só me avisa quando estiver voltando.",
+        care: 1,
+        trust: 1
+      },
+      {
+        text: "Se acontecer qualquer coisa, me manda mensagem na hora.",
+        reply: "Eu mando. E você responde, tá?",
+        care: 1,
+        trust: 0
+      },
+      {
+        text: "Tô ocupado. Para de se preocupar com tudo.",
+        reply: "...Tá bom.",
+        care: 0,
+        trust: -1,
+        neglect: 1
+      }
+    ]
+  },
+
+  yard: {
+    incoming:
+      "Acho que vi alguém no quintal. Foi rápido. Tinha uma coisa escura perto do muro.",
+    options: [
+      {
+        text: "Não sai do quarto. Eu vou conferir quando voltar.",
+        reply: "Tá. Eu tranquei a porta.",
+        care: 1,
+        trust: 1,
+        yard: true
+      },
+      {
+        text: "Olha pela janela só de longe. Não chega perto.",
+        reply: "Eu olhei de novo e não vi mais nada. Vou ficar aqui.",
+        care: 0,
+        trust: 1,
+        yard: true
+      },
+      {
+        text: "Pode ter sido sombra. Mesmo assim, fica dentro de casa.",
+        reply: "Eu sei o que eu vi... mas tá. Eu não vou sair.",
+        care: 0,
+        trust: -1,
+        yard: true
+      }
+    ]
+  },
+
+  afterWest: {
+    incoming:
+      "Você tá bem? As luzes aqui piscaram e eu fiquei com a sensação de que tinha alguém olhando a casa.",
+    options: [
+      {
+        text: "Tô bem. Se eu demorar, não abre a porta pra ninguém.",
+        reply: "Nem se parecer com a mãe ou o pai?",
+        care: 1,
+        trust: 1
+      },
+      {
+        text: "Continua no quarto. Eu achei uma coisa estranha do lado oeste.",
+        reply: "Eu sabia que não era só coisa da minha cabeça.",
+        care: 0,
+        trust: 1
+      },
+      {
+        text: "Não pensa nisso agora. Eu explico quando voltar.",
+        reply: "Você sempre fala isso quando não quer me contar alguma coisa.",
+        care: 0,
+        trust: -1
+      }
+    ]
+  }
+};
+
+let v081Snake = {
+  active: false,
+  timer: null,
+  canvas: null,
+  ctx: null,
+  snake: [],
+  food: { x: 12, y: 8 },
+  dir: { x: 1, y: 0 },
+  nextDir: { x: 1, y: 0 },
+  score: 0,
+  gameOver: false
+};
+
+function v081EnsurePhone() {
+  if (!state) return;
+
+  if (!state.phone || typeof state.phone !== "object") {
+    state.phone = {};
+  }
+
+  const p =
+    state.phone;
+
+  if (!Array.isArray(p.pendingBrotherScenes)) {
+    p.pendingBrotherScenes = [];
+  }
+
+  if (!Array.isArray(p.resolvedBrotherScenes)) {
+    p.resolvedBrotherScenes = [];
+  }
+
+  if (!Array.isArray(p.brotherLog)) {
+    p.brotherLog = [];
+  }
+
+  if (typeof p.activeBrotherScene !== "string") {
+    p.activeBrotherScene = "";
+  }
+
+  if (!Number.isFinite(p.unreadBrother)) {
+    p.unreadBrother = 0;
+  }
+
+  if (!Number.isFinite(p.parentAttempts)) {
+    p.parentAttempts = 0;
+  }
+
+  if (!Number.isFinite(p.snakeHighScore)) {
+    p.snakeHighScore = 0;
+  }
+
+  if (typeof p.mineArchiveRead !== "boolean") {
+    p.mineArchiveRead = false;
+  }
+
+  if (typeof p.notificationShownFor !== "string") {
+    p.notificationShownFor = "";
+  }
+
+  if (!state.forgottenAlive || typeof state.forgottenAlive !== "object") {
+    return;
+  }
+
+  const f =
+    state.forgottenAlive;
+
+  if (!f.completed || typeof f.completed !== "object") {
+    f.completed = {};
+  }
+
+  // Migração: quem encontrou o jornal antigo na 0.8.0 recebe a mesma
+  // informação como arquivo digital já salvo no celular.
+  const legacyMineClue =
+    Boolean(
+      f.completed.mineNewspaper ||
+      f.mineNewspaperSeen
+    );
+
+  if (typeof f.completed.mineArchive !== "boolean") {
+    f.completed.mineArchive =
+      legacyMineClue;
+  }
+
+  if (legacyMineClue) {
+    p.mineArchiveRead = true;
+  }
+
+  // O objeto antigo deixa de existir como interação no chão.
+  f.mineNewspaperSeen = true;
+}
+
+const v081PrepareBase =
+  prepareSystems;
+
+prepareSystems = function() {
+  v081PrepareBase();
+  v081EnsurePhone();
+};
+
+// A pista da mina continua sendo um dos quatro Fragmentos possíveis,
+// mas agora vem de um arquivo digital, não de um jornal abandonado.
+v080FragmentCount = function() {
+  const completed =
+    state?.forgottenAlive?.completed || {};
+
+  return [
+    completed.marketDrift,
+    completed.osmar,
+    completed.brotherYard,
+    completed.mineArchive
+  ].filter(Boolean).length;
+};
+
+function v081HasInternet() {
+  return Boolean(
+    state &&
+    V081_CONNECTED_ROOMS.has(state.room)
+  );
+}
+
+function v081PhoneCanOpen() {
+  if (
+    !state ||
+    mode !== "game" ||
+    state.stage === "prologue" ||
+    state.gameOver ||
+    dialog ||
+    transitionBusy ||
+    !$("overlay").hidden ||
+    state.dawnCollapse?.active ||
+    state.wakeUp?.active
+  ) {
+    return false;
+  }
+
+  if (
+    dangerActive() ||
+    state.eventDirector?.hunter?.active ||
+    state.eventDirector?.follower?.active ||
+    state.copyFather?.phase === "chase"
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+function v081SignalLabel() {
+  return v081HasInternet()
+    ? "REDE ███"
+    : "SEM REDE";
+}
+
+function v081PhoneTime() {
+  const minutes =
+    Math.max(
+      0,
+      Math.floor(state?.minutes || 0)
+    );
+
+  const h =
+    Math.floor(minutes / 60) % 24;
+
+  const m =
+    minutes % 60;
+
+  return (
+    String(h).padStart(2, "0") +
+    ":" +
+    String(m).padStart(2, "0")
+  );
+}
+
+function v081PhoneElement(tag, className, text) {
+  const element =
+    document.createElement(tag);
+
+  if (className) {
+    element.className =
+      className;
+  }
+
+  if (text !== undefined) {
+    element.textContent =
+      text;
+  }
+
+  return element;
+}
+
+function v081ResetPhoneChrome() {
+  const label =
+    $("modalLabel");
+
+  if (label) {
+    label.textContent =
+      "A QUINTA SOMBRA";
+  }
+
+  const overlay =
+    $("overlay");
+
+  if (overlay) {
+    overlay.className = "";
+  }
+
+  const card =
+    overlay?.querySelector(".card");
+
+  if (card) {
+    card.className =
+      "card";
+  }
+}
+
+function v081StopSnake() {
+  if (v081Snake.timer) {
+    clearInterval(
+      v081Snake.timer
+    );
+  }
+
+  v081Snake.timer = null;
+  v081Snake.active = false;
+  v081Snake.canvas = null;
+  v081Snake.ctx = null;
+}
+
+const v081CloseModalBase =
+  closeModal;
+
+closeModal = function() {
+  v081StopSnake();
+  v081ResetPhoneChrome();
+  v081CloseModalBase();
+};
+
+function v081PhoneModal(title, buildScreen, options = {}) {
+  v081StopSnake();
+
+  modal(
+    "",
+    "",
+    []
+  );
+
+  $("modalLabel").textContent =
+    "LANCASTER M-91";
+
+  $("overlay").className =
+    "phone-overlay";
+
+  const card =
+    $("overlay").querySelector(".card");
+
+  card.className =
+    "card phone-shell";
+
+  $("modalTitle").textContent =
+    title || "";
+
+  const root =
+    $("modalText");
+
+  root.replaceChildren();
+
+  const speaker =
+    v081PhoneElement(
+      "div",
+      "phone-speaker",
+      ""
+    );
+
+  const status =
+    v081PhoneElement(
+      "div",
+      "phone-status"
+    );
+
+  const statusLeft =
+    v081PhoneElement(
+      "span",
+      v081HasInternet()
+        ? "phone-online"
+        : "phone-offline",
+      v081SignalLabel()
+    );
+
+  const statusRight =
+    v081PhoneElement(
+      "span",
+      "",
+      "DIA " +
+        Math.max(1, state.day || 1) +
+        " · " +
+        v081PhoneTime()
+    );
+
+  status.append(
+    statusLeft,
+    statusRight
+  );
+
+  const screen =
+    v081PhoneElement(
+      "div",
+      "phone-screen"
+    );
+
+  screen.append(status);
+
+  buildScreen(screen);
+
+  root.append(
+    speaker,
+    screen
+  );
+
+  const actions =
+    $("modalActions");
+
+  actions.replaceChildren();
+
+  if (options.back) {
+    const back =
+      document.createElement("button");
+
+    back.textContent =
+      "VOLTAR";
+
+    back.onclick =
+      options.back;
+
+    actions.append(back);
+  }
+
+  const close =
+    document.createElement("button");
+
+  close.textContent =
+    "FECHAR";
+
+  close.onclick =
+    closeModal;
+
+  actions.append(close);
+}
+
+function v081AppButton(label, sub, action, badge = "") {
+  const button =
+    document.createElement("button");
+
+  button.className =
+    "phone-app";
+
+  const name =
+    v081PhoneElement(
+      "strong",
+      "",
+      label
+    );
+
+  const detail =
+    v081PhoneElement(
+      "span",
+      "",
+      sub
+    );
+
+  button.append(
+    name,
+    detail
+  );
+
+  if (badge) {
+    const bubble =
+      v081PhoneElement(
+        "em",
+        "phone-badge",
+        badge
+      );
+
+    button.append(bubble);
+  }
+
+  button.onclick =
+    action;
+
+  return button;
+}
+
+function v081OpenPhoneHome() {
+  if (
+    !$("overlay").hidden &&
+    !$("overlay").classList.contains("phone-overlay")
+  ) {
+    return;
+  }
+
+  prepareSystems();
+
+  v081PhoneModal(
+    "CELULAR",
+    screen => {
+      const welcome =
+        v081PhoneElement(
+          "div",
+          "phone-home-title"
+        );
+
+      welcome.innerHTML =
+        "<strong>M-91</strong><span>memória 12 MB</span>";
+
+      const grid =
+        v081PhoneElement(
+          "div",
+          "phone-app-grid"
+        );
+
+      const unread =
+        state.phone.unreadBrother > 0
+          ? String(state.phone.unreadBrother)
+          : "";
+
+      grid.append(
+        v081AppButton(
+          "MENSAGENS",
+          v081HasInternet()
+            ? "conectado"
+            : "sem rede",
+          v081OpenMessages,
+          unread
+        ),
+        v081AppButton(
+          "NOTAS",
+          "investigação",
+          v081OpenNotes
+        ),
+        v081AppButton(
+          "INTERNET",
+          v081HasInternet()
+            ? "rede local"
+            : "offline",
+          v081OpenInternet
+        ),
+        v081AppButton(
+          "COBRINHA",
+          "jogo",
+          v081OpenSnake
+        )
+      );
+
+      const hint =
+        v081PhoneElement(
+          "p",
+          "phone-small",
+          "C fecha/abre o aparelho · aplicativos offline continuam funcionando sem rede."
+        );
+
+      screen.append(
+        welcome,
+        grid,
+        hint
+      );
+    }
+  );
+}
+
+function v081AppendNoteSection(screen, title, rows) {
+  const section =
+    v081PhoneElement(
+      "section",
+      "phone-note-section"
+    );
+
+  section.append(
+    v081PhoneElement(
+      "strong",
+      "phone-section-title",
+      title
+    )
+  );
+
+  if (!rows.length) {
+    section.append(
+      v081PhoneElement(
+        "p",
+        "phone-empty",
+        "Nenhum registro."
+      )
+    );
+  } else {
+    for (const rowText of rows) {
+      section.append(
+        v081PhoneElement(
+          "p",
+          "phone-note-row",
+          "• " + rowText
+        )
+      );
+    }
+  }
+
+  screen.append(section);
+}
+
+function v081OpenNotes() {
+  prepareSystems();
+
+  v081PhoneModal(
+    "NOTAS",
+    screen => {
+      const q =
+        chapter();
+
+      const clues = [];
+
+      for (const id of q?.clues || []) {
+        if (!["list", "photo", "note"].includes(id)) {
+          continue;
+        }
+
+        clues.push(
+          v0645ClueName(id) +
+          " — " +
+          clueText[id]
+        );
+      }
+
+      const log =
+        typeof v0650EnsureInvestigationLog === "function"
+          ? v0650EnsureInvestigationLog()
+          : { contradictions: [] };
+
+      const contradictions =
+        (log.contradictions || []).map(id =>
+          V0650_CONTRADICTION_LABELS?.[id] ||
+          id
+        );
+
+      const fragments = [];
+      const f =
+        state.forgottenAlive;
+
+      if (f?.completed?.marketDrift) {
+        fragments.push(
+          "O funcionário do mercado mudou a própria lembrança sobre a saída dos meus pais."
+        );
+      }
+
+      if (f?.completed?.osmar) {
+        fragments.push(
+          "Osmar viu um casal parecido com meus pais entrando no mercado, mas não viu quando saíram."
+        );
+      }
+
+      if (f?.completed?.brotherYard) {
+        fragments.push(
+          "Meu irmão viu algo no quintal. Encontrei uma marca funda no solo e um fio escuro preso no muro."
+        );
+      }
+
+      if (f?.completed?.mineArchive) {
+        fragments.push(
+          "Um arquivo digitalizado confirma um grande desabamento na mina de Forgotten há quase quarenta anos."
+        );
+      }
+
+      if (f?.westPresenceSeen) {
+        fragments.push(
+          "Uma presença escura apareceu na direção da Rua Oeste e desapareceu quando tentei olhar diretamente."
+        );
+      }
+
+      v081AppendNoteSection(
+        screen,
+        "PISTAS",
+        clues
+      );
+
+      v081AppendNoteSection(
+        screen,
+        "CONTRADIÇÕES",
+        contradictions
+      );
+
+      v081AppendNoteSection(
+        screen,
+        "FORGOTTEN",
+        fragments
+      );
+    },
+    {
+      back: v081OpenPhoneHome
+    }
+  );
+}
+
+function v081QueueBrotherScene(id) {
+  prepareSystems();
+
+  const p =
+    state.phone;
+
+  if (
+    !V081_BROTHER_SCENES[id] ||
+    p.resolvedBrotherScenes.includes(id) ||
+    p.pendingBrotherScenes.includes(id) ||
+    p.activeBrotherScene === id
+  ) {
+    return false;
+  }
+
+  p.pendingBrotherScenes.push(id);
+  save();
+
+  return true;
+}
+
+function v081DeliverBrotherScene() {
+  prepareSystems();
+
+  if (
+    !v081HasInternet() ||
+    state.phone.activeBrotherScene ||
+    !state.phone.pendingBrotherScenes.length
+  ) {
+    return false;
+  }
+
+  const id =
+    state.phone.pendingBrotherScenes.shift();
+
+  const scene =
+    V081_BROTHER_SCENES[id];
+
+  if (!scene) {
+    return false;
+  }
+
+  state.phone.activeBrotherScene =
+    id;
+
+  state.phone.unreadBrother += 1;
+
+  state.phone.brotherLog.push({
+    from: "brother",
+    text: scene.incoming
+  });
+
+  if (
+    state.phone.notificationShownFor !== id
+  ) {
+    state.phone.notificationShownFor =
+      id;
+
+    v06Toast(
+      "Você tem uma nova mensagem.",
+      2.6
+    );
+  }
+
+  save();
+
+  return true;
+}
+
+function v081ApplyBrotherReply(sceneId, optionIndex) {
+  prepareSystems();
+
+  const scene =
+    V081_BROTHER_SCENES[sceneId];
+
+  const option =
+    scene?.options?.[optionIndex];
+
+  if (
+    !scene ||
+    !option ||
+    state.phone.activeBrotherScene !== sceneId
+  ) {
+    return;
+  }
+
+  state.phone.brotherLog.push({
+    from: "you",
+    text: option.text
+  });
+
+  state.phone.brotherLog.push({
+    from: "brother",
+    text: option.reply
+  });
+
+  state.phone.resolvedBrotherScenes.push(
+    sceneId
+  );
+
+  state.phone.activeBrotherScene = "";
+  state.phone.unreadBrother = 0;
+
+  if (
+    state.relationship &&
+    typeof state.relationship === "object"
+  ) {
+    state.relationship.brotherCare +=
+      option.care || 0;
+
+    state.relationship.brotherTrust +=
+      option.trust || 0;
+
+    state.relationship.brotherNeglect +=
+      option.neglect || 0;
+  }
+
+  if (
+    option.yard &&
+    state.forgottenAlive &&
+    state.forgottenAlive.brotherYardStage === 0
+  ) {
+    state.forgottenAlive.brotherYardStage = 1;
+
+    updateHud();
+  }
+
+  save();
+
+  v081OpenBrotherThread();
+}
+
+function v081RenderMessageBubble(container, message) {
+  const bubble =
+    v081PhoneElement(
+      "div",
+      "phone-message " +
+        (
+          message.from === "you"
+            ? "phone-message-you"
+            : "phone-message-brother"
+        ),
+      message.text
+    );
+
+  container.append(bubble);
+}
+
+function v081OpenMessages() {
+  prepareSystems();
+
+  v081PhoneModal(
+    "MENSAGENS",
+    screen => {
+      const info =
+        v081PhoneElement(
+          "p",
+          v081HasInternet()
+            ? "phone-online-text"
+            : "phone-offline-text",
+          v081HasInternet()
+            ? "Rede disponível nesta residência."
+            : "Sem conexão. Mensagens novas chegam quando você entra em uma residência."
+        );
+
+      const list =
+        v081PhoneElement(
+          "div",
+          "phone-contact-list"
+        );
+
+      const brother =
+        document.createElement("button");
+
+      brother.className =
+        "phone-contact";
+
+      brother.innerHTML =
+        "<strong>IRMÃO</strong><span>" +
+        (
+          state.phone.unreadBrother > 0
+            ? state.phone.unreadBrother + " nova"
+            : "conversa"
+        ) +
+        "</span>";
+
+      brother.onclick =
+        v081OpenBrotherThread;
+
+      const parents =
+        document.createElement("button");
+
+      parents.className =
+        "phone-contact phone-contact-offline";
+
+      parents.innerHTML =
+        "<strong>PAIS</strong><span>SEM SINAL</span>";
+
+      parents.onclick =
+        v081OpenParentsThread;
+
+      list.append(
+        brother,
+        parents
+      );
+
+      screen.append(
+        info,
+        list
+      );
+    },
+    {
+      back: v081OpenPhoneHome
+    }
+  );
+}
+
+function v081OpenBrotherThread() {
+  prepareSystems();
+
+  if (!v081HasInternet()) {
+    v081PhoneModal(
+      "IRMÃO",
+      screen => {
+        screen.append(
+          v081PhoneElement(
+            "div",
+            "phone-no-signal",
+            "SEM CONEXÃO\n\nEste contato volta a funcionar quando você entra em uma residência."
+          )
+        );
+      },
+      {
+        back: v081OpenMessages
+      }
+    );
+
+    return;
+  }
+
+  state.phone.unreadBrother = 0;
+
+  const sceneId =
+    state.phone.activeBrotherScene;
+
+  const scene =
+    V081_BROTHER_SCENES[sceneId];
+
+  v081PhoneModal(
+    "IRMÃO",
+    screen => {
+      const thread =
+        v081PhoneElement(
+          "div",
+          "phone-thread"
+        );
+
+      const log =
+        state.phone.brotherLog.slice(-12);
+
+      if (!log.length) {
+        thread.append(
+          v081PhoneElement(
+            "p",
+            "phone-empty",
+            "Nenhuma mensagem ainda."
+          )
+        );
+      } else {
+        for (const message of log) {
+          v081RenderMessageBubble(
+            thread,
+            message
+          );
+        }
+      }
+
+      screen.append(thread);
+
+      if (scene) {
+        const choices =
+          v081PhoneElement(
+            "div",
+            "phone-reply-list"
+          );
+
+        for (
+          let i = 0;
+          i < scene.options.length;
+          i++
+        ) {
+          const option =
+            scene.options[i];
+
+          const button =
+            document.createElement("button");
+
+          button.className =
+            "phone-reply";
+
+          button.textContent =
+            option.text;
+
+          button.onclick =
+            () =>
+              v081ApplyBrotherReply(
+                sceneId,
+                i
+              );
+
+          choices.append(button);
+        }
+
+        screen.append(choices);
+      }
+    },
+    {
+      back: v081OpenMessages
+    }
+  );
+
+  save();
+}
+
+function v081ParentAttempt(text) {
+  prepareSystems();
+
+  state.phone.parentAttempts += 1;
+
+  state.phone.lastParentDraft =
+    text;
+
+  save();
+
+  v081OpenParentsThread();
+}
+
+function v081OpenParentsThread() {
+  prepareSystems();
+
+  v081PhoneModal(
+    "PAIS",
+    screen => {
+      const noSignal =
+        v081PhoneElement(
+          "div",
+          "phone-no-signal",
+          "SEM SINAL\n\nNão foi possível estabelecer conexão com este contato."
+        );
+
+      screen.append(noSignal);
+
+      if (state.phone.lastParentDraft) {
+        const failed =
+          v081PhoneElement(
+            "div",
+            "phone-failed-message"
+          );
+
+        failed.append(
+          v081PhoneElement(
+            "span",
+            "",
+            state.phone.lastParentDraft
+          ),
+          v081PhoneElement(
+            "strong",
+            "",
+            "FALHA AO ENVIAR"
+          )
+        );
+
+        screen.append(failed);
+      }
+
+      const attempts =
+        v081PhoneElement(
+          "div",
+          "phone-reply-list"
+        );
+
+      for (const draft of [
+        "Onde vocês estão?",
+        "Eu e meu irmão estamos em casa. Respondam.",
+        "Por favor. Só manda qualquer coisa."
+      ]) {
+        const button =
+          document.createElement("button");
+
+        button.className =
+          "phone-reply";
+
+        button.textContent =
+          draft;
+
+        button.onclick =
+          () =>
+            v081ParentAttempt(draft);
+
+        attempts.append(button);
+      }
+
+      screen.append(attempts);
+    },
+    {
+      back: v081OpenMessages
+    }
+  );
+}
+
+function v081OpenInternet() {
+  prepareSystems();
+
+  if (!v081HasInternet()) {
+    v081PhoneModal(
+      "INTERNET",
+      screen => {
+        screen.append(
+          v081PhoneElement(
+            "div",
+            "phone-no-signal",
+            "SEM CONEXÃO\n\nA rede só funciona dentro de casa ou de outras residências."
+          )
+        );
+      },
+      {
+        back: v081OpenPhoneHome
+      }
+    );
+
+    return;
+  }
+
+  v081PhoneModal(
+    "INTERNET",
+    screen => {
+      const title =
+        v081PhoneElement(
+          "div",
+          "phone-browser-title",
+          "PORTAL DE FORGOTTEN"
+        );
+
+      const list =
+        v081PhoneElement(
+          "div",
+          "phone-browser-list"
+        );
+
+      if (
+        state.storyFlags?.raimundoMet
+      ) {
+        const archive =
+          document.createElement("button");
+
+        archive.className =
+          "phone-browser-result";
+
+        archive.innerHTML =
+          "<strong>Arquivo Municipal</strong>" +
+          "<span>Acidente na antiga mina · documento digitalizado</span>";
+
+        archive.onclick =
+          v081OpenMineArchive;
+
+        list.append(archive);
+      } else {
+        list.append(
+          v081PhoneElement(
+            "p",
+            "phone-empty",
+            "Nenhuma pesquisa importante salva."
+          )
+        );
+      }
+
+      screen.append(
+        title,
+        list
+      );
+    },
+    {
+      back: v081OpenPhoneHome
+    }
+  );
+}
+
+function v081OpenMineArchive() {
+  prepareSystems();
+
+  v081PhoneModal(
+    "ARQUIVO MUNICIPAL",
+    screen => {
+      const article =
+        v081PhoneElement(
+          "article",
+          "phone-archive"
+        );
+
+      const heading =
+        v081PhoneElement(
+          "strong",
+          "",
+          "DESABAMENTO NA MINA DE FORGOTTEN"
+        );
+
+      const body =
+        v081PhoneElement(
+          "p",
+          "",
+          "Cópia digitalizada de um jornal local de quase quarenta anos atrás. O texto registra um grande desabamento, turnos noturnos, galerias interditadas e famílias esperando notícias por vários dias. O nome dos Lancaster não aparece no documento."
+        );
+
+      const note =
+        v081PhoneElement(
+          "p",
+          "phone-small",
+          "O arquivo confirma que Raimundo não exagerou sobre a dimensão do acidente."
+        );
+
+      article.append(
+        heading,
+        body,
+        note
+      );
+
+      screen.append(article);
+    },
+    {
+      back: v081OpenInternet
+    }
+  );
+
+  if (!state.phone.mineArchiveRead) {
+    state.phone.mineArchiveRead = true;
+
+    if (state.forgottenAlive) {
+      state.forgottenAlive.completed.mineArchive = true;
+
+      if (
+        state.storyFlags?.raimundoMet &&
+        !state.forgottenAlive.westPresenceSeen
+      ) {
+        v080CompleteFragment(
+          "mineArchive",
+          "Arquivo da mina"
+        );
+      }
+    }
+
+    updateHud();
+    save();
+  }
+}
+
+function v081RandomFoodCell() {
+  const occupied =
+    new Set(
+      v081Snake.snake.map(
+        part =>
+          part.x + "," + part.y
+      )
+    );
+
+  let x = 0;
+  let y = 0;
+
+  do {
+    x =
+      Math.floor(Math.random() * 18);
+
+    y =
+      Math.floor(Math.random() * 18);
+  } while (
+    occupied.has(x + "," + y)
+  );
+
+  return { x, y };
+}
+
+function v081DrawSnake() {
+  const game =
+    v081Snake;
+
+  if (!game.ctx || !game.canvas) {
+    return;
+  }
+
+  const ctx =
+    game.ctx;
+
+  const size =
+    game.canvas.width;
+
+  const cell =
+    size / 18;
+
+  ctx.fillStyle =
+    "#9cae75";
+
+  ctx.fillRect(
+    0,
+    0,
+    size,
+    size
+  );
+
+  ctx.fillStyle =
+    "rgba(23,32,24,0.12)";
+
+  for (let i = 0; i < 18; i++) {
+    ctx.fillRect(
+      i * cell,
+      0,
+      1,
+      size
+    );
+
+    ctx.fillRect(
+      0,
+      i * cell,
+      size,
+      1
+    );
+  }
+
+  ctx.fillStyle =
+    "#182219";
+
+  for (const part of game.snake) {
+    ctx.fillRect(
+      part.x * cell + 1,
+      part.y * cell + 1,
+      cell - 2,
+      cell - 2
+    );
+  }
+
+  ctx.fillRect(
+    game.food.x * cell + cell * 0.28,
+    game.food.y * cell + cell * 0.28,
+    cell * 0.44,
+    cell * 0.44
+  );
+
+  ctx.font =
+    "bold 12px monospace";
+
+  ctx.fillText(
+    "PONTOS " + game.score,
+    6,
+    14
+  );
+
+  if (game.gameOver) {
+    ctx.fillStyle =
+      "rgba(156,174,117,0.88)";
+
+    ctx.fillRect(
+      20,
+      size / 2 - 28,
+      size - 40,
+      56
+    );
+
+    ctx.fillStyle =
+      "#182219";
+
+    ctx.textAlign =
+      "center";
+
+    ctx.font =
+      "bold 16px monospace";
+
+    ctx.fillText(
+      "FIM DE JOGO",
+      size / 2,
+      size / 2 - 3
+    );
+
+    ctx.font =
+      "11px monospace";
+
+    ctx.fillText(
+      "ENTER PARA RECOMEÇAR",
+      size / 2,
+      size / 2 + 16
+    );
+
+    ctx.textAlign =
+      "left";
+  }
+}
+
+function v081ResetSnake() {
+  const center = 8;
+
+  v081Snake.snake = [
+    { x: center, y: 9 },
+    { x: center - 1, y: 9 },
+    { x: center - 2, y: 9 }
+  ];
+
+  v081Snake.dir =
+    { x: 1, y: 0 };
+
+  v081Snake.nextDir =
+    { x: 1, y: 0 };
+
+  v081Snake.score = 0;
+  v081Snake.gameOver = false;
+  v081Snake.food =
+    v081RandomFoodCell();
+
+  v081DrawSnake();
+}
+
+function v081SnakeStep() {
+  if (
+    !v081Snake.active ||
+    v081Snake.gameOver
+  ) {
+    return;
+  }
+
+  v081Snake.dir = {
+    ...v081Snake.nextDir
+  };
+
+  const head = {
+    x:
+      v081Snake.snake[0].x +
+      v081Snake.dir.x,
+    y:
+      v081Snake.snake[0].y +
+      v081Snake.dir.y
+  };
+
+  const hitWall =
+    head.x < 0 ||
+    head.y < 0 ||
+    head.x >= 18 ||
+    head.y >= 18;
+
+  const hitSelf =
+    v081Snake.snake.some(
+      part =>
+        part.x === head.x &&
+        part.y === head.y
+    );
+
+  if (hitWall || hitSelf) {
+    v081Snake.gameOver = true;
+
+    state.phone.snakeHighScore =
+      Math.max(
+        state.phone.snakeHighScore,
+        v081Snake.score
+      );
+
+    save();
+    v081DrawSnake();
+    return;
+  }
+
+  v081Snake.snake.unshift(
+    head
+  );
+
+  if (
+    head.x === v081Snake.food.x &&
+    head.y === v081Snake.food.y
+  ) {
+    v081Snake.score += 1;
+    v081Snake.food =
+      v081RandomFoodCell();
+  } else {
+    v081Snake.snake.pop();
+  }
+
+  v081DrawSnake();
+}
+
+function v081SnakeDirection(x, y) {
+  if (
+    x === -v081Snake.dir.x &&
+    y === -v081Snake.dir.y
+  ) {
+    return;
+  }
+
+  v081Snake.nextDir =
+    { x, y };
+}
+
+function v081OpenSnake() {
+  prepareSystems();
+
+  v081PhoneModal(
+    "COBRINHA",
+    screen => {
+      const stats =
+        v081PhoneElement(
+          "div",
+          "phone-game-stats",
+          "RECORDE " +
+            state.phone.snakeHighScore
+        );
+
+      const canvas =
+        document.createElement("canvas");
+
+      canvas.width = 270;
+      canvas.height = 270;
+      canvas.className =
+        "snake-canvas";
+
+      const controls =
+        v081PhoneElement(
+          "div",
+          "snake-controls"
+        );
+
+      const buttons = [
+        ["▲", 0, -1, "snake-up"],
+        ["◀", -1, 0, "snake-left"],
+        ["▼", 0, 1, "snake-down"],
+        ["▶", 1, 0, "snake-right"]
+      ];
+
+      for (const [label, x, y, cls] of buttons) {
+        const button =
+          document.createElement("button");
+
+        button.textContent =
+          label;
+
+        button.className =
+          cls;
+
+        button.onclick =
+          () =>
+            v081SnakeDirection(x, y);
+
+        controls.append(button);
+      }
+
+      screen.append(
+        stats,
+        canvas,
+        controls,
+        v081PhoneElement(
+          "p",
+          "phone-small",
+          "Setas ou WASD · ENTER reinicia após perder."
+        )
+      );
+
+      v081Snake.canvas =
+        canvas;
+
+      v081Snake.ctx =
+        canvas.getContext("2d");
+
+      v081Snake.active = true;
+
+      v081ResetSnake();
+
+      v081Snake.timer =
+        setInterval(
+          v081SnakeStep,
+          135
+        );
+    },
+    {
+      back: v081OpenPhoneHome
+    }
+  );
+}
+
+function v081SnakeKeydown(event) {
+  if (!v081Snake.active) {
+    return;
+  }
+
+  const key =
+    event.key.toLowerCase();
+
+  const directions = {
+    arrowup: [0, -1],
+    w: [0, -1],
+    arrowdown: [0, 1],
+    s: [0, 1],
+    arrowleft: [-1, 0],
+    a: [-1, 0],
+    arrowright: [1, 0],
+    d: [1, 0]
+  };
+
+  if (directions[key]) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+
+    v081SnakeDirection(
+      directions[key][0],
+      directions[key][1]
+    );
+
+    return;
+  }
+
+  if (
+    key === "enter" &&
+    v081Snake.gameOver
+  ) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+
+    v081ResetSnake();
+    return;
+  }
+
+  if (key === "escape") {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+
+    v081OpenPhoneHome();
+  }
+}
+
+window.addEventListener(
+  "keydown",
+  v081SnakeKeydown,
+  true
+);
+
+function v081PhoneShortcut(event) {
+  if (
+    event.key.toLowerCase() !== "c" ||
+    event.repeat ||
+    mode !== "game"
+  ) {
+    return;
+  }
+
+  if (
+    v081Snake.active
+  ) {
+    return;
+  }
+
+  if (
+    $("overlay").classList.contains("phone-overlay")
+  ) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+
+    closeModal();
+    return;
+  }
+
+  if (!v081PhoneCanOpen()) {
+    if (
+      $("overlay").hidden &&
+      !dialog &&
+      !transitionBusy
+    ) {
+      v06Toast(
+        "Não dá para mexer no celular agora.",
+        1.8
+      );
+    }
+
+    return;
+  }
+
+  event.preventDefault();
+  event.stopImmediatePropagation();
+
+  v081OpenPhoneHome();
+}
+
+window.addEventListener(
+  "keydown",
+  v081PhoneShortcut,
+  true
+);
+
+// Compatibilidade: o antigo atalho J também abre o aparelho,
+// porque os listeners antigos chamam openJournal() dinamicamente.
+openJournal =
+  v081OpenPhoneHome;
+
+const v081GetNearBase =
+  getNear;
+
+getNear = function() {
+  const target =
+    v081GetNearBase();
+
+  // O jornal físico foi removido. A pista agora mora no arquivo digital.
+  if (
+    target?.action ===
+      "v080MineNewspaper"
+  ) {
+    return null;
+  }
+
+  return target;
+};
+
+function v081TryQueueMessages() {
+  if (
+    !state?.phone ||
+    !state?.forgottenAlive?.started
+  ) {
+    return;
+  }
+
+  if (
+    state.storyFlags?.raimundoMet &&
+    !state.phone.resolvedBrotherScenes.includes("checkIn")
+  ) {
+    v081QueueBrotherScene(
+      "checkIn"
+    );
+  }
+
+  if (
+    v080FragmentCount() >= 1 &&
+    state.forgottenAlive.brotherYardStage === 0 &&
+    state.phone.resolvedBrotherScenes.includes("checkIn") &&
+    !state.phone.resolvedBrotherScenes.includes("yard")
+  ) {
+    v081QueueBrotherScene(
+      "yard"
+    );
+  }
+
+  if (
+    state.forgottenAlive.westPresenceSeen &&
+    !state.phone.resolvedBrotherScenes.includes("afterWest")
+  ) {
+    v081QueueBrotherScene(
+      "afterWest"
+    );
+  }
+}
+
+const v081UpdateBase =
+  update;
+
+update = function(dt) {
+  v081UpdateBase(dt);
+
+  if (
+    !state ||
+    mode !== "game" ||
+    dialog ||
+    transitionBusy ||
+    state.gameOver
+  ) {
+    return;
+  }
+
+  prepareSystems();
+
+  v081TryQueueMessages();
+
+  if (
+    $("overlay").hidden &&
+    v081HasInternet()
+  ) {
+    v081DeliverBrotherScene();
+  }
+};
+
+// Ajuda final da 0.8.1: o diário deixa de ser uma interface separada.
+$("help").onclick = () => modal(
+  "Como jogar",
+  "WASD / setas: andar. Shift/F: correr. E: interagir. I: inventário. C: celular. J também abre o celular por compatibilidade. L: ligar/desligar a lanterna. Esc: pausar. ESPAÇO: soco apenas contra ameaças físicas compatíveis.\\n\\nO celular funciona como registro de investigação. NOTAS e COBRINHA funcionam offline. INTERNET e mensagens com seu irmão só conectam dentro da sua casa ou de outras residências. O contato dos seus pais permanece sem sinal em qualquer lugar.\\n\\nAo jogar Cobrinha, o mundo fica pausado até você sair do aparelho.",
+  [["Entendi", closeModal]]
+);
+
+$("version").textContent = "PROTÓTIPO · 0.8.1";
   
   requestAnimationFrame(frame);
   showBootSplash();
