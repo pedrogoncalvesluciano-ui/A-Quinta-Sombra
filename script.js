@@ -21013,10 +21013,33 @@ function v081AppButton(label, sub, action, badge = "") {
 }
 
 function v081OpenPhoneHome() {
+  const phoneAlreadyOpen =
+    $("overlay").classList.contains("phone-overlay");
+
   if (
     !$("overlay").hidden &&
-    !$("overlay").classList.contains("phone-overlay")
+    !phoneAlreadyOpen
   ) {
+    return;
+  }
+
+  // Também protege o atalho antigo J, que chama openJournal()
+  // e agora é redirecionado para o celular.
+  if (
+    !phoneAlreadyOpen &&
+    !v081PhoneCanOpen()
+  ) {
+    if (
+      $("overlay").hidden &&
+      !dialog &&
+      !transitionBusy
+    ) {
+      v06Toast(
+        "Não dá para mexer no celular agora.",
+        1.8
+      );
+    }
+
     return;
   }
 
@@ -21369,6 +21392,15 @@ function v081RenderMessageBubble(container, message) {
 
 function v081OpenMessages() {
   prepareSystems();
+
+  // Se uma mensagem ficou esperando sinal, ela entra assim que
+  // o aplicativo é aberto dentro de uma residência.
+  if (
+    v081HasInternet() &&
+    !state.phone.activeBrotherScene
+  ) {
+    v081DeliverBrotherScene();
+  }
 
   v081PhoneModal(
     "MENSAGENS",
