@@ -2,7 +2,7 @@
 "use strict";
 
 /*
-  A QUINTA SOMBRA — 0.7.5
+  A QUINTA SOMBRA — 0.7.6
 
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
@@ -17088,7 +17088,491 @@ $("help").onclick = () => modal(
   [["Voltar", closeModal]]
 );
 
-$("version").textContent = "PROTÓTIPO · 0.7.5";
+// =========================================================
+// 0.7.6 — RUAS DE ACESSO AO MERCADO E À PRAÇA
+// =========================================================
+
+// O mercado e a praça deixam de ser teletransportes diretos.
+// Agora cada destino possui uma rua própria antes da área principal.
+if (!maps.northRoad) {
+  maps.northRoad = {
+    w: 900,
+    h: 1320,
+    objects: [
+      // Mercado no fim da rua.
+      obj(270, 70, 360, 165, "market"),
+
+      // Residências ao longo da rua.
+      obj(55, 345, 225, 165, "building"),
+      obj(620, 350, 220, 165, "building"),
+      obj(65, 650, 215, 165, "building"),
+      obj(620, 665, 220, 165, "building"),
+      obj(55, 955, 225, 165, "building"),
+      obj(620, 960, 220, 165, "building")
+    ],
+    doors: [
+      door(
+        450, 260,
+        null, 0, 0,
+        "Entrar no mercado",
+        "northMarketDoor"
+      )
+    ]
+  };
+}
+roomNames.northRoad = "Rua do mercado · norte de Forgotten";
+
+if (!maps.squareRoad) {
+  maps.squareRoad = {
+    w: 1400,
+    h: 760,
+    objects: [
+      // Casas nas duas laterais da rua sem saída.
+      obj(150, 70, 235, 165, "building"),
+      obj(500, 72, 225, 165, "building"),
+      obj(835, 68, 235, 170, "building"),
+
+      obj(190, 515, 235, 165, "building"),
+      obj(545, 520, 225, 160, "building"),
+      obj(885, 510, 235, 170, "building")
+    ],
+    doors: [
+      door(
+        1245, 365,
+        null, 0, 0,
+        "Entrar na praça central",
+        "squareRoadEntrance"
+      )
+    ]
+  };
+}
+roomNames.squareRoad = "Rua da praça · leste de Forgotten";
+
+function v076SetOutdoorRoom(room, x, y, facing) {
+  state.room = room;
+  state.x = x;
+  state.y = y;
+  state.facing = facing;
+  state.walk = 0;
+  keys.clear();
+  near = null;
+  updateHud();
+  save();
+}
+
+function v076DrawRoadTexture(x, y, w, h, horizontal = false) {
+  rect(x, y, w, h, "#706b5f");
+
+  if (horizontal) {
+    for (let px = x + 28; px < x + w - 20; px += 58) {
+      rect(px, y + h / 2 - 2, 25, 4, "#b9ad87");
+    }
+  } else {
+    for (let py = y + 28; py < y + h - 20; py += 58) {
+      rect(x + w / 2 - 2, py, 4, 25, "#b9ad87");
+    }
+  }
+}
+
+function v076DrawNorthRoad() {
+  const m = maps.northRoad;
+
+  camera.x = Math.max(
+    0,
+    Math.min(m.w - W, state.x - W / 2)
+  );
+  camera.y = Math.max(
+    0,
+    Math.min(m.h - H, state.y - H / 2)
+  );
+
+  c.save();
+  c.translate(
+    -Math.floor(camera.x),
+    -Math.floor(camera.y)
+  );
+
+  rect(0, 0, m.w, m.h, "#34493c");
+
+  // Rua principal, calçadas e marcação central.
+  v076DrawRoadTexture(350, 0, 200, m.h, false);
+  rect(330, 0, 20, m.h, "#8a867b");
+  rect(550, 0, 20, m.h, "#8a867b");
+
+  // Pequenas entradas para as casas.
+  for (const y of [430, 735, 1040]) {
+    rect(280, y, 70, 38, "#777268");
+    rect(550, y + 10, 70, 38, "#777268");
+  }
+
+  // Postes alternados deixam a rua mais longa e legível.
+  for (let y = 310; y < 1220; y += 210) {
+    const left = Math.floor(y / 210) % 2 === 0;
+    const x = left ? 312 : 575;
+
+    rect(x, y, 4, 36, "#343a39");
+    rect(x - 4, y - 3, 12, 5, "#4d5350");
+    rect(x - 2, y - 1, 8, 3, "#d2b777");
+  }
+
+  // Papel velho no meio-fio: detalhe ambiental, não é pista ainda.
+  rect(318, 825, 14, 9, "#c3bca9");
+  rect(321, 823, 9, 3, "#ded8c7");
+
+  for (const o of m.objects) {
+    building(o);
+  }
+
+  txt(
+    "MERCADO",
+    405,
+    250,
+    "#d4c49c",
+    8
+  );
+
+  person(
+    state.x,
+    state.y,
+    "player",
+    state.walk,
+    state.facing
+  );
+
+  c.restore();
+  v0646ApplyOutdoorLight();
+}
+
+function v076DrawSquareRoad() {
+  const m = maps.squareRoad;
+
+  camera.x = Math.max(
+    0,
+    Math.min(m.w - W, state.x - W / 2)
+  );
+  camera.y = Math.max(
+    0,
+    Math.min(m.h - H, state.y - H / 2)
+  );
+
+  c.save();
+  c.translate(
+    -Math.floor(camera.x),
+    -Math.floor(camera.y)
+  );
+
+  rect(0, 0, m.w, m.h, "#354a3d");
+
+  // Rua leste: termina em um retorno circular antes da praça.
+  v076DrawRoadTexture(0, 310, 1125, 115, true);
+  rect(0, 290, 1120, 20, "#8a867b");
+  rect(0, 425, 1120, 20, "#8a867b");
+
+  c.fillStyle = "#706b5f";
+  c.beginPath();
+  c.arc(1135, 367, 118, 0, Math.PI * 2);
+  c.fill();
+
+  c.strokeStyle = "#8a867b";
+  c.lineWidth = 18;
+  c.beginPath();
+  c.arc(1135, 367, 126, -Math.PI * 0.58, Math.PI * 0.58);
+  c.stroke();
+
+  // Caminho de pedestres da rua sem saída até a praça.
+  rect(1210, 337, 190, 60, "#7b786f");
+  for (let x = 1220; x < 1390; x += 28) {
+    rect(x, 347, 18, 10, "#8d897f");
+    rect(x + 8, 370, 18, 10, "#817e75");
+  }
+
+  // Casas residenciais.
+  for (const o of m.objects) {
+    building(o);
+  }
+
+  // Árvores no fundo da rua reforçam que o asfalto não continua.
+  for (const [x, y] of [
+    [1090, 180],
+    [1180, 190],
+    [1095, 555],
+    [1190, 545]
+  ]) {
+    rect(x, y, 8, 32, "#493f31");
+    rect(x - 17, y - 19, 42, 30, "#244438");
+    rect(x - 10, y - 30, 29, 26, "#315441");
+  }
+
+  txt(
+    "PRAÇA →",
+    1210,
+    320,
+    "#d4c49c",
+    8
+  );
+
+  person(
+    state.x,
+    state.y,
+    "player",
+    state.walk,
+    state.facing
+  );
+
+  c.restore();
+  v0646ApplyOutdoorLight();
+}
+
+const v076DrawWorldBase = drawWorld;
+drawWorld = function() {
+  if (state?.room === "northRoad") {
+    v076DrawNorthRoad();
+    return;
+  }
+
+  if (state?.room === "squareRoad") {
+    v076DrawSquareRoad();
+    return;
+  }
+
+  v076DrawWorldBase();
+};
+
+// Do bairro para o norte, o jogador agora chega primeiro à rua do mercado.
+v0648GoMarket = function() {
+  if (
+    !state ||
+    transitionBusy ||
+    dialog ||
+    !v0648Chapter2Unlocked()
+  ) {
+    return;
+  }
+
+  fade(
+    "Rua do mercado",
+    "Norte de Forgotten",
+    () => {
+      v076SetOutdoorRoom(
+        "northRoad",
+        450,
+        maps.northRoad.h - 70,
+        "up"
+      );
+    }
+  );
+};
+
+// Do bairro para leste, a praça passa a ficar no fim de uma rua sem saída.
+v0648GoSquare = function() {
+  if (
+    !state ||
+    transitionBusy ||
+    dialog ||
+    !v0648Chapter2Unlocked() ||
+    !state.storyFlags?.marketParentsConfirmed
+  ) {
+    return;
+  }
+
+  fade(
+    "Rua da praça",
+    "Leste de Forgotten",
+    () => {
+      v076SetOutdoorRoom(
+        "squareRoad",
+        70,
+        367,
+        "right"
+      );
+    }
+  );
+};
+
+// Ao sair da praça, volta para a rua, não diretamente para o bairro.
+v0648ReturnFromSquare = function() {
+  if (!state || transitionBusy || dialog) return;
+
+  fade(
+    "",
+    "",
+    () => {
+      v076SetOutdoorRoom(
+        "squareRoad",
+        1190,
+        367,
+        "left"
+      );
+    }
+  );
+};
+
+// A porta interna do mercado também retorna para a rua norte.
+const v076MarketExit =
+  maps.market?.doors?.find(d => d.label === "Sair do mercado");
+
+if (v076MarketExit) {
+  v076MarketExit.to = null;
+  v076MarketExit.action = "leaveMarketToNorthRoad";
+  v076MarketExit.label = "Sair para a rua do mercado";
+}
+
+const v076InteractBase = interact;
+interact = function(action) {
+  if (action === "northMarketDoor") {
+    fade(
+      "Mercado",
+      "Fim da rua norte",
+      () => {
+        go("market", 310, 330);
+      }
+    );
+    return;
+  }
+
+  if (action === "leaveMarketToNorthRoad") {
+    fade(
+      "",
+      "",
+      () => {
+        v076SetOutdoorRoom(
+          "northRoad",
+          450,
+          285,
+          "down"
+        );
+      }
+    );
+    return;
+  }
+
+  if (action === "squareRoadEntrance") {
+    fade(
+      "Praça central",
+      "Fim da rua leste",
+      () => {
+        const firstVisit =
+          !state.storyFlags.squareVisited;
+
+        state.storyFlags.squareVisited = true;
+        state.storyFlags.squareVisitCount =
+          (state.storyFlags.squareVisitCount || 0) + 1;
+
+        v076SetOutdoorRoom(
+          "square",
+          82,
+          500,
+          "right"
+        );
+
+        if (firstVisit) {
+          v06Toast(
+            "Praça central · procure alguém que possa ter visto seus pais.",
+            2.6
+          );
+        }
+      }
+    );
+    return;
+  }
+
+  v076InteractBase(action);
+};
+
+const v076UpdateBase = update;
+update = function(dt) {
+  v076UpdateBase(dt);
+
+  if (
+    !state ||
+    mode !== "game" ||
+    dialog ||
+    transitionBusy ||
+    !$("overlay").hidden
+  ) {
+    return;
+  }
+
+  const down =
+    keys.has("s") ||
+    keys.has("arrowdown");
+
+  const left =
+    keys.has("a") ||
+    keys.has("arrowleft");
+
+  if (
+    state.room === "northRoad" &&
+    state.y >= maps.northRoad.h - 42 &&
+    down
+  ) {
+    state.y = maps.northRoad.h - 44;
+
+    fade(
+      "",
+      "",
+      () => {
+        v076SetOutdoorRoom(
+          "village",
+          650,
+          82,
+          "down"
+        );
+      }
+    );
+
+    return;
+  }
+
+  if (
+    state.room === "squareRoad" &&
+    state.x <= 42 &&
+    left
+  ) {
+    state.x = 44;
+
+    fade(
+      "",
+      "",
+      () => {
+        v076SetOutdoorRoom(
+          "village",
+          maps.village.w - 58,
+          424,
+          "left"
+        );
+      }
+    );
+  }
+};
+
+// Atualiza a leitura da missão enquanto o jogador percorre as novas ruas.
+const v076HudBase = updateHud;
+updateHud = function() {
+  v076HudBase();
+
+  if (!state || state.stage === "prologue") return;
+
+  if (
+    state.room === "northRoad" &&
+    !state.storyFlags?.marketParentsConfirmed
+  ) {
+    $("objective").textContent =
+      "Siga a rua até o mercado.";
+    return;
+  }
+
+  if (
+    state.room === "squareRoad" &&
+    state.storyFlags?.marketParentsConfirmed &&
+    !state.squareManFirstSpeechDone
+  ) {
+    $("objective").textContent =
+      "Siga a rua sem saída até a praça central.";
+  }
+};
+
+$("version").textContent = "PROTÓTIPO · 0.7.6";
   
   requestAnimationFrame(frame);
   showBootSplash();
