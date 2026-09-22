@@ -18980,7 +18980,246 @@ update = function(dt) {
   }
 };
 
-$("version").textContent = "PROTÓTIPO · 0.7.8";
+// =========================================================
+// 0.7.9 — SONO VOLUNTÁRIO DEPOIS DAS 03:00
+// =========================================================
+
+function v079NightSleepAvailable() {
+  if (
+    !state ||
+    state.stage === "prologue" ||
+    state.gameOver ||
+    state.dawnCollapse?.active ||
+    state.wakeUp?.active
+  ) {
+    return false;
+  }
+
+  // Janela voluntária: das 03:00 até antes do colapso das 07:00.
+  if (
+    state.minutes < 180 ||
+    state.minutes >= 420
+  ) {
+    return false;
+  }
+
+  // A primeira noite não pode ser pulada antes de concluir a investigação-base.
+  if (
+    state.day === 1 &&
+    !state.day1Progress?.completed
+  ) {
+    return false;
+  }
+
+  if (dangerActive()) {
+    return false;
+  }
+
+  const director =
+    state.eventDirector;
+
+  if (
+    director?.hunter?.active ||
+    director?.follower?.active
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+function v079SleepBlockedReason() {
+  if (!state) {
+    return "Não consigo dormir agora.";
+  }
+
+  if (
+    state.day === 1 &&
+    !state.day1Progress?.completed &&
+    state.minutes >= 180 &&
+    state.minutes < 420
+  ) {
+    return "Ainda não. Preciso terminar o que comecei esta noite antes de dormir.";
+  }
+
+  if (
+    dangerActive() ||
+    state.eventDirector?.hunter?.active ||
+    state.eventDirector?.follower?.active
+  ) {
+    return "Não posso dormir enquanto alguma coisa está rondando a casa.";
+  }
+
+  return "Ainda não estou com sono suficiente.";
+}
+
+function v079SleepUntilNextNight() {
+  prepareSystems();
+
+  if (!v079NightSleepAvailable()) {
+    say([
+      v079SleepBlockedReason()
+    ]);
+    return;
+  }
+
+  const currentDay =
+    Math.max(1, state.day || 1);
+
+  const nextDay =
+    currentDay + 1;
+
+  modal(
+    "Dormir até a próxima noite?",
+    "Já passou das 03:00.\n\nDormir agora encerra esta noite e você acorda às 00:00 do DIA " +
+      nextDay +
+      ".\n\nEventos ainda não vistos desta noite serão perdidos.",
+    [
+      [
+        "Dormir",
+        () => {
+          closeModal();
+
+          fade(
+            "Você decide descansar",
+            "DIA " +
+              currentDay +
+              " → DIA " +
+              nextDay +
+              " · 00:00",
+            () => {
+              state.day = nextDay;
+              state.minutes = 0;
+              state.sun = 0;
+              state.forcedSleepDue = false;
+              state.dawnCollapseArmed = true;
+
+              // O sono voluntário não conta como desmaio das 07:00.
+              if (state.dawnCollapse) {
+                state.dawnCollapse.active = false;
+                state.dawnCollapse.phase = "idle";
+                state.dawnCollapse.time = 0;
+              }
+
+              if (state.wakeUp) {
+                state.wakeUp.active = false;
+                state.wakeUp.time = 0;
+              }
+
+              // Cancela acontecimentos aleatórios daquela saída/noite.
+              if (state.randomEventState) {
+                state.randomEventState.pending = false;
+              }
+
+              if (state.smallEventState) {
+                state.smallEventState.pending = false;
+              }
+
+              if (state.eventDirector) {
+                if (state.eventDirector.follower) {
+                  state.eventDirector.follower.active = false;
+                }
+
+                if (state.eventDirector.hunter) {
+                  state.eventDirector.hunter.active = false;
+                }
+              }
+
+              // Acorda sempre no próprio quarto.
+              state.room = "bedroom";
+              state.x = housePoint(180);
+              state.y = housePoint(235);
+              state.facing = "down";
+              state.walk = 0;
+
+              keys.clear();
+              near = null;
+              $("prompt").hidden = true;
+
+              if (typeof v06AbsoluteMinutes === "function") {
+                state.foodClock = v06AbsoluteMinutes();
+              }
+
+              updateHud();
+              save();
+
+              say([
+                [
+                  "Você",
+                  "Consegui dormir um pouco. Já é meia-noite de novo."
+                ]
+              ]);
+            }
+          );
+        }
+      ],
+      ["Agora não", closeModal]
+    ]
+  );
+}
+
+const v079GetNearBase = getNear;
+getNear = function() {
+  const target =
+    v079GetNearBase();
+
+  if (
+    target?.action === "bed" &&
+    state &&
+    state.minutes >= 180 &&
+    state.minutes < 420
+  ) {
+    return {
+      ...target,
+      label: v079NightSleepAvailable()
+        ? "Dormir até a próxima noite"
+        : "Tentar dormir"
+    };
+  }
+
+  return target;
+};
+
+const v079InteractBase = interact;
+interact = function(action) {
+  prepareSystems();
+
+  if (
+    action === "bed" &&
+    state &&
+    state.minutes >= 180 &&
+    state.minutes < 420
+  ) {
+    v079SleepUntilNextNight();
+    return;
+  }
+
+  v079InteractBase(action);
+};
+
+const v079HudBase = updateHud;
+updateHud = function() {
+  v079HudBase();
+
+  if (
+    !state ||
+    state.stage === "prologue" ||
+    state.minutes < 180 ||
+    state.minutes >= 420
+  ) {
+    return;
+  }
+
+  if (
+    v079NightSleepAvailable() &&
+    state.room === "bedroom"
+  ) {
+    $("timeNote").textContent =
+      "DEPOIS DAS 03:00 · VOCÊ PODE DORMIR";
+  }
+};
+
+$("version").textContent = "PROTÓTIPO · 0.7.9";
   
   requestAnimationFrame(frame);
   showBootSplash();
