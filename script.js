@@ -22180,24 +22180,6 @@ window.addEventListener(
 openJournal =
   v081OpenPhoneHome;
 
-const v081GetNearBase =
-  getNear;
-
-getNear = function() {
-  const target =
-    v081GetNearBase();
-
-  // O jornal físico foi removido. A pista agora mora no arquivo digital.
-  if (
-    target?.action ===
-      "v080MineNewspaper"
-  ) {
-    return null;
-  }
-
-  return target;
-};
-
 function v081TryQueueMessages() {
   if (
     !state?.phone ||
