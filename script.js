@@ -2,7 +2,7 @@
 "use strict";
 
 /*
-  A QUINTA SOMBRA — 0.7.6
+  A QUINTA SOMBRA — 0.8.1
 
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
