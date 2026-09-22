@@ -18128,6 +18128,8 @@ v0645TriggerRandomEvent = function() {
   if (!event?.pending) return;
 
   const type = event.type;
+  const previousBrotherRemark =
+    state.pendingBrotherRemark || "";
 
   if (type === "shadowFollower") {
     event.pending = false;
@@ -18222,7 +18224,24 @@ v0645TriggerRandomEvent = function() {
     ["van", "voices", "knock", "blackout", "invasion", "brotherEcho"]
       .includes(type)
   ) {
-    v077QueueBrotherRemark(type);
+    const variant =
+      v077BrotherRemark(type);
+
+    if (!previousBrotherRemark) {
+      // Substitui a fala fixa do sistema antigo por uma variante contextual.
+      state.pendingBrotherRemark = variant;
+    } else {
+      // Se já havia uma observação pendente, não apaga a anterior.
+      state.pendingBrotherRemark =
+        previousBrotherRemark;
+
+      if (
+        !state.eventDirector.brotherQueue.includes(variant) &&
+        state.eventDirector.brotherQueue.length < 2
+      ) {
+        state.eventDirector.brotherQueue.push(variant);
+      }
+    }
   }
 
   save();
