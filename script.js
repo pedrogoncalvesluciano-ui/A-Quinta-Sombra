@@ -17775,6 +17775,7 @@ function v077TriggerSquareObserver() {
   state.storyFlags.observerFirstSeen = true;
   state.storyFlags.southObserverPending = false;
   state.squareManReturnObserverPending = false;
+  state.squareManReturnObserverSeenDay = state.day;
   state.eventDirector.squareReturnReady = false;
 
   v077ObserverUntil = elapsed + 0.95;
@@ -18578,9 +18579,49 @@ v0639EdgeNotice = function(message) {
   v077EdgeNoticeBase(message);
 };
 
+const V077_DAWN_BROTHER_SCENES = [
+  [
+    ["Irmão", "Eu acordei com alguém andando na sala."],
+    ["Irmão", "Os passos pararam bem no pé da escada."]
+  ],
+  [
+    ["Irmão", "A maçaneta do corredor mexeu uma vez."],
+    ["Irmão", "Eu fiquei quieto. Depois não ouvi mais nada."]
+  ],
+  [
+    ["Irmão", "Eu achei que você tinha voltado antes."],
+    ["Irmão", "Ouvi passos lá embaixo, mas a porta nunca abriu."]
+  ],
+  [
+    ["Irmão", "Teve um barulho na sala enquanto você estava fora."],
+    ["Irmão", "Parecia alguém andando devagar, tentando não fazer barulho."]
+  ]
+];
+
 const v077InteractBase = interact;
 interact = function(action) {
   prepareSystems();
+
+  if (
+    action === "brother" &&
+    state.dawnCollapseCount > state.brotherDawnTalkCount
+  ) {
+    state.brotherDawnTalkCount =
+      state.dawnCollapseCount;
+
+    const index =
+      Math.abs(
+        (state.day || 0) +
+        state.dawnCollapseCount
+      ) % V077_DAWN_BROTHER_SCENES.length;
+
+    say(
+      V077_DAWN_BROTHER_SCENES[index],
+      save
+    );
+
+    return;
+  }
 
   if (action === "southLocked") {
     if (!state.storyFlags?.marketParentsConfirmed) {
