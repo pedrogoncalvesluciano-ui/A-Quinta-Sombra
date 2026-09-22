@@ -2,7 +2,7 @@
 "use strict";
 
 /*
-  A QUINTA SOMBRA — 0.7.4
+  A QUINTA SOMBRA — 0.7.5
 
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
@@ -1483,7 +1483,11 @@ function drawCharacterSprite(
       }
 
       if (state.stage === "prologue") {
-        drawMother();
+        prepareMother();
+
+        if (state.mother.y <= state.y) {
+          drawMother();
+        }
       }
     } else {
       if (state.room === "bedroom") {
@@ -1548,7 +1552,12 @@ function drawCharacterSprite(
     }
 
     if (state.stage === "prologue" && state.room !== "village") {
-      drawMother();
+      prepareMother();
+
+      if (state.mother.y <= state.y) {
+        drawMother();
+      }
+
       if (state.room === "foyer") {
         person(children.x - 18, children.y, "player", 0, "down");
         person(children.x + 18, children.y + 5, "brother", 0, "down", 0.8);
@@ -1562,6 +1571,14 @@ function drawCharacterSprite(
       state.walk,
       state.facing
     );
+
+    if (
+      state.stage === "prologue" &&
+      state.mother &&
+      state.mother.y > state.y
+    ) {
+      drawMother();
+    }
 
     if (state.room === "bedroom") {
       drawPlayerRoomForeground(m);
@@ -1855,8 +1872,8 @@ function drawCharacterSprite(
     }[state.facing] || [1, 0];
 
     // Ela anda atrás, mas levemente de lado, como outra pessoa.
-    const backDistance = 45;
-    const sideDistance = 20 * mother.preferredSide;
+    const backDistance = 58;
+    const sideDistance = 24 * mother.preferredSide;
 
     return {
       x:
@@ -1932,13 +1949,47 @@ function drawCharacterSprite(
     }
   }
 
+  function motherOverlapsFather(x, y) {
+    if (
+      state.stage !== "prologue" ||
+      !Number.isFinite(state.x) ||
+      !Number.isFinite(state.y)
+    ) {
+      return false;
+    }
+
+    const dx = (x - state.x) / 19;
+    const dy = (y - state.y) / 13;
+
+    return dx * dx + dy * dy < 1;
+  }
+
+  function motherBlocksPlayer(x, y) {
+    if (
+      state.stage !== "prologue" ||
+      !state.mother ||
+      !Number.isFinite(state.mother.x) ||
+      !Number.isFinite(state.mother.y)
+    ) {
+      return false;
+    }
+
+    const dx = (x - state.mother.x) / 19;
+    const dy = (y - state.mother.y) / 13;
+
+    return dx * dx + dy * dy < 1;
+  }
+
   function motherTryMove(dx, dy) {
     const mother = state.mother;
 
     const nx = mother.x + dx;
     const ny = mother.y + dy;
 
-    if (!solid(nx, ny)) {
+    if (
+      !solid(nx, ny) &&
+      !motherOverlapsFather(nx, ny)
+    ) {
       mother.x = nx;
       mother.y = ny;
       return true;
@@ -2010,8 +2061,8 @@ function drawCharacterSprite(
 
     // Se já está perto, ela não fica grudada nem tremendo.
     if (
-      distanceToFather >= 38 &&
-      distanceToFather <= 68 &&
+      distanceToFather >= 52 &&
+      distanceToFather <= 86 &&
       distanceToTarget < 12
     ) {
       mother.walk = 0;
@@ -2028,7 +2079,7 @@ function drawCharacterSprite(
       return;
     }
 
-    if (mother.pause > 0 && distanceToFather < 80) {
+    if (mother.pause > 0 && distanceToFather < 96) {
       mother.walk = 0;
       return;
     }
@@ -2761,11 +2812,17 @@ function drawCharacterSprite(
     dy = dy / length * speed * dt;
 
     if (dx || dy) {
-      if (!solid(state.x + dx, state.y)) {
+      if (
+        !solid(state.x + dx, state.y) &&
+        !motherBlocksPlayer(state.x + dx, state.y)
+      ) {
         state.x += dx;
       }
 
-      if (!solid(state.x, state.y + dy)) {
+      if (
+        !solid(state.x, state.y + dy) &&
+        !motherBlocksPlayer(state.x, state.y + dy)
+      ) {
         state.y += dy;
       }
 
@@ -2799,10 +2856,14 @@ function drawCharacterSprite(
       const old = state.minutes;
 
       // CICLO DE TEMPO:
-      // 1 hora do jogo = 1 minuto real, em qualquer horário ativo.
-      // Isso deixa 00:00–07:00 em aproximadamente 7 minutos reais.
+      // Primeira noite (Dia 1, até 07:00): 1 hora = 30 segundos reais.
+      // Demais períodos ativos: 1 hora = 1 minuto real.
       // Às 14:00 o relógio continua parando até o player dormir.
-      const timeRate = 1;
+      const firstNightFast =
+        state.day === 1 &&
+        state.minutes < 420;
+
+      const timeRate = firstNightFast ? 2 : 1;
 
       state.minutes += dt * timeRate;
 
@@ -7981,14 +8042,15 @@ function v0639FinishPrologueAtNorth() {
       state.facing = "down";
       state.walk = 0;
 
-      // A mãe fica logo abaixo dele, olhando diretamente para o pai.
+      // A mãe fica abaixo dele, com espaço suficiente para não sobrepor
+      // sprite nem sombra. A hitbox impede que um atravesse o outro.
       prepareMother();
       state.mother.x = 636;
-      state.mother.y = 104;
+      state.mother.y = 126;
       state.mother.facing = "up";
       state.mother.walk = 0;
       state.mother.targetX = 636;
-      state.mother.targetY = 104;
+      state.mother.targetY = 126;
       state.mother.think = 999;
       state.mother.pause = 999;
       state.mother.lastFatherX = state.x;
@@ -16905,14 +16967,128 @@ updateHud = function() {
     "Continue explorando o bairro até o amanhecer.";
 };
 
-// Ajuda atualizada: Florinda é apoio condicionado, não objetivo fixo.
+// =========================================================
+// 0.7.5 — FLUXO DA PRIMEIRA NOITE + PAIS SEM SOBREPOSIÇÃO
+// =========================================================
+
+function v075EnsureFirstNightSequence() {
+  if (
+    !state ||
+    state.stage === "prologue" ||
+    state.day !== 1 ||
+    state.firstExit
+  ) {
+    return;
+  }
+
+  const q = chapter();
+  const clueCount =
+    Array.isArray(q?.clues)
+      ? q.clues.length
+      : 0;
+
+  if (clueCount < 3) {
+    return;
+  }
+
+  // Depois das três pistas, a sequência obrigatória é:
+  // irmão -> chave -> sair de casa -> Florinda -> delegacia.
+  if (state.key) {
+    if (state.stage !== "exit") {
+      state.stage = "exit";
+    }
+    return;
+  }
+
+  if (state.stage !== "key") {
+    state.stage = "talk";
+  }
+}
+
+const v075HudBase = updateHud;
+updateHud = function() {
+  v075EnsureFirstNightSequence();
+  v075HudBase();
+
+  if (!state) return;
+
+  if (
+    state.firstExit &&
+    state.day === 1 &&
+    state.minutes < 420 &&
+    !state.forcedSleepDue
+  ) {
+    $("timeNote").textContent =
+      "PRIMEIRA NOITE · 1 HORA = 00:30";
+  }
+
+  if (
+    state.stage === "prologue" ||
+    state.day !== 1
+  ) {
+    return;
+  }
+
+  const q = chapter();
+  const clueCount =
+    Array.isArray(q?.clues)
+      ? q.clues.length
+      : 0;
+
+  if (clueCount < 3) {
+    $("objective").textContent =
+      "Investigue o quarto dos seus pais · pistas " +
+      clueCount +
+      "/3.";
+    return;
+  }
+
+  if (!state.firstExit) {
+    if (!state.key) {
+      $("objective").textContent =
+        state.stage === "key"
+          ? "Pegue a chave reserva atrás do relógio parado da sala."
+          : "Fale com seu irmão.";
+    } else {
+      $("objective").textContent =
+        "Use a chave reserva e saia de casa.";
+    }
+    return;
+  }
+
+  if (
+    !state.day1Progress.neighborVisited &&
+    !state.day1Progress.policeVisited
+  ) {
+    $("objective").textContent =
+      "Fale com Florinda na casa vizinha.";
+    return;
+  }
+
+  if (!state.day1Progress.neighborVisited) {
+    $("objective").textContent =
+      "Fale com Florinda na casa vizinha.";
+    return;
+  }
+
+  if (!state.day1Progress.policeVisited) {
+    $("objective").textContent =
+      "Registre o desaparecimento na delegacia.";
+    return;
+  }
+
+  $("objective").textContent =
+    "Continue explorando o bairro até o amanhecer.";
+};
+
+// Ajuda atualizada: a primeira noite é mais curta e não pula etapas.
 $("help").onclick = () => modal(
   "Como jogar",
-  "WASD / setas: andar. Shift/F: correr. E: interagir. I: inventário. J: diário. L: ligar/desligar a lanterna. Esc: pausar. ESPAÇO: soco apenas contra ameaças físicas compatíveis.\n\nNo Dia 1, o foco é investigar o desaparecimento: procure pistas, fale com Florinda e registre o caso. A casa de Florinda não funciona como estoque infinito: depois da primeira conversa, só faz sentido pedir comida quando a alimentação do seu irmão estiver abaixo de 60%, salvo quando a história exigir falar com ela.\n\nÀs 07:00, Estevão perde os sentidos.",
+  "WASD / setas: andar. Shift/F: correr. E: interagir. I: inventário. J: diário. L: ligar/desligar a lanterna. Esc: pausar. ESPAÇO: soco apenas contra ameaças físicas compatíveis.\n\nNa primeira noite, cada hora do jogo leva 30 segundos reais. Depois das três pistas, fale com seu irmão, pegue a chave reserva, saia de casa, converse com Florinda e registre o desaparecimento na delegacia. A primeira saída ainda pode mostrar a van à distância.\n\nNas noites seguintes, o ritmo volta para 1 hora do jogo por 1 minuto real. Às 07:00, Estevão perde os sentidos.",
   [["Voltar", closeModal]]
 );
 
-$("version").textContent = "PROTÓTIPO · 0.7.4";
+$("version").textContent = "PROTÓTIPO · 0.7.5";
   
   requestAnimationFrame(frame);
   showBootSplash();
