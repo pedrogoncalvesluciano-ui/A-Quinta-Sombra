@@ -19386,13 +19386,9 @@ function v080EnsureForgottenAlive() {
       state.storyFlags?.chapter4Complete ||
       state.chapter4?.bodySeen ||
       state.chapter4?.bodyReported ||
-      state.room === "westRoad" ||
-      (
-        state.day >= 6 &&
-        state.storyFlags?.raimundoMet &&
-        state.storyFlags?.mineExteriorSeen &&
-        state.storyFlags?.observerFirstSeen
-      )
+      state.storyFlags?.florindaChapter4Concern ||
+      state.flashlight?.owned ||
+      state.room === "westRoad"
     );
 
   if (alreadyPastForgottenAlive) {
@@ -19812,18 +19808,25 @@ function v080TriggerWestPresence() {
 }
 
 // Capítulo 4 não depende mais de simplesmente esperar chegar ao Dia 6.
-// Saves antigos continuam válidos pelo resultado da função-base.
-const v080Chapter4UnlockedBase =
-  v0649Chapter4Unlocked;
-
+// Saves que JÁ iniciaram a Rua Oeste continuam válidos por evidência real
+// de progresso; só chegar a um número de dia não libera conteúdo.
 v0649Chapter4Unlocked = function() {
-  const legacy =
-    v080Chapter4UnlockedBase();
-
-  if (legacy) return true;
-
   const f =
     state?.forgottenAlive;
+
+  const legacyProgress =
+    Boolean(
+      state?.storyFlags?.chapter4Complete ||
+      state?.chapter4?.bodySeen ||
+      state?.chapter4?.bodyReported ||
+      state?.storyFlags?.florindaChapter4Concern ||
+      state?.flashlight?.owned ||
+      state?.room === "westRoad"
+    );
+
+  if (legacyProgress) {
+    return true;
+  }
 
   return Boolean(
     state &&
