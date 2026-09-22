@@ -2,7 +2,7 @@
 "use strict";
 
 /*
-  A QUINTA SOMBRA — 0.8.1
+  A QUINTA SOMBRA — 0.8.2
 
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
@@ -2300,8 +2300,10 @@ function drawCharacterSprite(
     say([
       ["Pai", "Nós vamos até o mercado. Cuide do seu irmão até voltarmos."],
       ["Mãe", "Deixei uma porção para ele na cozinha. Fiquem dentro de casa."],
-      ["Você", "Vocês vão demorar?"],
+      ["Pai", "Qualquer coisa, manda mensagem. O celular está carregado, né?"],
+      ["Você", "Tá. Vocês vão demorar?"],
       ["Pai", "Vamos comprar as coisas rápido e já voltar."],
+      ["Mãe", "Se a gente demorar, não sai com seu irmão. Manda mensagem primeiro."],
       ["Irmão", "Eu vou esperar vocês aqui."]
     ], () => {
       state.familyFarewell = true;
@@ -6974,6 +6976,9 @@ function v0630PoliceParents() {
       ? [
           ["Policial", "Certo. Desde quando seus pais estão desaparecidos?"],
           ["Você", "Eles foram ao mercado e não voltaram."],
+          ["Policial", "Você tentou ligar ou mandar mensagem?"],
+          ["Você", "Tentei. Os dois contatos ficam sem sinal, até dentro de casa."],
+          ["Policial", "Vou anotar isso também. Pode ser só problema de rede, mas é informação."],
           ["Policial", "Vou registrar. Se soubermos de alguma coisa, avisamos."]
         ]
       : count === 1
@@ -7157,7 +7162,9 @@ interact = function (action) {
       [
         ["Vizinha", "Seus pais ainda não voltaram?"],
         ["Você", "Eles foram ao mercado e não apareceram mais."],
-        ["Vizinha", "Leve isto para o seu irmão. Não é muito, mas deve ajudar."],
+        ["Vizinha", "E o celular? Conseguiu falar com algum deles?"],
+        ["Você", "Não. Continua aparecendo sem sinal nos dois."],
+        ["Vizinha", "Se isso mudar, me avisa. Por enquanto, leve isto para o seu irmão."],
         ["Vizinha", "E não fique andando sozinho pela rua por muito tempo."]
       ],
       () => {
@@ -8062,7 +8069,8 @@ function v0639FinishPrologueAtNorth() {
       say(
         [
           ["Pai", "Vamos comprar as coisas rápido e já voltar."],
-          ["Mãe", "Vamos. Não deve demorar."]
+          ["Mãe", "Vamos. Não deve demorar."],
+          ["Pai", "Se precisar de alguma coisa, manda mensagem."]
         ],
         () => fade(
           "",
@@ -16791,8 +16799,10 @@ function v072FirstNeighborVisit() {
     [
       ["Florinda", "Estevão? O que você está fazendo fora a essa hora?"],
       ["Você", "Meus pais ainda não voltaram do mercado."],
-      ["Florinda", "Ainda não?"],
-      ["Você", "Não. Eu queria saber se a senhora viu eles voltando."],
+      ["Florinda", "Ainda não? Você já tentou ligar ou mandar mensagem pra eles?"],
+      ["Você", "Já. Nos dois contatos aparece sem sinal."],
+      ["Florinda", "Sem sinal até dentro de casa? Estranho. Aqui a rede costuma funcionar."],
+      ["Você", "Eu queria saber se a senhora viu eles voltando."],
       ["Florinda", "Não vi."],
       ["Florinda", "Se eles continuarem desaparecidos, fala com o Anísio na delegacia. E não deixa seu irmão sozinho por muito tempo."],
       ["Você", "Ele acabou de comer. Está bem por enquanto."],
@@ -22253,7 +22263,7 @@ $("help").onclick = () => modal(
   [["Entendi", closeModal]]
 );
 
-$("version").textContent = "PROTÓTIPO · 0.8.1";
+$("version").textContent = "PROTÓTIPO · 0.8.2";
   
   requestAnimationFrame(frame);
   showBootSplash();
