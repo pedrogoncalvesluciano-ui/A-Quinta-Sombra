@@ -14502,7 +14502,7 @@ update = function(dt) {
   if (
     (state.homeAtmosphere?.pendingRadio ||
       state.homeAtmosphere?.pendingKnock) &&
-    !["village", "square", "oldRoad", "westRoad", "market", "police"].includes(state.room)
+    !["village", "northRoad", "squareRoad", "square", "oldRoad", "westRoad", "market", "police"].includes(state.room)
   ) {
     state.homeAtmosphere.timer -= dt;
 
@@ -18412,6 +18412,33 @@ update = function(dt) {
     !dialog &&
     $("overlay").hidden
   ) {
+    // As ruas adicionadas na 0.7.6 também recebem eventos de rua.
+    // No bairro principal o timer já é atualizado pelo sistema-base,
+    // então aqui tratamos apenas as duas áreas novas.
+    if (
+      ["northRoad", "squareRoad"].includes(state.room) &&
+      state.danger?.phase === "safe"
+    ) {
+      const randomEvent =
+        state.randomEventState;
+
+      if (randomEvent?.pending) {
+        randomEvent.timer -= dt;
+
+        if (randomEvent.timer <= 0) {
+          v0645TriggerRandomEvent();
+        }
+      }
+
+      if (state.smallEventState?.pending) {
+        state.smallEventState.timer -= dt;
+
+        if (state.smallEventState.timer <= 0) {
+          v070TriggerSmallOutingEvent();
+        }
+      }
+    }
+
     v077UpdateFollower(dt);
     v077UpdateHunter(dt);
   }
