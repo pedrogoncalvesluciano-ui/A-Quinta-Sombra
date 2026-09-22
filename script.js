@@ -19225,12 +19225,6 @@ const V080_OSMAR_POS = {
   y: 750
 };
 
-const V080_NEWSPAPER_POS = {
-  // Reaproveita o papel que já existia visualmente na rua do mercado.
-  x: 325,
-  y: 825
-};
-
 const V080_YARD_TRACE_POS = {
   x: 586,
   y: 620
@@ -19300,7 +19294,7 @@ function v080EnsureForgottenAlive() {
     "marketDrift",
     "osmar",
     "brotherYard",
-    "mineNewspaper"
+    "mineArchive"
   ]) {
     if (typeof f.completed[id] !== "boolean") {
       f.completed[id] = false;
@@ -19325,10 +19319,6 @@ function v080EnsureForgottenAlive() {
 
   if (!Number.isFinite(f.brotherYardStage)) {
     f.brotherYardStage = 0;
-  }
-
-  if (typeof f.mineNewspaperSeen !== "boolean") {
-    f.mineNewspaperSeen = false;
   }
 
   if (typeof f.westPresenceArmed !== "boolean") {
@@ -19731,39 +19721,6 @@ function v080InspectYardTrace() {
   );
 }
 
-function v080ReadMineNewspaper() {
-  prepareSystems();
-
-  const f =
-    state.forgottenAlive;
-
-  if (f.mineNewspaperSeen) {
-    say([
-      "O jornal está encharcado. Eu já anotei o que ainda dava para ler."
-    ]);
-    return;
-  }
-
-  say(
-    [
-      "É uma página velha de jornal, dobrada e presa no meio-fio.",
-      "A manchete ainda pode ser lida:",
-      "“DESABAMENTO NA MINA DE FORGOTTEN — buscas continuam após acidente.”",
-      "A data é de quase quarenta anos atrás.",
-      "O restante fala em turnos noturnos, galerias interditadas e famílias esperando notícias.",
-      "Não cita meus pais. Mas confirma que Raimundo não exagerou sobre o tamanho do acidente."
-    ],
-    () => {
-      f.mineNewspaperSeen = true;
-
-      v080CompleteFragment(
-        "mineNewspaper",
-        "Jornal da mina"
-      );
-    }
-  );
-}
-
 function v080TriggerWestPresence() {
   prepareSystems();
 
@@ -19982,22 +19939,6 @@ getNear = function() {
   if (
     f &&
     state.room === "northRoad" &&
-    f.started &&
-    !f.mineNewspaperSeen &&
-    Math.hypot(
-      state.x - V080_NEWSPAPER_POS.x,
-      state.y - V080_NEWSPAPER_POS.y
-    ) < 46
-  ) {
-    return {
-      label: "Examinar o jornal molhado",
-      action: "v080MineNewspaper"
-    };
-  }
-
-  if (
-    f &&
-    state.room === "northRoad" &&
     f.osmarStage >= 1 &&
     Math.hypot(
       state.x - V080_OSMAR_POS.x,
@@ -20033,11 +19974,6 @@ getNear = function() {
 const v080InteractBase = interact;
 interact = function(action) {
   prepareSystems();
-
-  if (action === "v080MineNewspaper") {
-    v080ReadMineNewspaper();
-    return;
-  }
 
   if (action === "v080Osmar") {
     v080TalkOsmar();
@@ -20399,9 +20335,9 @@ openJournal = function() {
     );
   }
 
-  if (f.completed.mineNewspaper) {
+  if (f.completed.mineArchive) {
     notes.push(
-      "Um jornal antigo confirma um grande desabamento na mina de Forgotten há quase quarenta anos."
+      "Um arquivo digitalizado confirma um grande desabamento na mina de Forgotten há quase quarenta anos."
     );
   }
 
@@ -20489,7 +20425,6 @@ v0645RunDevCommand = function(raw) {
     state.forgottenAlive.completed.marketDrift = false;
     state.forgottenAlive.completed.osmar = false;
     state.forgottenAlive.completed.brotherYard = false;
-    state.forgottenAlive.completed.mineNewspaper = false;
     state.forgottenAlive.completed.mineArchive = false;
     if (state.phone) {
       state.phone.mineArchiveRead = false;
