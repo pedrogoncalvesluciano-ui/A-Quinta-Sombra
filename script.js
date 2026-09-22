@@ -20362,6 +20362,102 @@ updateHud = function() {
   }
 };
 
+// O diário mostra somente descobertas feitas.
+// Não revela quantos Fragmentos faltam nem vira uma checklist.
+const v080OpenJournalBase =
+  openJournal;
+
+openJournal = function() {
+  v080OpenJournalBase();
+
+  if (
+    !state?.forgottenAlive?.started
+  ) {
+    return;
+  }
+
+  const root =
+    $("modalText");
+
+  if (!root) return;
+
+  const notes = [];
+  const f =
+    state.forgottenAlive;
+
+  if (f.completed.marketDrift) {
+    notes.push(
+      "O funcionário do mercado mudou a própria lembrança sobre a saída dos meus pais."
+    );
+  }
+
+  if (f.completed.osmar) {
+    notes.push(
+      "Osmar viu um casal parecido com meus pais entrando no mercado, mas não viu quando saíram."
+    );
+  }
+
+  if (f.completed.brotherYard) {
+    notes.push(
+      "Meu irmão viu algo no quintal. Encontrei uma marca funda no solo e um fio escuro preso no muro."
+    );
+  }
+
+  if (f.completed.mineNewspaper) {
+    notes.push(
+      "Um jornal antigo confirma um grande desabamento na mina de Forgotten há quase quarenta anos."
+    );
+  }
+
+  if (f.westPresenceSeen) {
+    notes.push(
+      "Uma presença escura apareceu na direção da Rua Oeste e desapareceu quando tentei olhar diretamente."
+    );
+  }
+
+  if (!notes.length) {
+    return;
+  }
+
+  const title =
+    document.createElement("strong");
+
+  title.textContent =
+    "FRAGMENTOS DE FORGOTTEN";
+
+  title.style.display =
+    "block";
+
+  title.style.marginTop =
+    "18px";
+
+  root.append(title);
+
+  const box =
+    document.createElement("div");
+
+  box.style.display =
+    "grid";
+
+  box.style.gap =
+    "7px";
+
+  box.style.marginTop =
+    "10px";
+
+  for (const note of notes) {
+    const row =
+      document.createElement("div");
+
+    row.textContent =
+      "• " + note;
+
+    box.append(row);
+  }
+
+  root.append(box);
+};
+
 // Comando de teste focado na nova camada sem alterar a progressão normal.
 const v080DevCommandBase =
   v0645RunDevCommand;
