@@ -17406,6 +17406,20 @@ function v076DrawSquareRoad() {
     building(o);
   }
 
+  // Postes acompanham os pontos de luz do passe visual global.
+  for (const [lx, ly] of [
+    [240, 285],
+    [610, 285],
+    [960, 285],
+    [240, 455],
+    [610, 455],
+    [960, 455]
+  ]) {
+    rect(lx, ly, 4, 34, "#343a39");
+    rect(lx - 4, ly - 3, 12, 5, "#4d5350");
+    rect(lx - 2, ly - 1, 8, 3, "#d2b777");
+  }
+
   // Árvores no fundo da rua reforçam que o asfalto não continua.
   for (const [x, y] of [
     [1090, 180],
@@ -22705,7 +22719,10 @@ drawWorld = function() {
 
   if (
     !state ||
-    mode !== "game"
+    mode !== "game" ||
+    state.dawnCollapse?.active ||
+    state.wakeUp?.active ||
+    transitionBusy
   ) {
     return;
   }
