@@ -17572,7 +17572,1069 @@ updateHud = function() {
   }
 };
 
-$("version").textContent = "PROTÓTIPO · 0.7.6";
+// =========================================================
+// 0.7.7 — PROGRESSÃO DO OBSERVADOR + DIRETOR DE EVENTOS
+// =========================================================
+
+let v077ObserverUntil = 0;
+let v077ObserverStaticUntil = 0;
+let v077ThreatStaticUntil = 0;
+
+function v077EnsureSystems() {
+  if (!state) return;
+
+  if (!state.storyFlags || typeof state.storyFlags !== "object") {
+    state.storyFlags = {};
+  }
+
+  for (const [key, fallback] of [
+    ["squareObserverArmed", false],
+    ["squareObserverSeen", false],
+    ["squareObserverReported", false]
+  ]) {
+    if (typeof state.storyFlags[key] !== "boolean") {
+      state.storyFlags[key] = fallback;
+    }
+  }
+
+  // Migração: quem já avançou para Raimundo/mina não volta para trás.
+  if (
+    state.storyFlags.raimundoMet ||
+    state.storyFlags.mineExteriorSeen ||
+    state.storyFlags.observerFirstSeen
+  ) {
+    state.storyFlags.squareObserverSeen = true;
+    state.storyFlags.squareObserverReported = true;
+    state.storyFlags.squareObserverArmed = false;
+  } else if (
+    state.squareManFirstSpeechDone &&
+    !state.storyFlags.squareObserverSeen
+  ) {
+    state.storyFlags.squareObserverArmed = true;
+  }
+
+  // O primeiro avistamento agora acontece na saída da praça.
+  // Impede o gatilho antigo da estrada sul de duplicar a mesma revelação.
+  if (state.storyFlags.squareObserverSeen) {
+    state.storyFlags.observerFirstSeen = true;
+    state.storyFlags.southObserverPending = false;
+  }
+
+  if (!state.eventDirector || typeof state.eventDirector !== "object") {
+    state.eventDirector = {
+      outingCount: 0,
+      noEventStreak: 0,
+      outingsSinceThreat: 3,
+      recentMajor: [],
+      lastBrotherLine: "",
+      brotherQueue: [],
+      squareReturnReady: false,
+      follower: null,
+      hunter: null
+    };
+  }
+
+  const d = state.eventDirector;
+
+  for (const key of [
+    "outingCount",
+    "noEventStreak",
+    "outingsSinceThreat"
+  ]) {
+    if (!Number.isFinite(d[key])) d[key] = 0;
+  }
+
+  if (!Array.isArray(d.recentMajor)) d.recentMajor = [];
+  if (!Array.isArray(d.brotherQueue)) d.brotherQueue = [];
+  if (typeof d.lastBrotherLine !== "string") d.lastBrotherLine = "";
+  if (typeof d.squareReturnReady !== "boolean") d.squareReturnReady = false;
+
+  if (d.follower && typeof d.follower !== "object") d.follower = null;
+  if (d.hunter && typeof d.hunter !== "object") d.hunter = null;
+}
+
+const v077PrepareBase = prepareSystems;
+prepareSystems = function() {
+  v077PrepareBase();
+  v077EnsureSystems();
+};
+
+const V077_BROTHER_LINES = {
+  van: [
+    "Eu ouvi um carro parar lá fora. Ficou um tempo e depois foi embora.",
+    "Tinha um motor ligado perto de casa. Eu não cheguei perto da janela.",
+    "Um carro ficou parado aqui fora. Quando fui olhar pela cortina, já estava saindo."
+  ],
+  voices: [
+    "Eu ouvi alguém falando baixo no corredor. Achei que fosse você.",
+    "Uma voz chamou seu nome aqui dentro. Eu fiquei quieto porque você estava fora.",
+    "Eu ouvi alguém sussurrando perto da escada. Não parecia vir da rua."
+  ],
+  knock: [
+    "Bateram duas vezes na porta. Eu não respondi.",
+    "Alguém mexeu na maçaneta e depois bateu. Eu fiquei no quarto.",
+    "Eu ouvi batidas na entrada. Pararam quando eu cheguei perto do corredor."
+  ],
+  blackout: [
+    "As luzes daqui piscaram junto com as da rua.",
+    "Ficou tudo escuro por alguns segundos. O rádio fez um barulho estranho.",
+    "A energia caiu e voltou. Quando voltou, a porta do corredor estava aberta."
+  ],
+  invasion: [
+    "Eu ouvi alguma coisa andando lá embaixo. Não era passo normal.",
+    "O trinco mexeu enquanto você estava fora. Eu me escondi e não fiz barulho.",
+    "Tinha alguma coisa raspando perto da entrada. Depois ficou tudo quieto.",
+    "Eu ouvi passos subindo e depois descendo de novo. Eu não saí do quarto."
+  ],
+  shadowFollower: [
+    "Eu vi uma sombra passando pela janela. Ela parou quando eu cheguei perto.",
+    "Tinha alguma coisa do outro lado da rua olhando para a casa.",
+    "Eu achei que vi alguém seguindo você quando você saiu, mas não parecia uma pessoa."
+  ],
+  ambush: [
+    "Eu ouvi alguma coisa correndo pelo quintal quando você estava fora.",
+    "Teve um barulho forte lá fora, como se alguma coisa tivesse batido no muro.",
+    "Eu ouvi um rosnado ou... não sei. Não parecia cachorro."
+  ],
+  windowScratch: [
+    "Alguma coisa arranhou a janela do térreo. Três vezes.",
+    "Eu ouvi unha ou metal raspando no vidro. Quando fui olhar, não tinha ninguém.",
+    "A janela fez um barulho estranho. Parecia que alguém estava passando a mão do lado de fora."
+  ],
+  brotherEcho: [
+    "Eu também achei que ouvi você me chamando. Mas você estava fora.",
+    "Eu ouvi sua voz falando meu nome, só que vinha do andar de baixo.",
+    "Parecia você me chamando da sala. Eu sabia que você não estava aqui."
+  ],
+  wetFootprints: [
+    "Tinha marca molhada perto da escada. Eu limpei uma, mas apareceram outras.",
+    "O chão do corredor ficou molhado sem ninguém entrar.",
+    "Eu encontrei pegadas perto da sala. Elas terminavam no meio do corredor."
+  ],
+  distantSteps: [
+    "Eu ouvi passos acompanhando os seus lá fora. Quando você parava, eles paravam.",
+    "Tinha alguém andando do lado de fora no mesmo ritmo que você.",
+    "Eu fiquei ouvindo passos na rua. Eles nunca chegaram na porta."
+  ],
+  observer: [
+    "Na hora que você voltou da praça, a televisão chiou mesmo desligada.",
+    "Quando você estava voltando, as luzes piscaram e eu ouvi um chiado muito alto."
+  ]
+};
+
+function v077BrotherRemark(type) {
+  prepareSystems();
+
+  const options =
+    V077_BROTHER_LINES[type] ||
+    V077_BROTHER_LINES.voices;
+
+  const available =
+    options.filter(line =>
+      line !== state.eventDirector.lastBrotherLine
+    );
+
+  const pool = available.length ? available : options;
+  const line =
+    pool[Math.floor(Math.random() * pool.length)];
+
+  state.eventDirector.lastBrotherLine = line;
+  return line;
+}
+
+function v077QueueBrotherRemark(type) {
+  prepareSystems();
+
+  const line = v077BrotherRemark(type);
+
+  if (!state.pendingBrotherRemark) {
+    state.pendingBrotherRemark = line;
+    return;
+  }
+
+  if (
+    !state.eventDirector.brotherQueue.includes(line) &&
+    state.eventDirector.brotherQueue.length < 2
+  ) {
+    state.eventDirector.brotherQueue.push(line);
+  }
+}
+
+function v077TriggerSquareObserver() {
+  prepareSystems();
+
+  if (
+    !state.storyFlags.squareObserverArmed ||
+    state.storyFlags.squareObserverSeen
+  ) {
+    return;
+  }
+
+  state.storyFlags.squareObserverArmed = false;
+  state.storyFlags.squareObserverSeen = true;
+  state.storyFlags.observerFirstSeen = true;
+  state.storyFlags.southObserverPending = false;
+  state.squareManReturnObserverPending = false;
+  state.eventDirector.squareReturnReady = false;
+
+  v077ObserverUntil = elapsed + 0.95;
+  v077ObserverStaticUntil = elapsed + 1.35;
+
+  keys.clear();
+  v077QueueBrotherRemark("observer");
+
+  v06Toast(
+    "Uma forma preta surgiu no caminho e desapareceu na estática.",
+    2.7
+  );
+
+  updateHud();
+  save();
+}
+
+function v077PoliceObserverReport() {
+  prepareSystems();
+
+  if (state.storyFlags.squareObserverReported) {
+    say([
+      ["Você", "Sobre aquele vulto que eu vi saindo da praça..."],
+      ["Anísio", "Eu lembro. Sem descrição, testemunha ou marca física, não tenho o que registrar além do seu relato."],
+      ["Anísio", "Se acontecer de novo, não siga a coisa."]
+    ]);
+    return;
+  }
+
+  say(
+    [
+      ["Você", "Quando eu estava saindo da praça, apareceu um vulto preto na minha frente."],
+      ["Anísio", "Um vulto?"],
+      ["Você", "Não parecia uma pessoa. As luzes falharam, começou um chiado e ele sumiu."],
+      ["Anísio", "Você está há noites sem dormir direito procurando seus pais."],
+      ["Você", "Eu sei o que eu vi."],
+      ["Anísio", "Pode ter sido uma sombra, um animal ou cansaço. Não vou inventar uma ocorrência sem conseguir descrever o que estava ali."],
+      ["Anísio", "Mas, se quer continuar procurando, existe uma estrada ao sul. Raimundo mora por lá e conhece histórias antigas da cidade."],
+      ["Anísio", "Só não faça a besteira de seguir qualquer coisa para dentro da mata."]
+    ],
+    () => {
+      state.storyFlags.squareObserverReported = true;
+
+      v06Toast(
+        "Nova rota · estrada de terra ao sul",
+        2.6
+      );
+
+      updateHud();
+      save();
+    }
+  );
+}
+
+// Capítulo 3 deixa de depender de "esperar o Dia 4".
+// Agora depende da sequência investigativa que o jogador realmente cumpriu.
+v0648Chapter3Unlocked = function() {
+  prepareSystems();
+
+  return Boolean(
+    v0648Chapter2Unlocked() &&
+    state.storyFlags?.marketParentsConfirmed &&
+    state.squareManFirstSpeechDone &&
+    state.storyFlags?.squareObserverSeen &&
+    state.storyFlags?.squareObserverReported
+  );
+};
+
+const v077PoliceTopicsBase = v0630OpenPoliceTopics;
+v0630OpenPoliceTopics = function() {
+  prepareSystems();
+
+  const buttons = [];
+
+  buttons.push([
+    "Falar dos pais",
+    () => {
+      closeModal();
+      v0630PoliceParents();
+    }
+  ]);
+
+  if (state.storyFlags?.squareObserverSeen) {
+    buttons.push([
+      state.storyFlags.squareObserverReported
+        ? "Falar novamente do vulto"
+        : "Falar do vulto preto",
+      () => {
+        closeModal();
+        v077PoliceObserverReport();
+      }
+    ]);
+  }
+
+  if (state.storyEvents.oldManEncounters > 0) {
+    buttons.push([
+      "Falar do Raimundo",
+      () => {
+        closeModal();
+        v0630PoliceOldMan();
+      }
+    ]);
+  }
+
+  if (state.storyEvents.vanSightings > 0) {
+    buttons.push([
+      "Falar da van",
+      () => {
+        closeModal();
+        v0630PoliceVan();
+      }
+    ]);
+  }
+
+  if (state.chapter4?.bodySeen) {
+    buttons.push([
+      "Falar da rua oeste",
+      () => {
+        closeModal();
+        v0649PoliceBody();
+      }
+    ]);
+  }
+
+  if (v0650Chapter5Unlocked()) {
+    buttons.push([
+      v0650HasContradiction("policeRecord")
+        ? "Rever o registro estranho"
+        : "Conferir um relatório",
+      () => {
+        closeModal();
+        v0650PoliceContradiction();
+      }
+    ]);
+  }
+
+  if (
+    state.sideQuests?.westCase?.garciaStatement ||
+    state.sideQuests?.westCase?.evidenceFound
+  ) {
+    buttons.push([
+      "Reabrir o caso da rua oeste",
+      () => {
+        closeModal();
+        v070ResolveWestCase();
+      }
+    ]);
+  }
+
+  if (state.chapter8?.complete) {
+    buttons.push([
+      "Perguntar o que Anísio realmente pensa",
+      () => {
+        closeModal();
+        v070PoliceInsight();
+      }
+    ]);
+  }
+
+  buttons.push(["Sair", closeModal]);
+
+  modal(
+    "Delegacia",
+    "",
+    buttons
+  );
+};
+
+function v077WeightedChoice(items) {
+  if (!items.length) return null;
+
+  const total =
+    items.reduce((sum, item) => sum + item.weight, 0);
+
+  let roll = Math.random() * total;
+
+  for (const item of items) {
+    roll -= item.weight;
+    if (roll <= 0) return item.id;
+  }
+
+  return items[0].id;
+}
+
+function v077ChooseMajorEvent() {
+  prepareSystems();
+
+  const d = state.eventDirector;
+
+  const pool = [
+    { id: "van", weight: 11, minDay: 1 },
+    { id: "voices", weight: 14, minDay: 1 },
+    { id: "knock", weight: 12, minDay: 2 },
+    { id: "blackout", weight: 10, minDay: 2 },
+    { id: "windowScratch", weight: 10, minDay: 2 },
+    {
+      id: "shadowFollower",
+      weight: 13,
+      minDay: 2,
+      needsObserver: true
+    },
+    {
+      id: "ambush",
+      weight: 6,
+      minDay: 2,
+      needsObserver: true,
+      needsThreatGap: true
+    },
+    {
+      id: "invasion",
+      weight: 7,
+      minDay: 2,
+      needsFinished: true,
+      needsThreatGap: true
+    }
+  ].filter(item =>
+    state.day >= item.minDay &&
+    (!item.needsObserver || state.storyFlags.squareObserverSeen) &&
+    (!item.needsFinished || state.finished) &&
+    (!item.needsThreatGap || d.outingsSinceThreat >= 2) &&
+    !d.recentMajor.includes(item.id)
+  );
+
+  return v077WeightedChoice(pool);
+}
+
+// Sai de casa sem evento também é uma possibilidade.
+// Isso quebra o padrão previsível "porta -> ameaça -> irmão".
+v0645ScheduleOutingEvent = function() {
+  prepareSystems();
+
+  const d = state.eventDirector;
+  d.outingCount += 1;
+  d.outingsSinceThreat += 1;
+
+  // Mantém a van garantida da primeira noite.
+  if (
+    state.day === 1 &&
+    !state.day1Progress?.vanSeen
+  ) {
+    state.randomEventState.pending = true;
+    state.randomEventState.timer =
+      5 + Math.random() * 3;
+    state.randomEventState.type = "van";
+    save();
+    return;
+  }
+
+  // Durante a revelação praça -> policial, não empilha ameaça aleatória.
+  if (
+    (
+      state.storyFlags.squareObserverArmed &&
+      !state.storyFlags.squareObserverSeen
+    ) ||
+    (
+      state.storyFlags.squareObserverSeen &&
+      !state.storyFlags.squareObserverReported
+    )
+  ) {
+    state.randomEventState.pending = false;
+    state.smallEventState.pending = false;
+    save();
+    return;
+  }
+
+  const majorChance =
+    d.noEventStreak >= 2
+      ? 0.68
+      : 0.42;
+
+  const major =
+    Math.random() < majorChance
+      ? v077ChooseMajorEvent()
+      : null;
+
+  if (major) {
+    state.randomEventState.pending = true;
+    state.randomEventState.timer =
+      8 + Math.random() * 10;
+    state.randomEventState.type = major;
+
+    d.noEventStreak = 0;
+    d.recentMajor.push(major);
+    d.recentMajor = d.recentMajor.slice(-2);
+
+    if (major === "invasion" || major === "ambush") {
+      d.outingsSinceThreat = 0;
+    }
+  } else {
+    state.randomEventState.pending = false;
+    d.noEventStreak += 1;
+  }
+
+  const smallPool = [
+    { id: "windowLight", weight: 10, minDay: 2 },
+    { id: "brotherEcho", weight: 8, minDay: 2 },
+    { id: "foundFood", weight: 3, minDay: 2 },
+    { id: "burntSmell", weight: 6, minDay: 3 },
+    { id: "wetFootprints", weight: 8, minDay: 2 },
+    { id: "distantSteps", weight: 9, minDay: 2 }
+  ].filter(item => state.day >= item.minDay);
+
+  if (
+    smallPool.length &&
+    Math.random() < 0.30
+  ) {
+    state.smallEventState.pending = true;
+    state.smallEventState.timer =
+      5 + Math.random() * 10;
+    state.smallEventState.type =
+      v077WeightedChoice(smallPool);
+  } else {
+    state.smallEventState.pending = false;
+  }
+
+  save();
+};
+
+function v077SpawnRelative(distance = 115) {
+  const candidates = [
+    [-distance, 0],
+    [distance, 0],
+    [0, -distance],
+    [0, distance],
+    [-distance * 0.75, -distance * 0.75],
+    [distance * 0.75, distance * 0.75]
+  ];
+
+  const m = maps[state.room];
+
+  for (const [dx, dy] of candidates) {
+    const x = Math.max(28, Math.min(m.w - 28, state.x + dx));
+    const y = Math.max(28, Math.min(m.h - 28, state.y + dy));
+
+    if (!solid(x, y)) {
+      return { x, y };
+    }
+  }
+
+  return {
+    x: Math.max(28, state.x - 90),
+    y: state.y
+  };
+}
+
+const v077TriggerEventBase = v0645TriggerRandomEvent;
+v0645TriggerRandomEvent = function() {
+  prepareSystems();
+
+  const event = state.randomEventState;
+  if (!event?.pending) return;
+
+  const type = event.type;
+
+  if (type === "shadowFollower") {
+    event.pending = false;
+
+    const spawn = v077SpawnRelative(130);
+
+    state.eventDirector.follower = {
+      active: true,
+      room: state.room,
+      x: spawn.x,
+      y: spawn.y,
+      time: 9
+    };
+
+    v06Toast(
+      "Alguma coisa está acompanhando você do outro lado da rua.",
+      2.7
+    );
+
+    v077QueueBrotherRemark("shadowFollower");
+    save();
+    return;
+  }
+
+  if (type === "ambush") {
+    event.pending = false;
+
+    const spawn = v077SpawnRelative(120);
+
+    state.eventDirector.hunter = {
+      active: true,
+      room: state.room,
+      x: spawn.x,
+      y: spawn.y,
+      hp: 2,
+      flash: 0,
+      time: 16
+    };
+
+    v06Toast(
+      "Uma criatura escura saiu entre as casas. Ela está vindo na sua direção.",
+      2.9
+    );
+
+    v077QueueBrotherRemark("ambush");
+    save();
+    return;
+  }
+
+  if (type === "windowScratch") {
+    event.pending = false;
+
+    v06Toast(
+      "Um ruído de vidro raspando vem da direção da sua casa.",
+      2.6
+    );
+
+    v077QueueBrotherRemark("windowScratch");
+    save();
+    return;
+  }
+
+  if (type === "wetFootprints") {
+    event.pending = false;
+
+    v06Toast(
+      "Pegadas molhadas cruzam a calçada e terminam sem chegar a lugar nenhum.",
+      2.7
+    );
+
+    v077QueueBrotherRemark("wetFootprints");
+    save();
+    return;
+  }
+
+  if (type === "distantSteps") {
+    event.pending = false;
+
+    v06Toast(
+      "Passos acompanham o seu ritmo. Quando você para, eles param.",
+      2.7
+    );
+
+    v077QueueBrotherRemark("distantSteps");
+    save();
+    return;
+  }
+
+  v077TriggerEventBase();
+
+  if (
+    ["van", "voices", "knock", "blackout", "invasion", "brotherEcho"]
+      .includes(type)
+  ) {
+    v077QueueBrotherRemark(type);
+  }
+
+  save();
+};
+
+const v077PunchBase = punchInvader;
+punchInvader = function() {
+  prepareSystems();
+
+  const hunter = state.eventDirector?.hunter;
+
+  if (
+    hunter?.active &&
+    hunter.room === state.room &&
+    Math.hypot(
+      hunter.x - state.x,
+      hunter.y - state.y
+    ) <= 48
+  ) {
+    if (state.danger?.punch > 0) return;
+
+    if (state.danger) {
+      state.danger.punch = 0.45;
+    }
+
+    hunter.hp -= 1;
+    hunter.flash = 0.22;
+
+    if (hunter.hp <= 0) {
+      hunter.active = false;
+      v077ThreatStaticUntil = elapsed + 0.65;
+
+      v06Toast(
+        "A criatura recua e desaparece entre as casas.",
+        2.4
+      );
+
+      save();
+    }
+
+    return;
+  }
+
+  v077PunchBase();
+};
+
+function v077UpdateFollower(dt) {
+  const follower = state.eventDirector?.follower;
+
+  if (!follower?.active) return;
+
+  follower.time -= dt;
+
+  if (
+    follower.room !== state.room ||
+    follower.time <= 0
+  ) {
+    follower.active = false;
+    v077ThreatStaticUntil = elapsed + 0.5;
+    return;
+  }
+
+  const dx = state.x - follower.x;
+  const dy = state.y - follower.y;
+  const distance = Math.hypot(dx, dy) || 1;
+
+  if (distance > 88) {
+    const step = Math.min(22 * dt, distance - 84);
+
+    const nx = follower.x + dx / distance * step;
+    const ny = follower.y + dy / distance * step;
+
+    if (!solid(nx, follower.y)) follower.x = nx;
+    if (!solid(follower.x, ny)) follower.y = ny;
+  }
+}
+
+function v077UpdateHunter(dt) {
+  const hunter = state.eventDirector?.hunter;
+
+  if (!hunter?.active) return;
+
+  hunter.time -= dt;
+  hunter.flash = Math.max(0, hunter.flash - dt);
+
+  if (
+    hunter.room !== state.room ||
+    hunter.time <= 0
+  ) {
+    hunter.active = false;
+    return;
+  }
+
+  const dx = state.x - hunter.x;
+  const dy = state.y - hunter.y;
+  const distance = Math.hypot(dx, dy) || 1;
+
+  if (distance <= 19) {
+    hunter.active = false;
+    v077ThreatStaticUntil = elapsed + 0.8;
+    keys.clear();
+
+    v06Toast(
+      "A criatura te alcança. Você consegue se soltar antes que ela desapareça.",
+      2.8
+    );
+
+    save();
+    return;
+  }
+
+  const step = Math.min(48 * dt, Math.max(0, distance - 16));
+
+  const nx = hunter.x + dx / distance * step;
+  const ny = hunter.y + dy / distance * step;
+
+  if (!solid(nx, hunter.y)) hunter.x = nx;
+  if (!solid(hunter.x, ny)) hunter.y = ny;
+}
+
+const v077UpdateBase = update;
+update = function(dt) {
+  v077UpdateBase(dt);
+
+  if (
+    !state ||
+    mode !== "game" ||
+    transitionBusy ||
+    state.gameOver
+  ) {
+    return;
+  }
+
+  prepareSystems();
+
+  // Promove a próxima fala contextual do irmão sem sobrescrever histórias.
+  if (
+    !state.pendingBrotherRemark &&
+    state.eventDirector.brotherQueue.length &&
+    !dialog
+  ) {
+    state.pendingBrotherRemark =
+      state.eventDirector.brotherQueue.shift();
+  }
+
+  if (
+    state.room === "square" &&
+    state.storyFlags.squareObserverArmed &&
+    !state.storyFlags.squareObserverSeen
+  ) {
+    if (state.x >= 850) {
+      state.eventDirector.squareReturnReady = true;
+    }
+
+    if (
+      state.eventDirector.squareReturnReady &&
+      state.x <= 820 &&
+      !dialog &&
+      $("overlay").hidden
+    ) {
+      v077TriggerSquareObserver();
+      return;
+    }
+  }
+
+  if (
+    !dialog &&
+    $("overlay").hidden
+  ) {
+    v077UpdateFollower(dt);
+    v077UpdateHunter(dt);
+  }
+};
+
+function v077DrawBlackShape(x, y, flash = 0) {
+  const jitter =
+    Math.sin(elapsed * 41) * 1.5;
+
+  const body =
+    flash > 0
+      ? "#c8c9c4"
+      : "#030405";
+
+  rect(x - 15 + jitter, y - 26, 29, 18, body);
+  rect(x - 20, y - 12, 40, 11, body);
+  rect(x - 17, y - 3, 8, 14, body);
+  rect(x + 9, y - 4, 8, 15, body);
+  rect(x - 23, y - 17, 10, 6, "#050607");
+  rect(x + 13, y - 17, 11, 6, "#050607");
+}
+
+const v077DrawBase = drawWorld;
+drawWorld = function() {
+  v077DrawBase();
+
+  if (!state) return;
+
+  prepareSystems();
+
+  const follower =
+    state.eventDirector?.follower;
+
+  const hunter =
+    state.eventDirector?.hunter;
+
+  if (
+    follower?.active &&
+    follower.room === state.room
+  ) {
+    c.save();
+    c.translate(
+      -Math.floor(camera.x),
+      -Math.floor(camera.y)
+    );
+    v077DrawBlackShape(
+      follower.x,
+      follower.y,
+      0
+    );
+    c.restore();
+  }
+
+  if (
+    hunter?.active &&
+    hunter.room === state.room
+  ) {
+    c.save();
+    c.translate(
+      -Math.floor(camera.x),
+      -Math.floor(camera.y)
+    );
+    v077DrawBlackShape(
+      hunter.x,
+      hunter.y,
+      hunter.flash
+    );
+    c.restore();
+  }
+
+  // Mini jumpscare da primeira conversa com o homem da praça.
+  if (
+    state.room === "square" &&
+    elapsed < v077ObserverUntil
+  ) {
+    const x = W * 0.58;
+    const y = H * 0.63;
+    const scale =
+      1 + Math.sin(elapsed * 32) * 0.04;
+
+    c.save();
+    c.translate(x, y);
+    c.scale(scale, scale);
+
+    rect(-31, -52, 62, 31, "#020303");
+    rect(-43, -27, 86, 23, "#010202");
+    rect(-30, -5, 14, 34, "#010202");
+    rect(16, -7, 14, 36, "#010202");
+    rect(-48, -38, 20, 10, "#030404");
+    rect(28, -36, 21, 10, "#030404");
+
+    c.restore();
+  }
+
+  if (
+    elapsed < v077ObserverStaticUntil ||
+    elapsed < v077ThreatStaticUntil
+  ) {
+    const until =
+      Math.max(
+        v077ObserverStaticUntil,
+        v077ThreatStaticUntil
+      );
+
+    const strength =
+      Math.min(
+        1,
+        Math.max(until - elapsed, 0) / 0.8
+      );
+
+    for (let i = 0; i < 34; i++) {
+      const y =
+        (i * 17 + Math.floor(elapsed * 760)) % H;
+
+      rect(
+        -6 + (i % 3) * 3,
+        y,
+        W + 12,
+        1 + (i % 4 === 0 ? 2 : 0),
+        "rgba(225,230,220," +
+          (0.05 + strength * 0.16) +
+          ")"
+      );
+    }
+
+    if (Math.floor(elapsed * 28) % 3 === 0) {
+      rect(
+        0,
+        0,
+        W,
+        H,
+        "rgba(210,215,210," +
+          (0.04 + strength * 0.11) +
+          ")"
+      );
+    }
+  }
+};
+
+const v077EdgeNoticeBase = v0639EdgeNotice;
+v0639EdgeNotice = function(message) {
+  prepareSystems();
+
+  if (
+    message ===
+      "Ainda preciso procurar meus pais nas áreas mais próximas." ||
+    message ===
+      "Antes de ir tão longe, preciso confirmar o que aconteceu no mercado e na praça."
+  ) {
+    if (!state.storyFlags?.marketParentsConfirmed) {
+      message =
+        "Primeiro preciso confirmar no mercado se meus pais passaram por lá.";
+    } else if (!state.squareManFirstSpeechDone) {
+      message =
+        "Ainda preciso falar com o homem de cadeira de rodas na praça.";
+    } else if (!state.storyFlags.squareObserverSeen) {
+      message =
+        "Alguma coisa ficou pendente na praça. Preciso voltar lá.";
+    } else if (!state.storyFlags.squareObserverReported) {
+      message =
+        "Antes de seguir pela estrada, preciso contar ao Anísio o que vi saindo da praça.";
+    }
+  }
+
+  v077EdgeNoticeBase(message);
+};
+
+const v077InteractBase = interact;
+interact = function(action) {
+  prepareSystems();
+
+  if (action === "southLocked") {
+    if (!state.storyFlags?.marketParentsConfirmed) {
+      say([
+        "Primeiro preciso confirmar no mercado se meus pais realmente passaram por lá."
+      ]);
+      return;
+    }
+
+    if (!state.squareManFirstSpeechDone) {
+      say([
+        "Antes de ir tão longe, preciso falar com o homem de cadeira de rodas na praça."
+      ]);
+      return;
+    }
+
+    if (!state.storyFlags.squareObserverSeen) {
+      say([
+        "Ainda tem alguma coisa estranha ligada à praça. Preciso voltar lá."
+      ]);
+      return;
+    }
+
+    if (!state.storyFlags.squareObserverReported) {
+      say([
+        "Eu vi alguma coisa saindo da praça. Antes de seguir sozinho para a estrada, vou contar ao Anísio."
+      ]);
+      return;
+    }
+  }
+
+  v077InteractBase(action);
+};
+
+const v077HudBase = updateHud;
+updateHud = function() {
+  v077HudBase();
+
+  if (
+    !state ||
+    state.stage === "prologue"
+  ) {
+    return;
+  }
+
+  prepareSystems();
+
+  if (
+    v0648Chapter2Unlocked() &&
+    state.storyFlags?.marketParentsConfirmed &&
+    state.squareManFirstSpeechDone &&
+    !state.storyFlags?.raimundoMet
+  ) {
+    if (!state.storyFlags.squareObserverSeen) {
+      $("objective").textContent =
+        state.room === "square"
+          ? "Saia da região do homem da praça e volte pelo caminho de entrada."
+          : "Volte à praça. Algo ficou pendente depois da conversa com o homem de cadeira de rodas.";
+      return;
+    }
+
+    if (!state.storyFlags.squareObserverReported) {
+      $("objective").textContent =
+        "Conte ao Anísio, na delegacia, sobre o vulto preto que apareceu na praça.";
+      return;
+    }
+
+    $("objective").textContent =
+      "Siga pela estrada de terra ao sul e fale com Raimundo.";
+  }
+};
+
+$("version").textContent = "PROTÓTIPO · 0.7.7";
   
   requestAnimationFrame(frame);
   showBootSplash();
