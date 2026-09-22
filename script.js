@@ -7507,6 +7507,9 @@ drawWorld = function() {
 
   if (!state?.dawnCollapse?.active) return;
 
+  // 0.7.8: informa ao passe final que esta camada visual já foi desenhada.
+  v078DawnOverlayDrawnThisFrame = true;
+
   const collapse = state.dawnCollapse;
 
   if (collapse.phase === "dizzy") {
@@ -18721,7 +18724,263 @@ updateHud = function() {
   }
 };
 
-$("version").textContent = "PROTÓTIPO · 0.7.7";
+// =========================================================
+// 0.7.8 — DESMAIO VISÍVEL EM QUALQUER MAPA + PRAÇA AUTOMÁTICA
+// =========================================================
+
+// Algumas áreas externas desenham o mapa por um caminho próprio e pulavam
+// a camada antiga do desmaio. Este sinal permite um passe final de segurança.
+let v078DawnOverlayDrawnThisFrame = false;
+
+function v078DrawDawnCollapseOverlay() {
+  if (!state?.dawnCollapse?.active) return;
+
+  const collapse = state.dawnCollapse;
+
+  if (collapse.phase === "dizzy") {
+    const p =
+      Math.min(1, collapse.time / 2.2);
+
+    // Vinheta/escurecimento crescente.
+    rect(
+      0,
+      0,
+      W,
+      H,
+      "rgba(7,9,12," +
+        (0.16 + p * 0.60) +
+        ")"
+    );
+
+    // Interferência horizontal.
+    for (let i = 0; i < 18; i++) {
+      const y =
+        (
+          i * 27 +
+          Math.sin(elapsed * 8 + i) * 11 +
+          H
+        ) % H;
+
+      const alpha =
+        0.04 + p * 0.13;
+
+      rect(
+        Math.sin(elapsed * 11 + i) * 10,
+        y,
+        W + 18,
+        2 + (i % 4),
+        "rgba(220,224,216," +
+          alpha +
+          ")"
+      );
+    }
+
+    // Pequenos cortes laterais dão sensação de perda de equilíbrio.
+    const sway =
+      Math.sin(elapsed * 10) * 8 * p;
+
+    rect(
+      sway - 10,
+      0,
+      12,
+      H,
+      "rgba(185,178,163," +
+        (0.03 + p * 0.08) +
+        ")"
+    );
+
+    if (collapse.time > 0.45) {
+      txt(
+        collapse.time < 1.2
+          ? "Minha cabeça..."
+          : "Eu não consigo ficar em pé.",
+        24,
+        H - 28,
+        "#ded7c4",
+        8
+      );
+    }
+  }
+
+  if (collapse.phase === "black") {
+    rect(0, 0, W, H, "#000");
+
+    if (
+      collapse.time > 0.35 &&
+      collapse.time < 1.05
+    ) {
+      txt(
+        "...",
+        W / 2 - 8,
+        H / 2,
+        "#77736b",
+        10
+      );
+    }
+  }
+
+  if (collapse.phase === "dayCard") {
+    rect(0, 0, W, H, "#000");
+
+    const previousDay =
+      Math.max(1, state.day || 1);
+
+    const nextDay =
+      previousDay + 1;
+
+    const t =
+      collapse.time;
+
+    // "DIA 2" desce e então vira "DIA 3", por exemplo.
+    const drop =
+      Math.min(1, t / 1.15);
+
+    const easedDrop =
+      1 - Math.pow(1 - drop, 3);
+
+    const titleY =
+      -28 +
+      (H / 2 + 24) * easedDrop;
+
+    const shownDay =
+      t < 1.45
+        ? previousDay
+        : nextDay;
+
+    const fadeOut =
+      t < 2.65
+        ? 1
+        : Math.max(
+            0,
+            1 - (t - 2.65) / 0.65
+          );
+
+    c.save();
+    c.globalAlpha = fadeOut;
+
+    txt(
+      "DIA " + shownDay,
+      W / 2 - 34,
+      titleY,
+      "#d8d1bc",
+      14
+    );
+
+    if (t >= 1.45) {
+      txt(
+        "00:00",
+        W / 2 - 18,
+        titleY + 22,
+        "#9f9989",
+        9
+      );
+    }
+
+    c.restore();
+  }
+}
+
+const v078DrawBase = drawWorld;
+drawWorld = function() {
+  v078DawnOverlayDrawnThisFrame = false;
+
+  v078DrawBase();
+
+  // Se o mapa atual pulou a implementação de 0.6.32, desenha a mesma
+  // sequência no topo de tudo. Assim nenhuma área pode esconder o desmaio.
+  if (
+    state?.dawnCollapse?.active &&
+    !v078DawnOverlayDrawnThisFrame
+  ) {
+    v078DrawDawnCollapseOverlay();
+  }
+};
+
+// A rua da praça não precisa mais de um ponto de interação com [E].
+if (maps.squareRoad?.doors) {
+  maps.squareRoad.doors =
+    maps.squareRoad.doors.filter(
+      door =>
+        door.action !==
+        "squareRoadEntrance"
+    );
+}
+
+function v078EnterSquareAutomatically() {
+  if (
+    !state ||
+    state.room !== "squareRoad" ||
+    transitionBusy ||
+    dialog
+  ) {
+    return;
+  }
+
+  fade(
+    "Praça central",
+    "Fim da rua leste",
+    () => {
+      const firstVisit =
+        !state.storyFlags.squareVisited;
+
+      state.storyFlags.squareVisited = true;
+      state.storyFlags.squareVisitCount =
+        (state.storyFlags.squareVisitCount || 0) + 1;
+
+      v076SetOutdoorRoom(
+        "square",
+        82,
+        500,
+        "right"
+      );
+
+      if (firstVisit) {
+        v06Toast(
+          "Praça central · procure alguém que possa ter visto seus pais.",
+          2.6
+        );
+      }
+    }
+  );
+}
+
+const v078UpdateBase = update;
+update = function(dt) {
+  v078UpdateBase(dt);
+
+  if (
+    !state ||
+    mode !== "game" ||
+    dialog ||
+    transitionBusy ||
+    !$("overlay").hidden ||
+    state.dawnCollapse?.active ||
+    state.wakeUp?.active
+  ) {
+    return;
+  }
+
+  const right =
+    keys.has("d") ||
+    keys.has("arrowright");
+
+  // O limite físico do mapa já impede sair da tela. Ao continuar andando
+  // para a direita no fim da rua, a praça é carregada automaticamente.
+  const squareRoadThreshold =
+    maps.squareRoad.w -
+    housePoint(58);
+
+  if (
+    state.room === "squareRoad" &&
+    state.x >= squareRoadThreshold &&
+    right
+  ) {
+    state.x = squareRoadThreshold;
+    v078EnterSquareAutomatically();
+  }
+};
+
+$("version").textContent = "PROTÓTIPO · 0.7.8";
   
   requestAnimationFrame(frame);
   showBootSplash();
