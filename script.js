@@ -2,7 +2,7 @@
 "use strict";
 
 /*
-  A QUINTA SOMBRA — 0.8.2
+  A QUINTA SOMBRA — 0.8.3
 
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
@@ -564,7 +564,7 @@ for (const kind of Object.keys(characterSpriteSheets)) {
     const image = new Image();
 
     image.src =
-      `assets/sprites/characters/${kind}/${animation}.png?v=0.6.40`;
+      `assets/sprites/characters/${kind}/${animation}.png?v=0.8.3`;
 
     characterSpriteSheets[kind][animation] = image;
   }
@@ -979,16 +979,45 @@ function drawCharacterSprite(
       ];
   }
 
-  const image = sheets[animation];
+  let image = sheets[animation];
 
+  const imageReady = candidate =>
+    Boolean(
+      candidate &&
+      candidate.complete &&
+      candidate.naturalWidth > 0 &&
+      candidate.naturalHeight > 0
+    );
+
+  // Se a animação de caminhada ainda não carregou (ou falhou no cache),
+  // mantém o personagem usando o sprite real de idle em vez do fallback
+  // geométrico de Canvas. Isso evita a mãe "virar boneco de blocos".
   if (
-    !image ||
-    !image.complete ||
-    image.naturalWidth <= 0 ||
-    image.naturalHeight <= 0
+    !imageReady(image) &&
+    animation !== "idle" &&
+    imageReady(sheets.idle)
   ) {
+    animation = "idle";
+    frame = 0;
+    image = sheets.idle;
+  }
+
+  if (!imageReady(image)) {
     return false;
   }
+
+  const columns = Math.max(
+    1,
+    Math.floor(
+      image.naturalWidth / CHARACTER_FRAME_SIZE
+    )
+  );
+
+  // Protege contra spritesheets com menos quadros do que o ciclo esperado.
+  frame = Math.max(
+    0,
+    Math.min(frame, columns - 1)
+  );
 
   const rows = Math.max(
     1,
@@ -22263,7 +22292,7 @@ $("help").onclick = () => modal(
   [["Entendi", closeModal]]
 );
 
-$("version").textContent = "PROTÓTIPO · 0.8.2";
+$("version").textContent = "PROTÓTIPO · 0.8.3";
   
   requestAnimationFrame(frame);
   showBootSplash();
