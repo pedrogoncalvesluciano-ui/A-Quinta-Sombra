@@ -2,7 +2,7 @@
 "use strict";
 
 /*
-  A QUINTA SOMBRA — 0.8.4
+  A QUINTA SOMBRA — 0.8.5
 
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
@@ -1065,25 +1065,6 @@ function drawCharacterSprite(
     face = "down",
     scale = 1
   ) {
-    // 0.8.4: sombra de contato. Dá peso ao sprite sem alterar hitbox.
-    const shadowScale =
-      (CHARACTER_BASE_SCALE[kind] || 0.82) * scale;
-
-    c.save();
-    c.fillStyle = "rgba(3,8,10,0.28)";
-    c.beginPath();
-    c.ellipse(
-      Math.round(x),
-      Math.round(y - 1),
-      Math.max(5, 11 * shadowScale),
-      Math.max(2, 4 * shadowScale),
-      0,
-      0,
-      Math.PI * 2
-    );
-    c.fill();
-    c.restore();
-
     if (
       drawCharacterSprite(
         x,
@@ -22734,7 +22715,7 @@ drawWorld = function() {
   v084DrawFineGrain();
 };
 
-$("version").textContent = "PROTÓTIPO · 0.8.4";
+$("version").textContent = "PROTÓTIPO · 0.8.5";
   
   requestAnimationFrame(frame);
   showBootSplash();
