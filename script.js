@@ -2,7 +2,7 @@
 "use strict";
 
 /*
-  A QUINTA SOMBRA — 0.8.3
+  A QUINTA SOMBRA — 0.8.4
 
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
@@ -1065,6 +1065,25 @@ function drawCharacterSprite(
     face = "down",
     scale = 1
   ) {
+    // 0.8.4: sombra de contato. Dá peso ao sprite sem alterar hitbox.
+    const shadowScale =
+      (CHARACTER_BASE_SCALE[kind] || 0.82) * scale;
+
+    c.save();
+    c.fillStyle = "rgba(3,8,10,0.28)";
+    c.beginPath();
+    c.ellipse(
+      Math.round(x),
+      Math.round(y - 1),
+      Math.max(5, 11 * shadowScale),
+      Math.max(2, 4 * shadowScale),
+      0,
+      0,
+      Math.PI * 2
+    );
+    c.fill();
+    c.restore();
+
     if (
       drawCharacterSprite(
         x,
@@ -1315,8 +1334,14 @@ function drawCharacterSprite(
       return;
     }
 
-    rect(x + 7, y + 20, w, h, "#060d1644");
+    // 0.8.4: volume da construção em camadas.
+    rect(x + 11, y + 25, w + 3, h - 2, "#02070a55");
+    rect(x + 6, y + 18, w + 2, h, "#0810183b");
+
     rect(x, y + 30, w, h - 30, "#6e6b58");
+    rect(x, y + h - 12, w, 12, "#585544");
+    rect(x + w - 7, y + 35, 7, h - 35, "#4f5145");
+    rect(x + 5, y + 35, 4, h - 42, "#85816c55");
 
     for (let j = 40; j < h; j += 16) {
       for (let i = 5; i < w - 10; i += 25) {
@@ -1330,7 +1355,9 @@ function drawCharacterSprite(
       }
     }
 
-    rect(x - 10, y, w + 20, 55, "#34434a");
+    rect(x - 10, y, w + 20, 55, "#2d3a40");
+    rect(x - 7, y + 3, w + 14, 4, "#526168");
+    rect(x - 10, y + 50, w + 20, 7, "#1b262b");
 
     for (let j = 3; j < 50; j += 9) {
       for (let i = 0; i < w; i += 18) {
@@ -1341,7 +1368,20 @@ function drawCharacterSprite(
     rect(x + w / 2 - 18, y + h - 49, 36, 49, "#382e29");
 
     for (const wx of [x + 24, x + w - 51]) {
+      rect(wx - 2, y + 70, 32, 35, "#1b2223");
       rect(wx, y + 72, 28, 31, "#292f30");
+
+      const nightWindow =
+        state &&
+        state.stage !== "prologue" &&
+        (
+          state.minutes < 420 ||
+          state.minutes >= 1080
+        );
+
+      const litWindow =
+        nightWindow &&
+        hash(wx + x, y + h) > 0.36;
 
       rect(
         wx + 3,
@@ -1350,8 +1390,14 @@ function drawCharacterSprite(
         25,
         state && state.stage === "prologue"
           ? "#a8b3a1"
-          : "#b29b5e"
+          : litWindow
+            ? "#c5aa68"
+            : "#68716a"
       );
+
+      if (litWindow) {
+        rect(wx + 5, y + 77, 18, 2, "#e0c98b66");
+      }
 
       rect(wx + 13, y + 73, 2, 29, "#343732");
       rect(wx, y + 87, 28, 2, "#343732");
@@ -17203,7 +17249,38 @@ function v076SetOutdoorRoom(room, x, y, facing) {
 }
 
 function v076DrawRoadTexture(x, y, w, h, horizontal = false) {
-  rect(x, y, w, h, "#706b5f");
+  rect(x, y, w, h, "#69665d");
+
+  // Sombra nas bordas dá espessura ao asfalto.
+  if (horizontal) {
+    rect(x, y, w, 5, "#4f514c55");
+    rect(x, y + h - 5, w, 5, "#3f444155");
+  } else {
+    rect(x, y, 5, h, "#4f514c55");
+    rect(x + w - 5, y, 5, h, "#3f444155");
+  }
+
+  // Desgaste determinístico: rachaduras e remendos leves.
+  const count = horizontal
+    ? Math.max(4, Math.floor(w / 150))
+    : Math.max(4, Math.floor(h / 150));
+
+  for (let i = 0; i < count; i++) {
+    const a = hash(i + x, y + h);
+    const b = hash(i + y, x + w);
+
+    if (horizontal) {
+      const px = x + 35 + a * Math.max(1, w - 70);
+      const py = y + 16 + b * Math.max(1, h - 32);
+      rect(px, py, 19, 2, "#4c4c4745");
+      rect(px + 7, py + 2, 2, 8, "#4c4c4738");
+    } else {
+      const px = x + 16 + a * Math.max(1, w - 32);
+      const py = y + 35 + b * Math.max(1, h - 70);
+      rect(px, py, 2, 20, "#4c4c4745");
+      rect(px + 2, py + 8, 8, 2, "#4c4c4738");
+    }
+  }
 
   if (horizontal) {
     for (let px = x + 28; px < x + w - 20; px += 58) {
@@ -17327,6 +17404,20 @@ function v076DrawSquareRoad() {
   // Casas residenciais.
   for (const o of m.objects) {
     building(o);
+  }
+
+  // Postes acompanham os pontos de luz do passe visual global.
+  for (const [lx, ly] of [
+    [240, 285],
+    [610, 285],
+    [960, 285],
+    [240, 455],
+    [610, 455],
+    [960, 455]
+  ]) {
+    rect(lx, ly, 4, 34, "#343a39");
+    rect(lx - 4, ly - 3, 12, 5, "#4d5350");
+    rect(lx - 2, ly - 1, 8, 3, "#d2b777");
   }
 
   // Árvores no fundo da rua reforçam que o asfalto não continua.
@@ -22292,7 +22383,358 @@ $("help").onclick = () => modal(
   [["Entendi", closeModal]]
 );
 
-$("version").textContent = "PROTÓTIPO · 0.8.3";
+// =========================================================
+// 0.8.4 — CANVAS VISUAL PASS
+// ILUMINAÇÃO, ATMOSFERA E PROFUNDIDADE GLOBAL
+// =========================================================
+
+const V084_OUTDOOR_ROOMS = new Set([
+  "village",
+  "northRoad",
+  "squareRoad",
+  "square",
+  "oldRoad",
+  "westRoad"
+]);
+
+function v084NightStrength() {
+  if (!state) return 0;
+
+  if (state.stage === "prologue") {
+    return 0;
+  }
+
+  const m =
+    ((state.minutes % 1440) + 1440) % 1440;
+
+  if (m < 300) return 1;
+
+  if (m < 420) {
+    return 1 - (m - 300) / 120;
+  }
+
+  if (m < 1020) return 0;
+
+  if (m < 1260) {
+    return (m - 1020) / 240;
+  }
+
+  return 1;
+}
+
+function v084DrawScreenLight(x, y, radius, strength = 1) {
+  const gradient =
+    c.createRadialGradient(
+      x,
+      y,
+      0,
+      x,
+      y,
+      radius
+    );
+
+  gradient.addColorStop(
+    0,
+    "rgba(224,190,118," +
+      (0.17 * strength) +
+      ")"
+  );
+
+  gradient.addColorStop(
+    0.35,
+    "rgba(190,154,91," +
+      (0.08 * strength) +
+      ")"
+  );
+
+  gradient.addColorStop(
+    1,
+    "rgba(190,154,91,0)"
+  );
+
+  c.fillStyle = gradient;
+  c.fillRect(
+    x - radius,
+    y - radius,
+    radius * 2,
+    radius * 2
+  );
+}
+
+function v084WorldToScreen(x, y) {
+  return {
+    x: x - camera.x,
+    y: y - camera.y
+  };
+}
+
+function v084DrawStreetLightGlows() {
+  if (
+    !state ||
+    !V084_OUTDOOR_ROOMS.has(state.room)
+  ) {
+    return;
+  }
+
+  const night =
+    v084NightStrength();
+
+  if (night <= 0.08) {
+    return;
+  }
+
+  const sources = [];
+
+  if (state.room === "village") {
+    sources.push(
+      [575, 330],
+      [705, 520],
+      [575, 690],
+      [705, 900],
+      [270, 475],
+      [990, 475]
+    );
+  }
+
+  if (state.room === "northRoad") {
+    for (let y = 310; y < 1220; y += 210) {
+      const left =
+        Math.floor(y / 210) % 2 === 0;
+
+      sources.push([
+        left ? 312 : 575,
+        y
+      ]);
+    }
+  }
+
+  if (state.room === "squareRoad") {
+    sources.push(
+      [240, 285],
+      [610, 285],
+      [960, 285],
+      [240, 455],
+      [610, 455],
+      [960, 455]
+    );
+  }
+
+  c.save();
+  c.globalCompositeOperation =
+    "screen";
+
+  for (const [wx, wy] of sources) {
+    const p =
+      v084WorldToScreen(wx, wy);
+
+    if (
+      p.x < -100 ||
+      p.y < -100 ||
+      p.x > W + 100 ||
+      p.y > H + 100
+    ) {
+      continue;
+    }
+
+    v084DrawScreenLight(
+      p.x,
+      p.y - 6,
+      78,
+      night
+    );
+  }
+
+  c.restore();
+}
+
+function v084DrawFog() {
+  if (
+    !state ||
+    !V084_OUTDOOR_ROOMS.has(state.room)
+  ) {
+    return;
+  }
+
+  const night =
+    v084NightStrength();
+
+  if (night < 0.28) {
+    return;
+  }
+
+  c.save();
+
+  for (let i = 0; i < 3; i++) {
+    const drift =
+      (
+        elapsed * (5 + i * 2) +
+        i * 180
+      ) % (W + 260);
+
+    const x =
+      drift - 130;
+
+    const y =
+      H * (0.28 + i * 0.20) +
+      Math.sin(elapsed * 0.12 + i) * 18;
+
+    const gradient =
+      c.createRadialGradient(
+        x,
+        y,
+        8,
+        x,
+        y,
+        145
+      );
+
+    gradient.addColorStop(
+      0,
+      "rgba(170,184,176," +
+        (0.025 + night * 0.018) +
+        ")"
+    );
+
+    gradient.addColorStop(
+      1,
+      "rgba(170,184,176,0)"
+    );
+
+    c.fillStyle = gradient;
+    c.fillRect(
+      x - 150,
+      y - 70,
+      300,
+      140
+    );
+  }
+
+  c.restore();
+}
+
+function v084DrawVignette() {
+  const gradient =
+    c.createRadialGradient(
+      W / 2,
+      H / 2,
+      Math.min(W, H) * 0.20,
+      W / 2,
+      H / 2,
+      Math.max(W, H) * 0.68
+    );
+
+  gradient.addColorStop(
+    0,
+    "rgba(0,0,0,0)"
+  );
+
+  gradient.addColorStop(
+    0.68,
+    "rgba(2,6,8,0.04)"
+  );
+
+  gradient.addColorStop(
+    1,
+    "rgba(1,4,6,0.24)"
+  );
+
+  c.fillStyle = gradient;
+  c.fillRect(0, 0, W, H);
+}
+
+function v084DrawInteriorWarmth() {
+  if (
+    !state ||
+    V084_OUTDOOR_ROOMS.has(state.room)
+  ) {
+    return;
+  }
+
+  const gradient =
+    c.createRadialGradient(
+      W * 0.52,
+      H * 0.48,
+      15,
+      W * 0.52,
+      H * 0.48,
+      Math.max(W, H) * 0.62
+    );
+
+  gradient.addColorStop(
+    0,
+    "rgba(190,145,88,0.035)"
+  );
+
+  gradient.addColorStop(
+    1,
+    "rgba(8,16,20,0.08)"
+  );
+
+  c.fillStyle = gradient;
+  c.fillRect(0, 0, W, H);
+}
+
+function v084DrawFineGrain() {
+  const frame =
+    Math.floor(elapsed * 4);
+
+  c.save();
+
+  for (let i = 0; i < 28; i++) {
+    const x =
+      Math.floor(
+        hash(i + frame * 13, 91) * W
+      );
+
+    const y =
+      Math.floor(
+        hash(i + frame * 17, 47) * H
+      );
+
+    const alpha =
+      0.018 +
+      hash(i, frame + 3) * 0.018;
+
+    c.fillStyle =
+      "rgba(230,226,205," +
+      alpha +
+      ")";
+
+    c.fillRect(
+      x,
+      y,
+      1,
+      1
+    );
+  }
+
+  c.restore();
+}
+
+const v084DrawWorldBase =
+  drawWorld;
+
+drawWorld = function() {
+  v084DrawWorldBase();
+
+  if (
+    !state ||
+    mode !== "game" ||
+    state.dawnCollapse?.active ||
+    state.wakeUp?.active ||
+    transitionBusy
+  ) {
+    return;
+  }
+
+  v084DrawStreetLightGlows();
+  v084DrawFog();
+  v084DrawInteriorWarmth();
+  v084DrawVignette();
+  v084DrawFineGrain();
+};
+
+$("version").textContent = "PROTÓTIPO · 0.8.4";
   
   requestAnimationFrame(frame);
   showBootSplash();
