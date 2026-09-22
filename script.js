@@ -21722,18 +21722,19 @@ function v081OpenMineArchive() {
   if (!state.phone.mineArchiveRead) {
     state.phone.mineArchiveRead = true;
 
-    if (state.forgottenAlive) {
+    if (
+      state.forgottenAlive &&
+      state.storyFlags?.raimundoMet &&
+      !state.forgottenAlive.westPresenceSeen
+    ) {
+      // v080CompleteFragment é quem marca completed.mineArchive.
+      // Não marcamos antes, senão a função entenderia que já contou.
+      v080CompleteFragment(
+        "mineArchive",
+        "Arquivo da mina"
+      );
+    } else if (state.forgottenAlive) {
       state.forgottenAlive.completed.mineArchive = true;
-
-      if (
-        state.storyFlags?.raimundoMet &&
-        !state.forgottenAlive.westPresenceSeen
-      ) {
-        v080CompleteFragment(
-          "mineArchive",
-          "Arquivo da mina"
-        );
-      }
     }
 
     updateHud();
