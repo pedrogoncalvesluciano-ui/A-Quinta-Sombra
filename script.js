@@ -5900,7 +5900,8 @@ interact = function (action) {
     say(
       [
         ["Irmão", "Estou com um mau pressentimento. Eles nunca demoram assim."],
-        ["Você", "Come um pouco. Eu vou continuar procurando."]
+        ["Você", "Come um pouco. Eu vou continuar procurando."],
+        ["Você", "Eu nunca tive que cuidar do jantar sozinho. A mãe sempre deixava tudo pronto."]
       ],
       () => {
         v06FeedBrother();
@@ -16857,7 +16858,7 @@ function v072FirstNeighborVisit() {
       ["Você", "Meus pais ainda não voltaram do mercado."],
       ["Florinda", "Ainda não? Você já tentou ligar ou mandar mensagem pra eles?"],
       ["Você", "Já. No da minha mãe aparece sem sinal. O do meu pai diz fora de área."],
-      ["Florinda", "Sem sinal até dentro de casa? Estranho. Aqui a rede costuma funcionar."],
+      ["Florinda", "Dois erros diferentes? Estranho. Aqui dentro a rede costuma funcionar normalmente."],
       ["Você", "Eu queria saber se a senhora viu eles voltando."],
       ["Florinda", "Não vi."],
       ["Florinda", "Se eles continuarem desaparecidos, fala com o Anísio na delegacia. E não deixa seu irmão sozinho por muito tempo."],
@@ -22360,7 +22361,7 @@ update = function(dt) {
 // Ajuda final da 0.8.1: o diário deixa de ser uma interface separada.
 $("help").onclick = () => modal(
   "Como jogar",
-  "WASD / setas: andar. Shift/F: correr. E: interagir. I: inventário. C: celular. J também abre o celular por compatibilidade. L: ligar/desligar a lanterna. Esc: pausar. ESPAÇO: soco apenas contra ameaças físicas compatíveis.\\n\\nO celular funciona como registro de investigação. NOTAS e COBRINHA funcionam offline. INTERNET e mensagens com seu irmão só conectam dentro da sua casa ou de outras residências. O contato dos seus pais permanece sem sinal em qualquer lugar.\\n\\nAo jogar Cobrinha, o mundo fica pausado até você sair do aparelho.",
+  "WASD / setas: andar. Shift/F: correr. E: interagir. I: inventário. C: celular. J também abre o celular por compatibilidade. L: ligar/desligar a lanterna. Esc: pausar. ESPAÇO: soco apenas contra ameaças físicas compatíveis.\\n\\nO celular funciona como registro de investigação. NOTAS e COBRINHA funcionam offline. INTERNET e mensagens com seu irmão só conectam dentro da sua casa ou de outras residências. O contato da sua mãe permanece sem sinal em qualquer lugar; o do seu pai aparece fora de área.\\n\\nAo jogar Cobrinha, o mundo fica pausado até você sair do aparelho.",
   [["Entendi", closeModal]]
 );
 
