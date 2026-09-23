@@ -2,7 +2,7 @@
 "use strict";
 
 /*
-  A QUINTA SOMBRA — 0.8.10
+  A QUINTA SOMBRA — 0.8.11
 
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
@@ -76,21 +76,21 @@
 
   const roadAssetSources = {
     pavedVertical:
-      "assets/tiles/roads/rua_vertical.png?v=0.8.10",
+      "assets/tiles/roads/rua_vertical.png?v=0.8.11",
     pavedHorizontal:
-      "assets/tiles/roads/rua_horizontal.png?v=0.8.10",
+      "assets/tiles/roads/rua_horizontal.png?v=0.8.11",
     pavedCross:
-      "assets/tiles/roads/cruzamento_4_vias.png?v=0.8.10",
+      "assets/tiles/roads/cruzamento_4_vias.png?v=0.8.11",
     pavedToDirt:
-      "assets/tiles/roads/rua_vertical_terra.png?v=0.8.10",
+      "assets/tiles/roads/rua_vertical_terra.png?v=0.8.11",
     dirtVertical:
-      "assets/tiles/roads/estrada_de_terra.png?v=0.8.10",
+      "assets/tiles/roads/estrada_de_terra.png?v=0.8.11",
     dirtHorizontal:
-      "assets/tiles/roads/estrada_terra_horizontal.png?v=0.8.10",
+      "assets/tiles/roads/estrada_terra_horizontal.png?v=0.8.11",
     dirtTLeft:
-      "assets/tiles/roads/estrada_terra_conexao_t_esquerda.png?v=0.8.10",
+      "assets/tiles/roads/estrada_terra_conexao_t_esquerda.png?v=0.8.11",
     dirtTRight:
-      "assets/tiles/roads/estrada_terra_conexao_t_direita.png?v=0.8.10"
+      "assets/tiles/roads/estrada_terra_conexao_t_direita.png?v=0.8.11"
   };
 
   const roadAssets = {};
@@ -1879,36 +1879,89 @@ function drawCharacterSprite(
         m.h
       );
 
-      // 0.8.9 — ruas do bairro usando os PNGs modulares.
-      // A geometria e as colisões antigas permanecem intocadas.
-      const villageMainX = 590;
+      // 0.8.11 — cruzamentos maiores e ruas retas sem sobreposição.
+      // As ruas normais agora terminam na BORDA do cruzamento,
+      // em vez de continuar por baixo dele até o centro.
+      const villageRoadCenterX = 649;
       const villageMainW = 118;
+      const villageMainX =
+        villageRoadCenterX - villageMainW / 2;
 
+      const villageCrossSize = 330;
+      const villageCrossX =
+        villageRoadCenterX - villageCrossSize / 2;
+
+      const upperCrossCenterY = 424;
+      const lowerCrossCenterY = 794;
+
+      const upperCrossTop =
+        upperCrossCenterY - villageCrossSize / 2;
+      const upperCrossBottom =
+        upperCrossCenterY + villageCrossSize / 2;
+
+      const lowerCrossTop =
+        lowerCrossCenterY - villageCrossSize / 2;
+      const lowerCrossBottom =
+        lowerCrossCenterY + villageCrossSize / 2;
+
+      // Rua vertical: três trechos separados.
+      // Nenhum trecho entra no miolo dos cruzamentos.
       drawRoadTiledVertical(
         "pavedVertical",
         villageMainX,
         0,
         villageMainW,
-        1050
+        upperCrossTop
       );
 
-      // As duas ruas horizontais usam a mesma textura com calçada embutida.
-      for (const roadY of [369, 739]) {
+      drawRoadTiledVertical(
+        "pavedVertical",
+        villageMainX,
+        upperCrossBottom,
+        villageMainW,
+        Math.max(
+          0,
+          lowerCrossTop - upperCrossBottom
+        )
+      );
+
+      // Ruas horizontais: cada lado encosta somente na ponta
+      // esquerda/direita do sprite de cruzamento.
+      const horizontalRoadH = 110;
+
+      for (const centerY of [
+        upperCrossCenterY,
+        lowerCrossCenterY
+      ]) {
+        const roadY =
+          centerY - horizontalRoadH / 2;
+
         drawRoadTiledHorizontal(
           "pavedHorizontal",
           0,
           roadY,
-          m.w,
-          110
+          villageCrossX,
+          horizontalRoadH
+        );
+
+        drawRoadTiledHorizontal(
+          "pavedHorizontal",
+          villageCrossX + villageCrossSize,
+          roadY,
+          Math.max(
+            0,
+            m.w -
+            (villageCrossX + villageCrossSize)
+          ),
+          horizontalRoadH
         );
       }
 
-      // Cruzamentos em sprite próprio, evitando emendas retas visíveis.
-      const villageCrossSize = 286;
-      const villageCrossX =
-        649 - villageCrossSize / 2;
-
-      for (const centerY of [424, 794]) {
+      // Os próprios cruzamentos fazem toda a conexão central.
+      for (const centerY of [
+        upperCrossCenterY,
+        lowerCrossCenterY
+      ]) {
         if (
           !drawRoadAsset(
             "pavedCross",
@@ -1921,16 +1974,31 @@ function drawCharacterSprite(
         ) {
           rect(
             villageMainX,
-            centerY - 55,
+            centerY - horizontalRoadH / 2,
             villageMainW,
-            110,
+            horizontalRoadH,
             "#706b5f"
           );
         }
       }
 
+      // Depois do segundo cruzamento, a rua vertical volta
+      // apenas a partir da borda inferior do sprite.
+      const transitionY =
+        lowerCrossBottom + 8;
+
+      drawRoadTiledVertical(
+        "pavedVertical",
+        villageMainX,
+        lowerCrossBottom,
+        villageMainW,
+        Math.max(
+          0,
+          transitionY - lowerCrossBottom
+        )
+      );
+
       // Transição visual do asfalto para a estrada de terra ao sul.
-      const transitionY = 830;
       const transitionH =
         villageMainW *
         ROAD_CROPS.pavedToDirt.h /
@@ -1956,7 +2024,7 @@ function drawCharacterSprite(
 
       drawRoadTiledVertical(
         "dirtVertical",
-        602,
+        villageRoadCenterX - 47,
         transitionY + transitionH - 10,
         94,
         m.h - (
@@ -24244,7 +24312,7 @@ updateHud = function() {
   }
 };
 
-$("version").textContent = "PROTÓTIPO · 0.8.10";
+$("version").textContent = "PROTÓTIPO · 0.8.11";
   
   requestAnimationFrame(frame);
   showBootSplash();
