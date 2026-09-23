@@ -22883,10 +22883,7 @@ v0630OpenPoliceTopics = function() {
 
   const vanCanBeReported =
     unreportedVan &&
-    (
-      state.day !== 1 ||
-      state.day1Extra.vanWitnessed
-    );
+    state.day1Extra.vanWitnessed;
 
   if (vanCanBeReported) {
     buttons.push([
