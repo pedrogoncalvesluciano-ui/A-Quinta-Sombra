@@ -2,7 +2,7 @@
 "use strict";
 
 /*
-  A QUINTA SOMBRA — 0.8.5
+  A QUINTA SOMBRA — 0.8.6
 
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
@@ -5900,7 +5900,8 @@ interact = function (action) {
     say(
       [
         ["Irmão", "Estou com um mau pressentimento. Eles nunca demoram assim."],
-        ["Você", "Come um pouco. Eu vou continuar procurando."]
+        ["Você", "Come um pouco. Eu vou continuar procurando."],
+        ["Você", "Eu nunca tive que cuidar do jantar sozinho. A mãe sempre deixava tudo pronto."]
       ],
       () => {
         v06FeedBrother();
@@ -7033,7 +7034,7 @@ function v0630PoliceParents() {
           ["Policial", "Certo. Desde quando seus pais estão desaparecidos?"],
           ["Você", "Eles foram ao mercado e não voltaram."],
           ["Policial", "Você tentou ligar ou mandar mensagem?"],
-          ["Você", "Tentei. Os dois contatos ficam sem sinal, até dentro de casa."],
+          ["Você", "Tentei. O da minha mãe fica sem sinal. O do meu pai aparece fora de área, até dentro de casa."],
           ["Policial", "Vou anotar isso também. Pode ser só problema de rede, mas é informação."],
           ["Policial", "Vou registrar. Se soubermos de alguma coisa, avisamos."]
         ]
@@ -7219,7 +7220,7 @@ interact = function (action) {
         ["Vizinha", "Seus pais ainda não voltaram?"],
         ["Você", "Eles foram ao mercado e não apareceram mais."],
         ["Vizinha", "E o celular? Conseguiu falar com algum deles?"],
-        ["Você", "Não. Continua aparecendo sem sinal nos dois."],
+        ["Você", "Não. Minha mãe continua sem sinal e o telefone do meu pai aparece fora de área."],
         ["Vizinha", "Se isso mudar, me avisa. Por enquanto, leve isto para o seu irmão."],
         ["Vizinha", "E não fique andando sozinho pela rua por muito tempo."]
       ],
@@ -16798,7 +16799,7 @@ function v072TryCompleteDay1() {
   state.stage = "free";
 
   v06Toast(
-    "Você fez o que podia por enquanto. Continue atento até amanhecer.",
+    "Você fez o que podia na rua por enquanto. Volte para casa e veja como seu irmão está.",
     2.8
   );
 
@@ -16856,8 +16857,8 @@ function v072FirstNeighborVisit() {
       ["Florinda", "Estevão? O que você está fazendo fora a essa hora?"],
       ["Você", "Meus pais ainda não voltaram do mercado."],
       ["Florinda", "Ainda não? Você já tentou ligar ou mandar mensagem pra eles?"],
-      ["Você", "Já. Nos dois contatos aparece sem sinal."],
-      ["Florinda", "Sem sinal até dentro de casa? Estranho. Aqui a rede costuma funcionar."],
+      ["Você", "Já. No da minha mãe aparece sem sinal. O do meu pai diz fora de área."],
+      ["Florinda", "Dois erros diferentes? Estranho. Aqui dentro a rede costuma funcionar normalmente."],
       ["Você", "Eu queria saber se a senhora viu eles voltando."],
       ["Florinda", "Não vi."],
       ["Florinda", "Se eles continuarem desaparecidos, fala com o Anísio na delegacia. E não deixa seu irmão sozinho por muito tempo."],
@@ -22360,7 +22361,7 @@ update = function(dt) {
 // Ajuda final da 0.8.1: o diário deixa de ser uma interface separada.
 $("help").onclick = () => modal(
   "Como jogar",
-  "WASD / setas: andar. Shift/F: correr. E: interagir. I: inventário. C: celular. J também abre o celular por compatibilidade. L: ligar/desligar a lanterna. Esc: pausar. ESPAÇO: soco apenas contra ameaças físicas compatíveis.\\n\\nO celular funciona como registro de investigação. NOTAS e COBRINHA funcionam offline. INTERNET e mensagens com seu irmão só conectam dentro da sua casa ou de outras residências. O contato dos seus pais permanece sem sinal em qualquer lugar.\\n\\nAo jogar Cobrinha, o mundo fica pausado até você sair do aparelho.",
+  "WASD / setas: andar. Shift/F: correr. E: interagir. I: inventário. C: celular. J também abre o celular por compatibilidade. L: ligar/desligar a lanterna. Esc: pausar. ESPAÇO: soco apenas contra ameaças físicas compatíveis.\\n\\nO celular funciona como registro de investigação. NOTAS e COBRINHA funcionam offline. INTERNET e mensagens com seu irmão só conectam dentro da sua casa ou de outras residências. O contato da sua mãe permanece sem sinal em qualquer lugar; o do seu pai aparece fora de área.\\n\\nAo jogar Cobrinha, o mundo fica pausado até você sair do aparelho.",
   [["Entendi", closeModal]]
 );
 
@@ -22715,7 +22716,1077 @@ drawWorld = function() {
   v084DrawFineGrain();
 };
 
-$("version").textContent = "PROTÓTIPO · 0.8.5";
+// =========================================================
+// 0.8.6 — NOITE 1 COM VIDA + CONTATOS SEPARADOS NO CELULAR
+// =========================================================
+
+function v086EnsureDay1Extras() {
+  if (!state) return;
+
+  if (
+    !state.day1Extra ||
+    typeof state.day1Extra !== "object"
+  ) {
+    state.day1Extra = {};
+  }
+
+  const e = state.day1Extra;
+
+  for (const key of [
+    "firstNotePrompted",
+    "firstNoteSaved",
+    "brotherBedtime",
+    "tvChecked",
+    "doorChecked",
+    "doorLocked",
+    "vanWitnessed"
+  ]) {
+    if (typeof e[key] !== "boolean") {
+      e[key] = false;
+    }
+  }
+
+  if (typeof e.brotherChoice !== "string") {
+    e.brotherChoice = "";
+  }
+
+  if (typeof e.brotherLampOn !== "boolean") {
+    e.brotherLampOn = true;
+  }
+
+  if (!Number.isFinite(e.doorLockedDay)) {
+    e.doorLockedDay = -1;
+  }
+
+  if (!state.phone || typeof state.phone !== "object") {
+    state.phone = {};
+  }
+
+  const p = state.phone;
+
+  if (!Number.isFinite(p.motherAttempts)) {
+    p.motherAttempts = 0;
+  }
+
+  if (!Number.isFinite(p.fatherAttempts)) {
+    p.fatherAttempts = 0;
+  }
+
+  if (typeof p.lastMotherDraft !== "string") {
+    p.lastMotherDraft = "";
+  }
+
+  if (typeof p.lastFatherDraft !== "string") {
+    p.lastFatherDraft = "";
+  }
+}
+
+const v086PrepareBase = prepareSystems;
+prepareSystems = function() {
+  v086PrepareBase();
+  v086EnsureDay1Extras();
+};
+
+function v086AtHome() {
+  return Boolean(
+    state &&
+    [
+      "bedroom",
+      "brother",
+      "parents",
+      "hall",
+      "foyer",
+      "kitchen",
+      "living",
+      "attic",
+      "basement"
+    ].includes(state.room)
+  );
+}
+
+function v086Day1HomeDone() {
+  const e = state?.day1Extra;
+
+  return Boolean(
+    e?.brotherBedtime &&
+    e?.tvChecked &&
+    e?.doorChecked
+  );
+}
+
+// ---------------------------------------------------------
+// VAN: só vira tópico se o jogador realmente estava na rua
+// quando o acontecimento foi mostrado.
+// ---------------------------------------------------------
+
+const v086TriggerRandomBase =
+  v0645TriggerRandomEvent;
+
+v0645TriggerRandomEvent = function() {
+  prepareSystems();
+
+  const type =
+    state?.randomEventState?.type;
+
+  const witnessedVan =
+    type === "van" &&
+    state.room === "village" &&
+    !dialog &&
+    $("overlay").hidden;
+
+  v086TriggerRandomBase();
+
+  if (witnessedVan) {
+    state.day1Extra.vanWitnessed = true;
+    save();
+  }
+};
+
+v0630OpenPoliceTopics = function() {
+  prepareSystems();
+
+  const buttons = [];
+
+  buttons.push([
+    "Falar dos pais",
+    () => {
+      closeModal();
+      v0630PoliceParents();
+    }
+  ]);
+
+  if (state.storyFlags?.squareObserverSeen) {
+    buttons.push([
+      state.storyFlags.squareObserverReported
+        ? "Falar novamente do vulto"
+        : "Falar do vulto preto",
+      () => {
+        closeModal();
+        v077PoliceObserverReport();
+      }
+    ]);
+  }
+
+  if (state.storyEvents.oldManEncounters > 0) {
+    buttons.push([
+      "Falar do Raimundo",
+      () => {
+        closeModal();
+        v0630PoliceOldMan();
+      }
+    ]);
+  }
+
+  const unreportedVan =
+    state.storyEvents.vanSightings >
+    state.policeReportedEvents.vanSightings;
+
+  const vanCanBeReported =
+    unreportedVan &&
+    state.day1Extra.vanWitnessed;
+
+  if (vanCanBeReported) {
+    buttons.push([
+      "Falar da van",
+      () => {
+        closeModal();
+        v0630PoliceVan();
+      }
+    ]);
+  }
+
+  if (state.chapter4?.bodySeen) {
+    buttons.push([
+      "Falar da rua oeste",
+      () => {
+        closeModal();
+        v0649PoliceBody();
+      }
+    ]);
+  }
+
+  if (v0650Chapter5Unlocked()) {
+    buttons.push([
+      v0650HasContradiction("policeRecord")
+        ? "Rever o registro estranho"
+        : "Conferir um relatório",
+      () => {
+        closeModal();
+        v0650PoliceContradiction();
+      }
+    ]);
+  }
+
+  if (
+    state.sideQuests?.westCase?.garciaStatement ||
+    state.sideQuests?.westCase?.evidenceFound
+  ) {
+    buttons.push([
+      "Reabrir o caso da rua oeste",
+      () => {
+        closeModal();
+        v070ResolveWestCase();
+      }
+    ]);
+  }
+
+  if (state.chapter8?.complete) {
+    buttons.push([
+      "Perguntar o que Anísio realmente pensa",
+      () => {
+        closeModal();
+        v070PoliceInsight();
+      }
+    ]);
+  }
+
+  buttons.push(["Sair", closeModal]);
+
+  modal(
+    "Delegacia",
+    "",
+    buttons
+  );
+};
+
+// ---------------------------------------------------------
+// PEQUENAS AÇÕES DOMÉSTICAS DA PRIMEIRA NOITE
+// ---------------------------------------------------------
+
+if (
+  maps.living &&
+  !maps.living.objects.some(
+    o => o.action === "day1TV"
+  )
+) {
+  maps.living.objects.push(
+    obj(
+      58,
+      58,
+      88,
+      48,
+      "tv",
+      "Ligar a televisão",
+      "day1TV"
+    )
+  );
+}
+
+const v086FurnishingBase = furnishing;
+furnishing = function(o) {
+  if (o?.type === "tv") {
+    const { x, y, w, h } = o;
+
+    rect(
+      x + 5,
+      y + h - 1,
+      w,
+      7,
+      "#0005"
+    );
+
+    rect(
+      x,
+      y,
+      w,
+      h,
+      "#242827"
+    );
+
+    rect(
+      x + 5,
+      y + 5,
+      w - 10,
+      h - 13,
+      "#0f1516"
+    );
+
+    const active =
+      state?.day1Extra?.tvChecked &&
+      state.day === 1;
+
+    rect(
+      x + 9,
+      y + 9,
+      w - 18,
+      h - 21,
+      active
+        ? "#6d7f78"
+        : "#182020"
+    );
+
+    if (active) {
+      for (let i = 0; i < 5; i++) {
+        rect(
+          x + 12,
+          y + 12 + i * 5,
+          w - 24,
+          1,
+          i % 2
+            ? "#bdc5ae33"
+            : "#d5ddc644"
+        );
+      }
+    }
+
+    rect(
+      x + w - 9,
+      y + h - 8,
+      3,
+      3,
+      "#b6a06c"
+    );
+
+    return;
+  }
+
+  if (
+    o?.type === "lamp" &&
+    state?.room === "brother" &&
+    state?.day1Extra?.brotherBedtime
+  ) {
+    const { x, y, w } = o;
+    const on =
+      state.day1Extra.brotherLampOn;
+
+    rect(
+      x + w / 2 - 2,
+      y + 8,
+      4,
+      21,
+      "#322d27"
+    );
+
+    rect(
+      x + w / 2 - 12,
+      y + 3,
+      24,
+      12,
+      on
+        ? "#d2b36d"
+        : "#5d5548"
+    );
+
+    if (on) {
+      const glow =
+        c.createRadialGradient(
+          x + w / 2,
+          y + 8,
+          2,
+          x + w / 2,
+          y + 8,
+          58
+        );
+
+      glow.addColorStop(
+        0,
+        "#eac0792f"
+      );
+
+      glow.addColorStop(
+        1,
+        "#eac07900"
+      );
+
+      c.fillStyle = glow;
+      c.fillRect(
+        x - 55,
+        y - 55,
+        150,
+        150
+      );
+    }
+
+    return;
+  }
+
+  v086FurnishingBase(o);
+};
+
+function v086FinishBrotherBedtime(lightOn) {
+  prepareSystems();
+
+  state.day1Extra.brotherLampOn =
+    lightOn;
+
+  state.day1Extra.brotherBedtime =
+    true;
+
+  save();
+  updateHud();
+
+  say([
+    [
+      "Irmão",
+      lightOn
+        ? "Deixa acesa só por hoje."
+        : "Tá... boa noite."
+    ],
+    [
+      "Você",
+      "Se precisar de mim, manda mensagem. Eu estou em casa."
+    ]
+  ]);
+}
+
+function v086AskBrotherLamp() {
+  modal(
+    "Quarto do seu irmão",
+    "Ele se ajeita na cama, mas ainda olha para a porta.",
+    [
+      [
+        "Deixar a luz acesa",
+        () => {
+          closeModal();
+          v086FinishBrotherBedtime(true);
+        }
+      ],
+      [
+        "Apagar a luz",
+        () => {
+          closeModal();
+          v086FinishBrotherBedtime(false);
+        }
+      ]
+    ]
+  );
+}
+
+function v086BrotherNight1Choice() {
+  prepareSystems();
+
+  say(
+    [
+      ["Irmão", "A polícia achou eles?"],
+      ["Você", "Ainda não."],
+      ["Irmão", "Eles vão voltar, né?"]
+    ],
+    () => {
+      modal(
+        "O que dizer?",
+        "",
+        [
+          [
+            "“Eles só atrasaram. Vão voltar.”",
+            () => {
+              closeModal();
+
+              state.day1Extra.brotherChoice =
+                "reassure";
+
+              if (state.relationship) {
+                state.relationship.brotherCare += 1;
+                state.relationship.brotherTrust += 0;
+              }
+
+              say(
+                [
+                  ["Você", "Eles só atrasaram. Vão voltar."],
+                  ["Irmão", "Você promete?"],
+                  ["Você", "...Eu vou ficar aqui com você."]
+                ],
+                v086AskBrotherLamp
+              );
+            }
+          ],
+          [
+            "“Eu não sei. Mas eu tô aqui.”",
+            () => {
+              closeModal();
+
+              state.day1Extra.brotherChoice =
+                "honest";
+
+              if (state.relationship) {
+                state.relationship.brotherCare += 1;
+                state.relationship.brotherTrust += 1;
+              }
+
+              say(
+                [
+                  ["Você", "Eu não sei. Mas eu tô aqui com você."],
+                  ["Irmão", "Eu tô com medo."],
+                  ["Você", "Eu também. A gente vai fazer isso junto."]
+                ],
+                v086AskBrotherLamp
+              );
+            }
+          ],
+          [
+            "“A polícia está procurando. Tenta dormir.”",
+            () => {
+              closeModal();
+
+              state.day1Extra.brotherChoice =
+                "distant";
+
+              if (state.relationship) {
+                state.relationship.brotherNeglect += 1;
+                state.relationship.brotherTrust -= 1;
+              }
+
+              say(
+                [
+                  ["Você", "A polícia está procurando. Tenta dormir."],
+                  ["Irmão", "Tá..."],
+                  ["Você", "Eu vou estar por perto."]
+                ],
+                v086AskBrotherLamp
+              );
+            }
+          ]
+        ]
+      );
+    }
+  );
+}
+
+function v086WatchDay1TV() {
+  prepareSystems();
+
+  const e =
+    state.day1Extra;
+
+  if (
+    state.day !== 1 ||
+    !state.day1Progress?.completed
+  ) {
+    say([
+      "Os canais locais passam reprises e notícias comuns. Nada fala dos meus pais."
+    ]);
+    return;
+  }
+
+  if (e.tvChecked) {
+    say([
+      "Nada mudou. Nenhuma notícia sobre meus pais."
+    ]);
+    return;
+  }
+
+  say(
+    [
+      "O telejornal local fala de uma obra na rodovia, do tempo e de um comércio assaltado em outra cidade.",
+      "Nada sobre meus pais.",
+      "É cedo demais. Lá fora, ninguém sabe que eles desapareceram."
+    ],
+    () => {
+      e.tvChecked = true;
+      save();
+      updateHud();
+    }
+  );
+}
+
+function v086HandleFrontDoor() {
+  prepareSystems();
+
+  const e =
+    state.day1Extra;
+
+  if (!e.doorChecked) {
+    modal(
+      "Porta da frente",
+      "Antes de tentar descansar, é melhor decidir o que fazer com a entrada.",
+      [
+        [
+          "Trancar a porta",
+          () => {
+            closeModal();
+
+            e.doorChecked = true;
+            e.doorLocked = true;
+            e.doorLockedDay = state.day;
+
+            save();
+            updateHud();
+
+            say([
+              "Você gira a chave e testa a maçaneta duas vezes.",
+              "Pela primeira vez, trancar a casa parece uma responsabilidade sua."
+            ]);
+          }
+        ],
+        [
+          "Sair de novo",
+          () => {
+            closeModal();
+            v086InteractBase("outside");
+          }
+        ]
+      ]
+    );
+
+    return;
+  }
+
+  if (e.doorLocked) {
+    modal(
+      "Porta da frente",
+      "A porta está trancada por dentro.",
+      [
+        [
+          "Destrancar e sair",
+          () => {
+            closeModal();
+            e.doorLocked = false;
+            save();
+            v086InteractBase("outside");
+          }
+        ],
+        [
+          "Manter trancada",
+          closeModal
+        ]
+      ]
+    );
+
+    return;
+  }
+
+  v086InteractBase("outside");
+}
+
+function v086PromptFirstPhoneNote() {
+  prepareSystems();
+
+  if (
+    state.day1Extra.firstNotePrompted
+  ) {
+    return;
+  }
+
+  state.day1Extra.firstNotePrompted =
+    true;
+  save();
+
+  modal(
+    "Celular",
+    "Essa pode ser importante. Anotar no celular?",
+    [
+      [
+        "Anotar",
+        () => {
+          closeModal();
+
+          state.day1Extra.firstNoteSaved =
+            true;
+
+          save();
+
+          v06Toast(
+            "Anotação salva no celular.",
+            2
+          );
+        }
+      ],
+      [
+        "Agora não",
+        () => {
+          closeModal();
+
+          v06Toast(
+            "Você pode revisar as pistas no app NOTAS.",
+            2.2
+          );
+        }
+      ]
+    ]
+  );
+}
+
+const v086InteractBase = interact;
+interact = function(action) {
+  prepareSystems();
+
+  const clueAction =
+    typeof action === "string" &&
+    action.startsWith("clue:");
+
+  const qBefore =
+    clueAction
+      ? chapter()
+      : null;
+
+  const clueCountBefore =
+    Array.isArray(qBefore?.clues)
+      ? qBefore.clues.length
+      : -1;
+
+  if (
+    action === "day1TV"
+  ) {
+    v086WatchDay1TV();
+    return;
+  }
+
+  if (
+    action === "brother" &&
+    state.day === 1 &&
+    state.day1Progress?.completed &&
+    !state.day1Extra.brotherBedtime &&
+    !state.pendingBrotherRemark &&
+    !dangerActive()
+  ) {
+    v086BrotherNight1Choice();
+    return;
+  }
+
+  if (
+    action === "outside" &&
+    state.room === "foyer" &&
+    state.day === 1 &&
+    state.day1Progress?.completed
+  ) {
+    v086HandleFrontDoor();
+    return;
+  }
+
+  v086InteractBase(action);
+
+  if (
+    clueAction &&
+    state.day === 1 &&
+    !state.firstExit &&
+    !state.day1Extra.firstNotePrompted
+  ) {
+    const qAfter =
+      chapter();
+
+    const clueCountAfter =
+      Array.isArray(qAfter?.clues)
+        ? qAfter.clues.length
+        : clueCountBefore;
+
+    if (
+      clueCountAfter >
+      clueCountBefore
+    ) {
+      v086PromptFirstPhoneNote();
+    }
+  }
+};
+
+// ---------------------------------------------------------
+// SONO: na Noite 1, antes de dormir, fecha o pequeno ritual
+// doméstico. Depois disso continua valendo a regra das 03:00.
+// ---------------------------------------------------------
+
+const v086SleepAvailableBase =
+  v079NightSleepAvailable;
+
+v079NightSleepAvailable = function() {
+  if (
+    state?.day === 1 &&
+    state.day1Progress?.completed &&
+    !v086Day1HomeDone()
+  ) {
+    return false;
+  }
+
+  return v086SleepAvailableBase();
+};
+
+const v086SleepBlockedBase =
+  v079SleepBlockedReason;
+
+v079SleepBlockedReason = function() {
+  if (
+    state?.day === 1 &&
+    state.day1Progress?.completed &&
+    !v086Day1HomeDone()
+  ) {
+    return "Antes de dormir, preciso ver meu irmão e deixar a casa em ordem.";
+  }
+
+  return v086SleepBlockedBase();
+};
+
+// ---------------------------------------------------------
+// CELULAR: MÃE e PAI separados.
+// ---------------------------------------------------------
+
+function v086ParentAttempt(contact, text) {
+  prepareSystems();
+
+  if (contact === "mother") {
+    state.phone.motherAttempts += 1;
+    state.phone.lastMotherDraft = text;
+    save();
+    v086OpenMotherThread();
+    return;
+  }
+
+  state.phone.fatherAttempts += 1;
+  state.phone.lastFatherDraft = text;
+  save();
+  v086OpenFatherThread();
+}
+
+function v086BuildParentThread(
+  title,
+  status,
+  detail,
+  lastDraft,
+  contact
+) {
+  v081PhoneModal(
+    title,
+    screen => {
+      screen.append(
+        v081PhoneElement(
+          "div",
+          "phone-no-signal",
+          status +
+            "\n\n" +
+            detail
+        )
+      );
+
+      if (lastDraft) {
+        const failed =
+          v081PhoneElement(
+            "div",
+            "phone-failed-message"
+          );
+
+        failed.append(
+          v081PhoneElement(
+            "span",
+            "",
+            lastDraft
+          ),
+          v081PhoneElement(
+            "strong",
+            "",
+            "FALHA AO ENVIAR"
+          )
+        );
+
+        screen.append(failed);
+      }
+
+      const attempts =
+        v081PhoneElement(
+          "div",
+          "phone-reply-list"
+        );
+
+      const drafts =
+        contact === "mother"
+          ? [
+              "Mãe, onde você está?",
+              "Eu e ele estamos em casa. Responde.",
+              "Por favor, manda qualquer coisa."
+            ]
+          : [
+              "Pai, onde você está?",
+              "Seu telefone está fora de área. Me responde.",
+              "Pai, a gente tá esperando vocês."
+            ];
+
+      for (const draft of drafts) {
+        const button =
+          document.createElement("button");
+
+        button.className =
+          "phone-reply";
+
+        button.textContent =
+          draft;
+
+        button.onclick =
+          () =>
+            v086ParentAttempt(
+              contact,
+              draft
+            );
+
+        attempts.append(button);
+      }
+
+      screen.append(attempts);
+    },
+    {
+      back: v081OpenMessages
+    }
+  );
+}
+
+function v086OpenMotherThread() {
+  prepareSystems();
+
+  v086BuildParentThread(
+    "MÃE",
+    "SEM SINAL",
+    "Não foi possível estabelecer conexão com este contato.",
+    state.phone.lastMotherDraft,
+    "mother"
+  );
+}
+
+function v086OpenFatherThread() {
+  prepareSystems();
+
+  v086BuildParentThread(
+    "PAI",
+    "FORA DE ÁREA",
+    "O aparelho chamado está fora da área de cobertura ou desligado.",
+    state.phone.lastFatherDraft,
+    "father"
+  );
+}
+
+// Compatibilidade com código antigo que ainda possa abrir PAIS.
+v081OpenParentsThread =
+  v086OpenMotherThread;
+
+v081OpenMessages = function() {
+  prepareSystems();
+
+  if (
+    v081HasInternet() &&
+    !state.phone.activeBrotherScene
+  ) {
+    v081DeliverBrotherScene();
+  }
+
+  v081PhoneModal(
+    "MENSAGENS",
+    screen => {
+      const info =
+        v081PhoneElement(
+          "p",
+          v081HasInternet()
+            ? "phone-online-text"
+            : "phone-offline-text",
+          v081HasInternet()
+            ? "Rede disponível nesta residência."
+            : "Sem conexão. Mensagens novas chegam quando você entra em uma residência."
+        );
+
+      const list =
+        v081PhoneElement(
+          "div",
+          "phone-contact-list"
+        );
+
+      const brother =
+        document.createElement("button");
+
+      brother.className =
+        "phone-contact";
+
+      brother.innerHTML =
+        "<strong>IRMÃO</strong><span>" +
+        (
+          state.phone.unreadBrother > 0
+            ? state.phone.unreadBrother +
+              " nova"
+            : "conversa"
+        ) +
+        "</span>";
+
+      brother.onclick =
+        v081OpenBrotherThread;
+
+      const mother =
+        document.createElement("button");
+
+      mother.className =
+        "phone-contact phone-contact-offline";
+
+      mother.innerHTML =
+        "<strong>MÃE</strong><span>SEM SINAL</span>";
+
+      mother.onclick =
+        v086OpenMotherThread;
+
+      const father =
+        document.createElement("button");
+
+      father.className =
+        "phone-contact phone-contact-offline";
+
+      father.innerHTML =
+        "<strong>PAI</strong><span>FORA DE ÁREA</span>";
+
+      father.onclick =
+        v086OpenFatherThread;
+
+      list.append(
+        brother,
+        mother,
+        father
+      );
+
+      screen.append(
+        info,
+        list
+      );
+    },
+    {
+      back: v081OpenPhoneHome
+    }
+  );
+};
+
+// ---------------------------------------------------------
+// HUD DA NOITE 1: sem "ande até amanhecer" sem conteúdo.
+// ---------------------------------------------------------
+
+const v086HudBase = updateHud;
+updateHud = function() {
+  v086HudBase();
+
+  if (
+    !state ||
+    state.stage === "prologue" ||
+    state.day !== 1 ||
+    !state.day1Progress?.completed
+  ) {
+    return;
+  }
+
+  prepareSystems();
+
+  if (!v086AtHome()) {
+    $("objective").textContent =
+      "Você já fez o que podia na rua. Volte para casa e veja seu irmão.";
+    return;
+  }
+
+  if (!state.day1Extra.brotherBedtime) {
+    $("objective").textContent =
+      "Vá ao quarto do seu irmão e veja como ele está.";
+    return;
+  }
+
+  if (!state.day1Extra.tvChecked) {
+    $("objective").textContent =
+      "Veja se há alguma notícia na televisão da sala.";
+    return;
+  }
+
+  if (!state.day1Extra.doorChecked) {
+    $("objective").textContent =
+      "Confira e tranque a porta da frente antes de descansar.";
+    return;
+  }
+
+  if (state.minutes < 180) {
+    $("objective").textContent =
+      "Você fez o que podia por agora. Fique em casa; depois das 03:00, pode dormir.";
+    return;
+  }
+
+  if (state.minutes < 420) {
+    $("objective").textContent =
+      "Você fez o que podia por agora. Vá para o seu quarto e durma.";
+  }
+};
+
+$("version").textContent = "PROTÓTIPO · 0.8.6";
   
   requestAnimationFrame(frame);
   showBootSplash();
