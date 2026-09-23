@@ -104,7 +104,9 @@
 
   const ROAD_CROPS = {
     pavedVertical: {
-      x: 280, y: 4, w: 528, h: 1440
+      // Recorte interno evita a linha escura das bordas do PNG
+      // quando o trecho vertical é repetido.
+      x: 280, y: 16, w: 528, h: 1416
     },
     pavedHorizontal: {
       x: 0, y: 276, w: 1448, h: 535
@@ -113,7 +115,8 @@
       x: 274, y: 25, w: 538, h: 1381
     },
     dirtVertical: {
-      x: 313, y: 18, w: 462, h: 1412
+      // Mesmo tratamento na terra para a repetição ficar contínua.
+      x: 313, y: 28, w: 462, h: 1392
     },
     dirtHorizontal: {
       x: 0, y: 360, w: 1448, h: 382
@@ -1883,9 +1886,7 @@ function drawCharacterSprite(
         m.h
       );
 
-      // 0.8.11 — cruzamentos maiores e ruas retas sem sobreposição.
-      // As ruas normais agora terminam na BORDA do cruzamento,
-      // em vez de continuar por baixo dele até o centro.
+      // 0.8.12 — transições de rua mais suaves.
       const villageRoadCenterX = 649;
       const villageMainW = 118;
       const villageMainX =
@@ -1908,29 +1909,31 @@ function drawCharacterSprite(
       const lowerCrossBottom =
         lowerCrossCenterY + villageCrossSize / 2;
 
-      // Rua vertical: três trechos separados.
-      // Nenhum trecho entra no miolo dos cruzamentos.
+      // Pequena sobreposição fica escondida pelo sprite do cruzamento.
+      // Isso elimina a linha seca entre a rua reta e a conexão.
+      const roadJoinOverlap = 12;
+
       drawRoadTiledVertical(
         "pavedVertical",
         villageMainX,
         0,
         villageMainW,
-        upperCrossTop
+        upperCrossTop + roadJoinOverlap
       );
 
       drawRoadTiledVertical(
         "pavedVertical",
         villageMainX,
-        upperCrossBottom,
+        upperCrossBottom - roadJoinOverlap,
         villageMainW,
         Math.max(
           0,
-          lowerCrossTop - upperCrossBottom
+          lowerCrossTop -
+          upperCrossBottom +
+          roadJoinOverlap * 2
         )
       );
 
-      // Ruas horizontais: cada lado encosta somente na ponta
-      // esquerda/direita do sprite de cruzamento.
       const horizontalRoadH = 110;
 
       for (const centerY of [
@@ -1944,24 +1947,30 @@ function drawCharacterSprite(
           "pavedHorizontal",
           0,
           roadY,
-          villageCrossX,
+          villageCrossX + roadJoinOverlap,
           horizontalRoadH
         );
 
         drawRoadTiledHorizontal(
           "pavedHorizontal",
-          villageCrossX + villageCrossSize,
+          villageCrossX +
+          villageCrossSize -
+          roadJoinOverlap,
           roadY,
           Math.max(
             0,
             m.w -
-            (villageCrossX + villageCrossSize)
+            (
+              villageCrossX +
+              villageCrossSize -
+              roadJoinOverlap
+            )
           ),
           horizontalRoadH
         );
       }
 
-      // Os próprios cruzamentos fazem toda a conexão central.
+      // O cruzamento é desenhado depois e cobre as sobreposições.
       for (const centerY of [
         upperCrossCenterY,
         lowerCrossCenterY
@@ -1986,52 +1995,48 @@ function drawCharacterSprite(
         }
       }
 
-      // 0.8.12 — transição asfalto -> terra mais curta e suave.
-      // O sprite original tinha muito asfalto antes da terra;
-      // este recorte elimina boa parte desse trecho "descendo".
-      const transitionCropInset = 520;
+      // =====================================================
+      // ASFALTO -> TERRA
+      // =====================================================
+
+      // A imagem original de transição possui bastante asfalto no topo.
+      // Recortamos essa parte para a descida ficar menor.
+      const transitionCropTop = 520;
+
       const transitionCrop = {
         x: ROAD_CROPS.pavedToDirt.x,
         y:
           ROAD_CROPS.pavedToDirt.y +
-          transitionCropInset,
+          transitionCropTop,
         w: ROAD_CROPS.pavedToDirt.w,
         h:
           ROAD_CROPS.pavedToDirt.h -
-          transitionCropInset
+          transitionCropTop
       };
 
-      // Começa levemente dentro do final do cruzamento para não
-      // existir uma linha seca entre os dois sprites.
+      // Começa ainda dentro da borda inferior do cruzamento,
+      // eliminando um trecho reto desnecessário.
       const transitionY =
-        lowerCrossBottom - 10;
-
-      // A transição abre um pouco antes da estrada de terra,
-      // fazendo o caminho parecer alargar naturalmente.
-      const transitionW = 132;
-      const transitionX =
-        villageRoadCenterX -
-        transitionW / 2;
+        lowerCrossBottom - roadJoinOverlap;
 
       const transitionH =
-        transitionW *
+        villageMainW *
         transitionCrop.h /
         transitionCrop.w;
 
-      // Estrada de terra mais larga e começando antes do fim
-      // da transição. Ela é desenhada primeiro; o sprite de
-      // transição fica por cima e esconde a emenda.
-      const dirtW = 130;
+      // Terra mais larga e entrando por baixo da transição.
+      const dirtW = 132;
       const dirtX =
-        villageRoadCenterX -
-        dirtW / 2;
+        villageRoadCenterX - dirtW / 2;
 
-      const dirtOverlap = 64;
+      const dirtOverlap = 58;
       const dirtStartY =
         transitionY +
         transitionH -
         dirtOverlap;
 
+      // Terra primeiro: a transição é desenhada por cima,
+      // escondendo a emenda entre os dois PNGs.
       drawRoadTiledVertical(
         "dirtVertical",
         dirtX,
@@ -2047,32 +2052,34 @@ function drawCharacterSprite(
       if (
         !drawRoadAsset(
           "pavedToDirt",
-          transitionX,
+          villageMainX,
           transitionY,
-          transitionW,
+          villageMainW,
           transitionH,
           transitionCrop
         )
       ) {
         rect(
-          transitionX,
+          villageMainX,
           transitionY,
-          transitionW,
+          villageMainW,
           transitionH,
           "#655442"
         );
       }
 
-      // Gradiente curto no trecho final: aproxima a cor do
-      // sprite de transição da estrada de terra sem esconder
-      // a textura de pedras e marcas de roda.
-      const blendH = 86;
+      // Gradiente curto sobre a região final da transição.
+      // É só uma camada leve de cor, não uma nova textura pesada.
+      c.save();
+
       const blendY =
         transitionY +
         transitionH -
-        blendH;
+        72;
 
-      const roadBlend =
+      const blendH = 84;
+
+      const asphaltToDirtGradient =
         c.createLinearGradient(
           0,
           blendY,
@@ -2080,27 +2087,86 @@ function drawCharacterSprite(
           blendY + blendH
         );
 
-      roadBlend.addColorStop(
+      asphaltToDirtGradient.addColorStop(
         0,
-        "rgba(101,84,66,0)"
-      );
-      roadBlend.addColorStop(
-        0.45,
-        "rgba(101,84,66,0.08)"
-      );
-      roadBlend.addColorStop(
-        1,
-        "rgba(101,84,66,0.22)"
+        "rgba(104,84,63,0)"
       );
 
-      c.save();
-      c.fillStyle = roadBlend;
+      asphaltToDirtGradient.addColorStop(
+        0.52,
+        "rgba(104,84,63,0.10)"
+      );
+
+      asphaltToDirtGradient.addColorStop(
+        1,
+        "rgba(104,84,63,0.25)"
+      );
+
+      c.fillStyle =
+        asphaltToDirtGradient;
+
       c.fillRect(
-        dirtX - 3,
+        dirtX - 8,
         blendY,
-        dirtW + 6,
+        dirtW + 16,
         blendH
       );
+
+      // Laterais suaves para a terra crescer de 118px para 132px.
+      const sideBlendH = 76;
+
+      const leftBlend =
+        c.createLinearGradient(
+          dirtX - 12,
+          0,
+          dirtX + 14,
+          0
+        );
+
+      leftBlend.addColorStop(
+        0,
+        "rgba(91,72,54,0)"
+      );
+
+      leftBlend.addColorStop(
+        1,
+        "rgba(91,72,54,0.18)"
+      );
+
+      c.fillStyle = leftBlend;
+      c.fillRect(
+        dirtX - 12,
+        dirtStartY - 16,
+        26,
+        sideBlendH
+      );
+
+      const rightBlend =
+        c.createLinearGradient(
+          dirtX + dirtW - 14,
+          0,
+          dirtX + dirtW + 12,
+          0
+        );
+
+      rightBlend.addColorStop(
+        0,
+        "rgba(91,72,54,0.18)"
+      );
+
+      rightBlend.addColorStop(
+        1,
+        "rgba(91,72,54,0)"
+      );
+
+      c.fillStyle = rightBlend;
+      c.fillRect(
+        dirtX + dirtW - 14,
+        dirtStartY - 16,
+        26,
+        sideBlendH
+      );
+
       c.restore();
 
       // Sem extensão de calçada até a casa:
