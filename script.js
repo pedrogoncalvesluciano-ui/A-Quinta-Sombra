@@ -2,7 +2,7 @@
 "use strict";
 
 /*
-  A QUINTA SOMBRA — 0.8.7
+  A QUINTA SOMBRA — 0.8.8
 
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
@@ -23479,8 +23479,13 @@ interact = function(action) {
   if (
     action === "outside" &&
     state.room === "foyer" &&
-    state.day === 1 &&
-    state.day1Progress?.completed
+    (
+      state.day1Extra?.doorLocked ||
+      (
+        state.day === 1 &&
+        state.day1Progress?.completed
+      )
+    )
   ) {
     v086HandleFrontDoor();
     return;
@@ -23830,7 +23835,7 @@ updateHud = function() {
   }
 };
 
-$("version").textContent = "PROTÓTIPO · 0.8.7";
+$("version").textContent = "PROTÓTIPO · 0.8.8";
   
   requestAnimationFrame(frame);
   showBootSplash();
