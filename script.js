@@ -2,7 +2,7 @@
 "use strict";
 
 /*
-  A QUINTA SOMBRA — 0.8.13
+  A QUINTA SOMBRA — 0.8.14
 
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
@@ -76,30 +76,45 @@
 
   const roadAssetSources = {
     pavedVertical:
-      "assets/tiles/roads/rua_vertical.png?v=0.8.13",
+      "assets/tiles/roads/rua_vertical.png?v=0.8.14",
     pavedHorizontal:
-      "assets/tiles/roads/rua_horizontal.png?v=0.8.13",
+      "assets/tiles/roads/rua_horizontal.png?v=0.8.14",
     pavedCross:
-      "assets/tiles/roads/cruzamento_4_vias.png?v=0.8.13",
+      "assets/tiles/roads/cruzamento_4_vias.png?v=0.8.14",
     pavedToDirt:
-      "assets/tiles/roads/rua_vertical_terra.png?v=0.8.13",
+      "assets/tiles/roads/rua_vertical_terra.png?v=0.8.14",
     dirtVertical:
-      "assets/tiles/roads/estrada_de_terra.png?v=0.8.13",
+      "assets/tiles/roads/estrada_de_terra.png?v=0.8.14",
     dirtHorizontal:
-      "assets/tiles/roads/estrada_terra_horizontal.png?v=0.8.13",
+      "assets/tiles/roads/estrada_terra_horizontal.png?v=0.8.14",
     dirtTLeft:
-      "assets/tiles/roads/estrada_terra_conexao_t_esquerda.png?v=0.8.13",
+      "assets/tiles/roads/estrada_terra_conexao_t_esquerda.png?v=0.8.14",
     dirtTRight:
-      "assets/tiles/roads/estrada_terra_conexao_t_direita.png?v=0.8.13"
+      "assets/tiles/roads/estrada_terra_conexao_t_direita.png?v=0.8.14"
   };
 
   const roadAssets = {};
 
-  for (const [key, src] of Object.entries(roadAssetSources)) {
+  // 0.8.14 — imagens de rua passam a carregar somente quando
+  // realmente entram no campo de visão. Isso evita decodificar
+  // todos os PNGs grandes de uma vez no celular.
+  function getRoadImage(key) {
+    if (roadAssets[key]) {
+      return roadAssets[key];
+    }
+
+    const src = roadAssetSources[key];
+
+    if (!src) {
+      return null;
+    }
+
     const image = new Image();
     image.decoding = "async";
     image.src = src;
     roadAssets[key] = image;
+
+    return image;
   }
 
   const ROAD_CROPS = {
@@ -136,12 +151,35 @@
   const roadStripCache = new Map();
 
   function roadImageReady(key) {
-    const image = roadAssets[key];
+    const image = getRoadImage(key);
 
     return Boolean(
       image &&
       image.complete &&
       image.naturalWidth > 0
+    );
+  }
+
+  function roadRectVisible(
+    x,
+    y,
+    w,
+    h,
+    padding = 48
+  ) {
+    if (
+      typeof camera === "undefined" ||
+      !Number.isFinite(camera?.x) ||
+      !Number.isFinite(camera?.y)
+    ) {
+      return true;
+    }
+
+    return !(
+      x + w < camera.x - padding ||
+      y + h < camera.y - padding ||
+      x > camera.x + W + padding ||
+      y > camera.y + H + padding
     );
   }
 
@@ -207,7 +245,7 @@
 
     if (crop) {
       ctx.drawImage(
-        roadAssets[key],
+        getRoadImage(key),
         crop.x,
         crop.y,
         crop.w,
@@ -219,7 +257,7 @@
       );
     } else {
       ctx.drawImage(
-        roadAssets[key],
+        getRoadImage(key),
         0,
         0,
         w,
@@ -243,6 +281,17 @@
     h,
     crop = ROAD_CROPS[key] || null
   ) {
+    if (
+      !roadRectVisible(
+        x,
+        y,
+        w,
+        h
+      )
+    ) {
+      return true;
+    }
+
     const raster =
       getRoadRaster(
         key,
@@ -341,7 +390,7 @@
         // 0.8.12 — overlap mínimo evita frestas transparentes
         // entre os módulos horizontais.
         ctx.drawImage(
-          roadAssets[key],
+          getRoadImage(key),
           crop.x,
           crop.y,
           sourceWidth,
@@ -374,7 +423,7 @@
         // 0.8.12 — overlap mínimo evita a linha de grama
         // que aparecia entre módulos verticais.
         ctx.drawImage(
-          roadAssets[key],
+          getRoadImage(key),
           crop.x,
           crop.y,
           crop.w,
@@ -403,6 +452,18 @@
     height,
     fallback = "#69665d"
   ) {
+    if (
+      height <= 0 ||
+      !roadRectVisible(
+        x,
+        y,
+        width,
+        height
+      )
+    ) {
+      return;
+    }
+
     const strip =
       getRoadStrip(
         key,
@@ -440,6 +501,18 @@
     height,
     fallback = "#69665d"
   ) {
+    if (
+      width <= 0 ||
+      !roadRectVisible(
+        x,
+        y,
+        width,
+        height
+      )
+    ) {
+      return;
+    }
+
     const strip =
       getRoadStrip(
         key,
@@ -2000,8 +2073,8 @@ function drawCharacterSprite(
       // =====================================================
 
       // A imagem original de transição possui bastante asfalto no topo.
-      // O recorte agora é maior para a descida ficar curta e a terra aparecer antes.
-      const transitionCropTop = 680;
+      // O recorte é bem mais agressivo: fica somente a parte útil da mistura asfalto/terra.
+      const transitionCropTop = 960;
 
       const transitionCrop = {
         x: ROAD_CROPS.pavedToDirt.x,
@@ -2024,13 +2097,13 @@ function drawCharacterSprite(
         transitionCrop.h /
         transitionCrop.w;
 
-      // Terra mais larga e entrando bem por baixo da transição,
-      // formando uma abertura gradual em vez de um degrau visual.
-      const dirtW = 146;
+      // A terra continua mais larga que a estrada antiga (94px -> 128px),
+      // mas sem o bloco exagerado da versão anterior.
+      const dirtW = 128;
       const dirtX =
         villageRoadCenterX - dirtW / 2;
 
-      const dirtOverlap = 74;
+      const dirtOverlap = 10;
       const dirtStartY =
         transitionY +
         transitionH -
@@ -2070,15 +2143,23 @@ function drawCharacterSprite(
       }
 
       // Gradiente curto sobre a região final da transição.
-      // É só uma camada leve de cor, não uma nova textura pesada.
-      c.save();
+      // Só é processado quando esta parte do mapa está visível.
+      if (
+        roadRectVisible(
+          dirtX - 18,
+          transitionY - 20,
+          dirtW + 36,
+          transitionH + 90
+        )
+      ) {
+        c.save();
 
       const blendY =
         transitionY +
         transitionH -
-        92;
+        28;
 
-      const blendH = 112;
+      const blendH = 46;
 
       const asphaltToDirtGradient =
         c.createLinearGradient(
@@ -2100,7 +2181,7 @@ function drawCharacterSprite(
 
       asphaltToDirtGradient.addColorStop(
         1,
-        "rgba(104,84,63,0.20)"
+        "rgba(104,84,63,0.14)"
       );
 
       c.fillStyle =
@@ -2114,7 +2195,7 @@ function drawCharacterSprite(
       );
 
       // Laterais suaves para a terra crescer de 118px para 132px.
-      const sideBlendH = 104;
+      const sideBlendH = 42;
 
       const leftBlend =
         c.createLinearGradient(
@@ -2131,7 +2212,7 @@ function drawCharacterSprite(
 
       leftBlend.addColorStop(
         1,
-        "rgba(91,72,54,0.16)"
+        "rgba(91,72,54,0.11)"
       );
 
       c.fillStyle = leftBlend;
@@ -2152,7 +2233,7 @@ function drawCharacterSprite(
 
       rightBlend.addColorStop(
         0,
-        "rgba(91,72,54,0.16)"
+        "rgba(91,72,54,0.11)"
       );
 
       rightBlend.addColorStop(
@@ -2168,7 +2249,8 @@ function drawCharacterSprite(
         sideBlendH
       );
 
-      c.restore();
+        c.restore();
+      }
 
       // Sem extensão de calçada até a casa:
       // os PNGs de rua já carregam suas próprias calçadas.
@@ -24447,7 +24529,7 @@ updateHud = function() {
   }
 };
 
-$("version").textContent = "PROTÓTIPO · 0.8.13";
+$("version").textContent = "PROTÓTIPO · 0.8.14";
   
   requestAnimationFrame(frame);
   showBootSplash();
