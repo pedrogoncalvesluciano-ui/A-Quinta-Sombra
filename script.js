@@ -2,7 +2,7 @@
 "use strict";
 
 /*
-  A QUINTA SOMBRA — 0.8.6
+  A QUINTA SOMBRA — 0.8.7
 
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
@@ -21,6 +21,54 @@
   const $ = id => document.getElementById(id);
   const canvas = $("canvas");
   const c = canvas.getContext("2d");
+
+  // 0.8.7 — grama global.
+  // 64x64 é o tile padrão. A versão 128x128 permanece disponível em:
+  // assets/tiles/terrain/grama_base_128.png
+  const grassTile64 = new Image();
+  grassTile64.src =
+    "assets/tiles/terrain/grama_base_64.png?v=0.8.7";
+
+  let grassPattern64 = null;
+
+  grassTile64.addEventListener(
+    "load",
+    () => {
+      grassPattern64 =
+        c.createPattern(
+          grassTile64,
+          "repeat"
+        );
+    },
+    { once: true }
+  );
+
+  function drawGrassGround(
+    x,
+    y,
+    w,
+    h
+  ) {
+    if (
+      !grassPattern64 &&
+      grassTile64.complete &&
+      grassTile64.naturalWidth > 0
+    ) {
+      grassPattern64 =
+        c.createPattern(
+          grassTile64,
+          "repeat"
+        );
+    }
+
+    c.save();
+    c.imageSmoothingEnabled = false;
+    c.fillStyle =
+      grassPattern64 ||
+      "#34463b";
+    c.fillRect(x, y, w, h);
+    c.restore();
+  }
 
   const W = 480;
   const H = 270;
@@ -1432,20 +1480,12 @@ function drawCharacterSprite(
     } else if (state.room === "square") {
       v0648DrawSquareEnvironment(m);
     } else if (state.room === "village") {
-      rect(0, 0, m.w, m.h, "#34463b");
-
-      for (let y = 0; y < m.h; y += 12) {
-        for (let x = 0; x < m.w; x += 16) {
-          const z = hash(x, y);
-
-          if (z > 0.65) {
-            rect(
-              x, y, 3, 2,
-              z > 0.8 ? "#667350" : "#233d34"
-            );
-          }
-        }
-      }
+      drawGrassGround(
+        0,
+        0,
+        m.w,
+        m.h
+      );
 
       // Rua principal vertical. Ao sul o asfalto vira estrada de terra
       // e segue de verdade até a região da casa do velho.
@@ -9358,24 +9398,13 @@ function v0646DrawOldRoad() {
     -Math.floor(camera.y)
   );
 
-  // Terreno.
-  rect(0, 0, m.w, m.h, "#273d32");
-
-  for (let y = 0; y < m.h; y += 18) {
-    for (let x = 0; x < m.w; x += 22) {
-      const z = hash(x + 17, y + 91);
-
-      if (z > 0.72) {
-        rect(
-          x,
-          y,
-          z > 0.86 ? 4 : 2,
-          2,
-          z > 0.84 ? "#566849" : "#1f342d"
-        );
-      }
-    }
-  }
+  // Terreno de grama global.
+  drawGrassGround(
+    0,
+    0,
+    m.w,
+    m.h
+  );
 
   // Estrada principal, um pouco irregular.
   rect(425, 0, 94, 480, "#665442");
@@ -10083,7 +10112,12 @@ function v0648DrawMarketClerk() {
 }
 
 function v0648DrawSquareEnvironment(m) {
-  rect(0, 0, m.w, m.h, "#31483b");
+  drawGrassGround(
+    0,
+    0,
+    m.w,
+    m.h
+  );
 
   // Calçamento central e caminhos.
   rect(330, 185, 330, 390, "#77746a");
@@ -17293,7 +17327,12 @@ function v076DrawNorthRoad() {
     -Math.floor(camera.y)
   );
 
-  rect(0, 0, m.w, m.h, "#34493c");
+  drawGrassGround(
+    0,
+    0,
+    m.w,
+    m.h
+  );
 
   // Rua principal, calçadas e marcação central.
   v076DrawRoadTexture(350, 0, 200, m.h, false);
@@ -17358,7 +17397,12 @@ function v076DrawSquareRoad() {
     -Math.floor(camera.y)
   );
 
-  rect(0, 0, m.w, m.h, "#354a3d");
+  drawGrassGround(
+    0,
+    0,
+    m.w,
+    m.h
+  );
 
   // Rua leste: termina em um retorno circular antes da praça.
   v076DrawRoadTexture(0, 310, 1125, 115, true);
@@ -23786,7 +23830,7 @@ updateHud = function() {
   }
 };
 
-$("version").textContent = "PROTÓTIPO · 0.8.6";
+$("version").textContent = "PROTÓTIPO · 0.8.7";
   
   requestAnimationFrame(frame);
   showBootSplash();
