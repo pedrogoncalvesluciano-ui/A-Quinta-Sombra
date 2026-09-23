@@ -2,7 +2,7 @@
 "use strict";
 
 /*
-  A QUINTA SOMBRA — 0.8.14
+  A QUINTA SOMBRA — 0.8.15
 
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
@@ -76,21 +76,21 @@
 
   const roadAssetSources = {
     pavedVertical:
-      "assets/tiles/roads/rua_vertical.png?v=0.8.14",
+      "assets/tiles/roads/rua_vertical.png?v=0.8.15",
     pavedHorizontal:
-      "assets/tiles/roads/rua_horizontal.png?v=0.8.14",
+      "assets/tiles/roads/rua_horizontal.png?v=0.8.15",
     pavedCross:
-      "assets/tiles/roads/cruzamento_4_vias.png?v=0.8.14",
+      "assets/tiles/roads/cruzamento_4_vias.png?v=0.8.15",
     pavedToDirt:
-      "assets/tiles/roads/rua_vertical_terra.png?v=0.8.14",
+      "assets/tiles/roads/rua_vertical_terra.png?v=0.8.15",
     dirtVertical:
-      "assets/tiles/roads/estrada_de_terra.png?v=0.8.14",
+      "assets/tiles/roads/estrada_de_terra.png?v=0.8.15",
     dirtHorizontal:
-      "assets/tiles/roads/estrada_terra_horizontal.png?v=0.8.14",
+      "assets/tiles/roads/estrada_terra_horizontal.png?v=0.8.15",
     dirtTLeft:
-      "assets/tiles/roads/estrada_terra_conexao_t_esquerda.png?v=0.8.14",
+      "assets/tiles/roads/estrada_terra_conexao_t_esquerda.png?v=0.8.15",
     dirtTRight:
-      "assets/tiles/roads/estrada_terra_conexao_t_direita.png?v=0.8.14"
+      "assets/tiles/roads/estrada_terra_conexao_t_direita.png?v=0.8.15"
   };
 
   const roadAssets = {};
@@ -1112,19 +1112,43 @@ const playerRoomSpriteNames = {
 
 const playerRoomSprites = {};
 
-for (const [key, filename] of Object.entries(playerRoomSpriteNames)) {
+// 0.8.15 — sprites pesados do quarto são carregados somente
+// quando o jogador realmente entra no quarto.
+function getPlayerRoomSprite(key) {
+  if (getPlayerRoomSprite(key)) {
+    return getPlayerRoomSprite(key);
+  }
+
+  const filename =
+    playerRoomSpriteNames[key];
+
+  if (!filename) {
+    return null;
+  }
+
   const image = new Image();
+  image.decoding = "async";
   image.src =
-    `assets/sprites/house/player-room/${filename}?v=0.6.40`;
-  playerRoomSprites[key] = image;
+    `assets/sprites/house/player-room/${filename}?v=0.8.15`;
+
+  image.addEventListener(
+    "load",
+    () => {
+      roomPositionChecked = false;
+    },
+    { once: true }
+  );
+
+  getPlayerRoomSprite(key) = image;
+  return image;
 }
 
-// Em alguns navegadores o cache antigo podia manter uma falha de imagem.
-// Ao concluir cada carregamento, o próximo frame já usa o sprite real.
-for (const image of [
-  ...Object.values(playerRoomSprites),
-  ...Object.values(characterSpriteSheets).flatMap(set => Object.values(set))
-]) {
+// Sprites dos personagens são comuns a várias áreas.
+// Eles continuam compartilhados, sem duplicação por mapa.
+for (const image of
+  Object.values(characterSpriteSheets)
+    .flatMap(set => Object.values(set))
+) {
   image.addEventListener("load", () => {
     roomPositionChecked = false;
   }, { once: true });
@@ -1137,6 +1161,359 @@ function spriteReady(image) {
     image.naturalWidth > 0 &&
     image.naturalHeight > 0
   );
+}
+
+// =========================================================
+// 0.8.15 — CARREGAMENTO PROCEDURAL POR ÁREA
+// =========================================================
+
+const AREA_ROAD_ASSETS = {
+  village: [
+    "pavedVertical",
+    "pavedHorizontal",
+    "pavedCross",
+    "pavedToDirt",
+    "dirtVertical"
+  ],
+  northRoad: [
+    "pavedVertical"
+  ],
+  squareRoad: [
+    "pavedHorizontal"
+  ],
+  westRoad: [
+    "pavedHorizontal"
+  ],
+  oldRoad: [
+    "dirtVertical",
+    "dirtHorizontal",
+    "dirtTRight"
+  ]
+};
+
+const OUTDOOR_AREA_ROOMS =
+  new Set([
+    "village",
+    "northRoad",
+    "squareRoad",
+    "westRoad",
+    "oldRoad",
+    "square"
+  ]);
+
+let loadedAreaRoom = null;
+let loadingAreaRoom = null;
+let areaLoadPromise = null;
+let areaLoadingOverlay = false;
+
+function waitForAreaImage(
+  image,
+  timeout = 12000
+) {
+  if (!image) {
+    return Promise.resolve(false);
+  }
+
+  if (
+    image.complete &&
+    image.naturalWidth > 0
+  ) {
+    if (
+      typeof image.decode === "function"
+    ) {
+      return image
+        .decode()
+        .then(() => true)
+        .catch(() => true);
+    }
+
+    return Promise.resolve(true);
+  }
+
+  return new Promise(resolve => {
+    let finished = false;
+
+    const done = ok => {
+      if (finished) return;
+      finished = true;
+
+      clearTimeout(timer);
+      image.removeEventListener(
+        "load",
+        onLoad
+      );
+      image.removeEventListener(
+        "error",
+        onError
+      );
+
+      resolve(ok);
+    };
+
+    const onLoad = () => {
+      if (
+        typeof image.decode === "function"
+      ) {
+        image
+          .decode()
+          .catch(() => {})
+          .finally(() => done(true));
+      } else {
+        done(true);
+      }
+    };
+
+    const onError =
+      () => done(false);
+
+    image.addEventListener(
+      "load",
+      onLoad,
+      { once: true }
+    );
+
+    image.addEventListener(
+      "error",
+      onError,
+      { once: true }
+    );
+
+    const timer =
+      setTimeout(
+        () => done(
+          Boolean(
+            image.complete &&
+            image.naturalWidth > 0
+          )
+        ),
+        timeout
+      );
+  });
+}
+
+function clearRoadAreaMemory(nextRoom) {
+  roadRasterCache.clear();
+  roadStripCache.clear();
+
+  const needed =
+    new Set(
+      AREA_ROAD_ASSETS[nextRoom] || []
+    );
+
+  for (
+    const [
+      key,
+      image
+    ] of Object.entries(roadAssets)
+  ) {
+    if (needed.has(key)) {
+      continue;
+    }
+
+    try {
+      image.removeAttribute("src");
+      image.src = "";
+    } catch {}
+
+    delete roadAssets[key];
+  }
+}
+
+function clearPlayerRoomMemory(nextRoom) {
+  if (nextRoom === "bedroom") {
+    return;
+  }
+
+  for (
+    const image of
+    Object.values(playerRoomSprites)
+  ) {
+    try {
+      image.removeAttribute("src");
+      image.src = "";
+    } catch {}
+  }
+
+  for (
+    const key of
+    Object.keys(playerRoomSprites)
+  ) {
+    delete getPlayerRoomSprite(key);
+  }
+
+  roomPositionChecked = false;
+}
+
+function getAreaLoadingLabel(room) {
+  const labels = {
+    village: "Bairro residencial",
+    northRoad: "Rua do mercado",
+    squareRoad: "Rua da praça",
+    westRoad: "Rua oeste",
+    oldRoad: "Estrada de terra",
+    square: "Praça central",
+    market: "Mercado",
+    police: "Delegacia",
+    bedroom: "Seu quarto",
+    brother: "Quarto do irmão",
+    parents: "Quarto dos pais",
+    living: "Sala",
+    kitchen: "Cozinha",
+    foyer: "Entrada",
+    hall: "Corredor",
+    attic: "Sótão",
+    basement: "Porão"
+  };
+
+  return labels[room] ||
+    roomNames?.[room] ||
+    "Nova área";
+}
+
+async function preloadAreaAssets(room) {
+  if (!room) {
+    return;
+  }
+
+  if (loadedAreaRoom === room) {
+    return;
+  }
+
+  if (
+    loadingAreaRoom === room &&
+    areaLoadPromise
+  ) {
+    return areaLoadPromise;
+  }
+
+  loadingAreaRoom = room;
+
+  areaLoadPromise = (async () => {
+    // Só depois da tela preta limpamos o que pertencia à área anterior.
+    clearRoadAreaMemory(room);
+    clearPlayerRoomMemory(room);
+
+    const tasks = [];
+
+    if (OUTDOOR_AREA_ROOMS.has(room)) {
+      tasks.push(
+        waitForAreaImage(grassTile64)
+      );
+    }
+
+    const roadKeys =
+      AREA_ROAD_ASSETS[room] || [];
+
+    for (const key of roadKeys) {
+      tasks.push(
+        waitForAreaImage(
+          getRoadImage(key)
+        )
+      );
+    }
+
+    if (room === "bedroom") {
+      for (
+        const key of
+        Object.keys(playerRoomSpriteNames)
+      ) {
+        tasks.push(
+          waitForAreaImage(
+            getPlayerRoomSprite(key)
+          )
+        );
+      }
+    }
+
+    // O protagonista é comum e precisa estar pronto antes
+    // de revelar qualquer área jogável.
+    const playerSheets =
+      characterSpriteSheets.player;
+
+    for (
+      const image of
+      Object.values(playerSheets)
+    ) {
+      tasks.push(
+        waitForAreaImage(image)
+      );
+    }
+
+    await Promise.all(tasks);
+
+    // Dá ao navegador um frame inteiro para concluir upload
+    // das texturas para a camada gráfica antes de revelar o mapa.
+    await new Promise(resolve =>
+      requestAnimationFrame(() =>
+        requestAnimationFrame(resolve)
+      )
+    );
+
+    loadedAreaRoom = room;
+    loadingAreaRoom = null;
+    areaLoadPromise = null;
+  })();
+
+  return areaLoadPromise;
+}
+
+function coverAreaLoading(room) {
+  const transition = $("transition");
+
+  transitionBusy = true;
+  keys.clear();
+
+  $("transitionTitle").textContent =
+    "CARREGANDO";
+
+  $("transitionHint").textContent =
+    getAreaLoadingLabel(room);
+
+  transition.style.transition = "none";
+  transition.style.opacity = "1";
+  transition.classList.add("active");
+  areaLoadingOverlay = true;
+
+  // Força a tela preta antes de iniciar decodificação pesada.
+  void transition.offsetWidth;
+}
+
+async function ensureAreaLoaded(room) {
+  if (
+    !room ||
+    loadedAreaRoom === room
+  ) {
+    return;
+  }
+
+  if (!areaLoadingOverlay) {
+    coverAreaLoading(room);
+  }
+
+  await preloadAreaAssets(room);
+
+  if (
+    !state ||
+    state.room !== room
+  ) {
+    return;
+  }
+
+  const transition = $("transition");
+
+  transition.style.transition =
+    "opacity 0.24s";
+
+  transition.classList.remove("active");
+  transition.style.opacity = "";
+
+  await new Promise(resolve =>
+    setTimeout(resolve, 260)
+  );
+
+  areaLoadingOverlay = false;
+  transitionBusy = false;
+  save();
 }
 
 function drawSprite(image, x, y, w, h) {
@@ -1358,7 +1735,7 @@ function drawPlayerRoomBackground(m) {
 
   if (
     !drawSpriteCropStretch(
-      playerRoomSprites.floor,
+      getPlayerRoomSprite("floor"),
       floorX,
       floorY,
       floorW,
@@ -1376,7 +1753,7 @@ function drawPlayerRoomBackground(m) {
 
   // Parede de fundo.
   drawSprite(
-    playerRoomSprites.walls,
+    getPlayerRoomSprite("walls"),
     0,
     0,
     m.w,
@@ -1390,7 +1767,7 @@ function drawPlayerRoomBackground(m) {
 // Assim o player pode andar nessa área e parecer passar atrás/por baixo
 // da parede, em vez de ficar bloqueado ou desenhado sobre ela.
 function drawPlayerRoomForeground(m) {
-  if (!spriteReady(playerRoomSprites.walls)) return;
+  if (!spriteReady(getPlayerRoomSprite("walls"))) return;
 
   const foregroundY = housePoint(316);
 
@@ -1405,7 +1782,7 @@ function drawPlayerRoomForeground(m) {
   c.clip();
 
   drawSprite(
-    playerRoomSprites.walls,
+    getPlayerRoomSprite("walls"),
     0,
     0,
     m.w,
@@ -3076,15 +3453,24 @@ function drawCharacterSprite(
     $("transitionHint").textContent = hint;
     $("transition").classList.add("active");
 
-    setTimeout(() => {
-      fn();
+    setTimeout(async () => {
+      if (typeof fn === "function") {
+        await fn();
+      }
+
+      if (state?.room) {
+        await preloadAreaAssets(
+          state.room
+        );
+      }
 
       setTimeout(() => {
         $("transition").classList.remove("active");
         transitionBusy = false;
+        areaLoadingOverlay = false;
         save();
-      }, 900);
-    }, 700);
+      }, 220);
+    }, 420);
   }
 
   function enterGame() {
@@ -3094,6 +3480,7 @@ function drawCharacterSprite(
     $("hud").hidden = false;
     $("overlay").hidden = true;
 
+    loadedAreaRoom = null;
     updateHud();
   }
 
@@ -3726,9 +4113,41 @@ function drawCharacterSprite(
     const dt = Math.min((time - last) / 1000, 0.04);
     last = time;
 
+    // Nenhuma área é atualizada/desenhada antes de terminar seu preload.
+    // Se uma troca de mapa ocorreu fora do fade padrão, esta trava garante
+    // que o jogador continue vendo preto até tudo estar pronto.
+    if (
+      mode === "game" &&
+      state &&
+      loadedAreaRoom !== state.room
+    ) {
+      ensureAreaLoaded(
+        state.room
+      ).catch(() => {
+        areaLoadingOverlay = false;
+        transitionBusy = false;
+      });
+
+      requestAnimationFrame(frame);
+      return;
+    }
+
     update(dt);
-    // Resolução de desenho independente das coordenadas lógicas do jogo.
-    const renderScale = 3;
+
+    // No celular, 3x criava um framebuffer de mais de 1 milhão de pixels
+    // e era um dos principais custos por frame. 2x mantém boa definição
+    // e reduz bastante o trabalho de composição.
+    const mobileRender =
+      window.matchMedia?.(
+        "(pointer: coarse)"
+      )?.matches ||
+      Math.min(
+        window.innerWidth,
+        window.innerHeight
+      ) < 720;
+
+    const renderScale =
+      mobileRender ? 2 : 3;
     if (canvas.width !== W * renderScale || canvas.height !== H * renderScale) {
       canvas.width = W * renderScale;
       canvas.height = H * renderScale;
@@ -4947,18 +5366,27 @@ function runScreenTransition(title, hint, duration, changeRoom) {
   const fadeTime = 650;
   const holdTime = Math.max(0, duration - fadeTime * 2);
 
-  setTimeout(() => {
-    if (typeof changeRoom === 'function') changeRoom();
+  setTimeout(async () => {
+    if (typeof changeRoom === 'function') {
+      await changeRoom();
+    }
+
+    if (state?.room) {
+      await preloadAreaAssets(
+        state.room
+      );
+    }
 
     setTimeout(() => {
       $('transition').classList.remove('active');
 
       setTimeout(() => {
         transitionBusy = false;
+        areaLoadingOverlay = false;
         save();
-      }, fadeTime);
-    }, holdTime);
-  }, fadeTime);
+      }, Math.min(fadeTime, 260));
+    }, Math.min(holdTime, 180));
+  }, Math.min(fadeTime, 420));
 }
 
 enterGame = function () {
@@ -8124,7 +8552,7 @@ desk: [536, 172, 48, 146, .32, .18, .58, .74],
 };
 function roomItemBounds(key) {
   const [x,y,w,h] = roomItems[key].map(housePoint);
-  const image = playerRoomSprites[key];
+  const image = getPlayerRoomSprite(key);
   const crop = spriteReady(image) ? getSpriteCrop(image) : {w,h};
   const sourceW = crop.w;
   const sourceH = crop.h;
@@ -8143,7 +8571,7 @@ function roomItemBounds(key) {
 }
 function drawRoomItem(key) {
   const b = roomItemBounds(key);
-  drawSpriteContain(playerRoomSprites[key],b.x,b.y,b.w,b.h);
+  drawSpriteContain(getPlayerRoomSprite(key),b.x,b.y,b.w,b.h);
 }
 function roomCollision(o) {
   const key = o.roomItem || {
@@ -10401,7 +10829,7 @@ const roomUpdateBeforeFix=update;
 let roomPositionChecked=false;
 update=function(dt) {
   if (state?.room!=="bedroom") roomPositionChecked=false;
-  if (state?.room==="bedroom" && !roomPositionChecked && spriteReady(playerRoomSprites.bed) && spriteReady(playerRoomSprites.desk) && spriteReady(playerRoomSprites.shelf) && spriteReady(playerRoomSprites.nightstand)) {
+  if (state?.room==="bedroom" && !roomPositionChecked && spriteReady(getPlayerRoomSprite("bed")) && spriteReady(getPlayerRoomSprite("desk")) && spriteReady(getPlayerRoomSprite("shelf")) && spriteReady(getPlayerRoomSprite("nightstand"))) {
     roomPositionChecked=true;
     if (solid(state.x,state.y)) {
       search: for(let radius=4;radius<200;radius+=4) {
@@ -24529,7 +24957,7 @@ updateHud = function() {
   }
 };
 
-$("version").textContent = "PROTÓTIPO · 0.8.14";
+$("version").textContent = "PROTÓTIPO · 0.8.15";
   
   requestAnimationFrame(frame);
   showBootSplash();
