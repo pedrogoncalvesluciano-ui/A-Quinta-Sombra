@@ -2,7 +2,7 @@
 "use strict";
 
 /*
-  A QUINTA SOMBRA — 0.8.8
+  A QUINTA SOMBRA — 0.8.9
 
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
@@ -68,6 +68,234 @@
       "#34463b";
     c.fillRect(x, y, w, h);
     c.restore();
+  }
+
+  // =========================================================
+  // 0.8.9 — ASSETS MODULARES DE RUAS
+  // =========================================================
+
+  const roadAssetSources = {
+    pavedVertical:
+      "assets/tiles/roads/rua_vertical.png?v=0.8.9",
+    pavedHorizontal:
+      "assets/tiles/roads/rua_horizontal.png?v=0.8.9",
+    pavedCross:
+      "assets/tiles/roads/cruzamento_4_vias.png?v=0.8.9",
+    pavedToDirt:
+      "assets/tiles/roads/rua_vertical_terra.png?v=0.8.9",
+    dirtVertical:
+      "assets/tiles/roads/estrada_de_terra.png?v=0.8.9",
+    dirtHorizontal:
+      "assets/tiles/roads/estrada_terra_horizontal.png?v=0.8.9",
+    dirtTLeft:
+      "assets/tiles/roads/estrada_terra_conexao_t_esquerda.png?v=0.8.9",
+    dirtTRight:
+      "assets/tiles/roads/estrada_terra_conexao_t_direita.png?v=0.8.9"
+  };
+
+  const roadAssets = {};
+
+  for (const [key, src] of Object.entries(roadAssetSources)) {
+    const image = new Image();
+    image.src = src;
+    roadAssets[key] = image;
+  }
+
+  // Recortes retiram apenas as margens transparentes dos PNGs.
+  // Assim a escala no mapa corresponde ao tamanho real da rua.
+  const ROAD_CROPS = {
+    pavedVertical: {
+      x: 280, y: 4, w: 528, h: 1440
+    },
+    pavedHorizontal: {
+      x: 0, y: 276, w: 1448, h: 535
+    },
+    pavedToDirt: {
+      x: 274, y: 25, w: 538, h: 1381
+    },
+    dirtVertical: {
+      x: 313, y: 18, w: 462, h: 1412
+    },
+    dirtHorizontal: {
+      x: 0, y: 360, w: 1448, h: 382
+    },
+    dirtTLeft: {
+      x: 0, y: 0, w: 988, h: 1254
+    },
+    dirtTRight: {
+      x: 255, y: 0, w: 999, h: 1254
+    }
+  };
+
+  function drawRoadAsset(
+    key,
+    x,
+    y,
+    w,
+    h,
+    crop = ROAD_CROPS[key] || null
+  ) {
+    const image = roadAssets[key];
+
+    if (
+      !image ||
+      !image.complete ||
+      image.naturalWidth <= 0
+    ) {
+      return false;
+    }
+
+    c.save();
+    c.imageSmoothingEnabled = false;
+
+    if (crop) {
+      c.drawImage(
+        image,
+        crop.x,
+        crop.y,
+        crop.w,
+        crop.h,
+        x,
+        y,
+        w,
+        h
+      );
+    } else {
+      c.drawImage(
+        image,
+        x,
+        y,
+        w,
+        h
+      );
+    }
+
+    c.restore();
+    return true;
+  }
+
+  function drawRoadTiledVertical(
+    key,
+    x,
+    y,
+    width,
+    height,
+    fallback = "#69665d"
+  ) {
+    const crop = ROAD_CROPS[key];
+
+    if (!crop) {
+      if (!drawRoadAsset(key, x, y, width, height)) {
+        rect(x, y, width, height, fallback);
+      }
+      return;
+    }
+
+    const tileHeight =
+      width * crop.h / crop.w;
+
+    for (
+      let py = y;
+      py < y + height - 0.01;
+      py += tileHeight
+    ) {
+      const drawHeight =
+        Math.min(
+          tileHeight,
+          y + height - py
+        );
+
+      const sourceHeight =
+        crop.h *
+        (drawHeight / tileHeight);
+
+      const ok =
+        drawRoadAsset(
+          key,
+          x,
+          py,
+          width,
+          drawHeight,
+          {
+            x: crop.x,
+            y: crop.y,
+            w: crop.w,
+            h: sourceHeight
+          }
+        );
+
+      if (!ok) {
+        rect(
+          x,
+          py,
+          width,
+          drawHeight,
+          fallback
+        );
+      }
+    }
+  }
+
+  function drawRoadTiledHorizontal(
+    key,
+    x,
+    y,
+    width,
+    height,
+    fallback = "#69665d"
+  ) {
+    const crop = ROAD_CROPS[key];
+
+    if (!crop) {
+      if (!drawRoadAsset(key, x, y, width, height)) {
+        rect(x, y, width, height, fallback);
+      }
+      return;
+    }
+
+    const tileWidth =
+      height * crop.w / crop.h;
+
+    for (
+      let px = x;
+      px < x + width - 0.01;
+      px += tileWidth
+    ) {
+      const drawWidth =
+        Math.min(
+          tileWidth,
+          x + width - px
+        );
+
+      const sourceWidth =
+        crop.w *
+        (drawWidth / tileWidth);
+
+      const ok =
+        drawRoadAsset(
+          key,
+          px,
+          y,
+          drawWidth,
+          height,
+          {
+            x: crop.x,
+            y: crop.y,
+            w: sourceWidth,
+            h: crop.h
+          }
+        );
+
+      if (!ok) {
+        rect(
+          px,
+          y,
+          drawWidth,
+          height,
+          fallback
+        );
+      }
+    }
   }
 
   const W = 480;
@@ -1487,42 +1715,97 @@ function drawCharacterSprite(
         m.h
       );
 
-      // Rua principal vertical. Ao sul o asfalto vira estrada de terra
-      // e segue de verdade até a região da casa do velho.
-      rect(610, 0, 78, 1020, "#706b5f");
-      rect(610, 1020, 78, m.h - 1020, "#655442");
+      // 0.8.9 — ruas do bairro usando os PNGs modulares.
+      // A geometria e as colisões antigas permanecem intocadas.
+      const villageMainX = 590;
+      const villageMainW = 118;
 
-      // A estrada de terra segue até o limite sul do bairro.
-      // No fim, o jogador escolhe avançar para a área seguinte.
+      drawRoadTiledVertical(
+        "pavedVertical",
+        villageMainX,
+        0,
+        villageMainW,
+        1050
+      );
 
-      // Cruzamento superior.
-      rect(0, 385, 1280, 78, "#706b5f");
+      // As duas ruas horizontais usam a mesma textura com calçada embutida.
+      for (const roadY of [369, 739]) {
+        drawRoadTiledHorizontal(
+          "pavedHorizontal",
+          0,
+          roadY,
+          m.w,
+          110
+        );
+      }
 
-      // Rua inferior: livre desde a primeira saída.
-      rect(0, 755, 1280, 82, "#706b5f");
+      // Cruzamentos em sprite próprio, evitando emendas retas visíveis.
+      const villageCrossSize = 286;
+      const villageCrossX =
+        649 - villageCrossSize / 2;
 
-      // Entrada curta da casa da família até a rua principal.
+      for (const centerY of [424, 794]) {
+        if (
+          !drawRoadAsset(
+            "pavedCross",
+            villageCrossX,
+            centerY - villageCrossSize / 2,
+            villageCrossSize,
+            villageCrossSize,
+            null
+          )
+        ) {
+          rect(
+            villageMainX,
+            centerY - 55,
+            villageMainW,
+            110,
+            "#706b5f"
+          );
+        }
+      }
+
+      // Transição visual do asfalto para a estrada de terra ao sul.
+      const transitionY = 830;
+      const transitionH =
+        villageMainW *
+        ROAD_CROPS.pavedToDirt.h /
+        ROAD_CROPS.pavedToDirt.w;
+
+      if (
+        !drawRoadAsset(
+          "pavedToDirt",
+          villageMainX,
+          transitionY,
+          villageMainW,
+          transitionH
+        )
+      ) {
+        rect(
+          villageMainX,
+          transitionY,
+          villageMainW,
+          transitionH,
+          "#655442"
+        );
+      }
+
+      drawRoadTiledVertical(
+        "dirtVertical",
+        602,
+        transitionY + transitionH - 10,
+        94,
+        m.h - (
+          transitionY +
+          transitionH -
+          10
+        ),
+        "#655442"
+      );
+
+      // Entrada curta já existente da casa da família.
+      // O novo asset de extensão/calçada até a casa NÃO é usado.
       rect(420, 710, 190, 45, "#706b5f");
-
-      // Calçadas e meios-fios: ajudam a separar rua, casas e gramado.
-      rect(590, 0, 16, 1020, "#8b877c");
-      rect(692, 0, 16, 1020, "#8b877c");
-      rect(0, 369, 1280, 16, "#8b877c");
-      rect(0, 463, 1280, 16, "#8b877c");
-      rect(0, 739, 1280, 16, "#8b877c");
-      rect(0, 837, 1280, 16, "#8b877c");
-
-      // Marcação central discreta da rua principal.
-      for (let y = 24; y < 1000; y += 54) {
-        rect(647, y, 4, 22, "#b9ad87");
-      }
-
-      // Textura de terra do caminho do velho.
-      for (let y = 1040; y < m.h; y += 26) {
-        const drift = (Math.floor(y / 26) % 2) * 17;
-        rect(620 + drift, y, 12, 4, "#75624d");
-        rect(663 - drift / 2, y + 11, 9, 3, "#514333");
-      }
 
       // Postes simples, sem colisão, para dar leitura de bairro residencial.
       for (const [lx, ly] of [
@@ -9406,20 +9689,39 @@ function v0646DrawOldRoad() {
     m.h
   );
 
-  // Estrada principal, um pouco irregular.
-  rect(425, 0, 94, 480, "#665442");
-  rect(442, 450, 108, 320, "#665442");
-  rect(478, 735, 170, 86, "#665442");
+  // 0.8.9 — estrada de terra modular.
+  drawRoadTiledVertical(
+    "dirtVertical",
+    425,
+    0,
+    110,
+    850,
+    "#665442"
+  );
 
-  // Trilha até a casa.
-  rect(615, 775, 110, 74, "#665442");
-
-  // Marcas de roda e terra mais clara.
-  for (let y = 18; y < 730; y += 34) {
-    const drift = Math.sin(y * 0.05) * 8;
-    rect(448 + drift, y, 13, 4, "#796650");
-    rect(493 + drift, y + 12, 11, 3, "#514234");
+  // Junção para o caminho da casa do velho.
+  // A via principal continua vertical e o braço segue para a direita.
+  if (
+    !drawRoadAsset(
+      "dirtTRight",
+      392,
+      650,
+      285,
+      285
+    )
+  ) {
+    rect(425, 650, 110, 285, "#665442");
+    rect(478, 755, 245, 86, "#665442");
   }
+
+  drawRoadTiledHorizontal(
+    "dirtHorizontal",
+    525,
+    752,
+    230,
+    94,
+    "#665442"
+  );
 
   // Cerca baixa perto da casa.
   for (let x = 525; x < 850; x += 34) {
@@ -10920,14 +11222,15 @@ interact = function(action) {
 function v0649DrawWestEnvironment(m) {
   rect(0, 0, m.w, m.h, "#252b2e");
 
-  // Rua principal e calçadas.
-  rect(0, 295, m.w, 185, "#55585a");
-  rect(0, 275, m.w, 20, "#76766f");
-  rect(0, 480, m.w, 20, "#76766f");
-
-  for (let x = 20; x < m.w; x += 70) {
-    rect(x, 385, 34, 4, "#8c8978");
-  }
+  // 0.8.9 — rua oeste usando o mesmo conjunto visual do bairro.
+  drawRoadTiledHorizontal(
+    "pavedHorizontal",
+    0,
+    275,
+    m.w,
+    225,
+    "#55585a"
+  );
 
   // Fachadas residenciais.
   for (const o of m.objects) {
@@ -17334,10 +17637,14 @@ function v076DrawNorthRoad() {
     m.h
   );
 
-  // Rua principal, calçadas e marcação central.
-  v076DrawRoadTexture(350, 0, 200, m.h, false);
-  rect(330, 0, 20, m.h, "#8a867b");
-  rect(550, 0, 20, m.h, "#8a867b");
+  // 0.8.9 — rua principal com asfalto + calçadas no mesmo asset.
+  drawRoadTiledVertical(
+    "pavedVertical",
+    315,
+    0,
+    270,
+    m.h
+  );
 
   // Pequenas entradas para as casas.
   for (const y of [430, 735, 1040]) {
@@ -17404,10 +17711,14 @@ function v076DrawSquareRoad() {
     m.h
   );
 
-  // Rua leste: termina em um retorno circular antes da praça.
-  v076DrawRoadTexture(0, 310, 1125, 115, true);
-  rect(0, 290, 1120, 20, "#8a867b");
-  rect(0, 425, 1120, 20, "#8a867b");
+  // 0.8.9 — rua leste com textura modular de asfalto + calçadas.
+  drawRoadTiledHorizontal(
+    "pavedHorizontal",
+    0,
+    270,
+    1125,
+    200
+  );
 
   c.fillStyle = "#706b5f";
   c.beginPath();
@@ -23835,7 +24146,7 @@ updateHud = function() {
   }
 };
 
-$("version").textContent = "PROTÓTIPO · 0.8.8";
+$("version").textContent = "PROTÓTIPO · 0.8.9";
   
   requestAnimationFrame(frame);
   showBootSplash();
