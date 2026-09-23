@@ -27,7 +27,7 @@
   // assets/tiles/terrain/grama_base_128.png
   const grassTile64 = new Image();
   grassTile64.src =
-    "assets/tiles/terrain/grama_base_64.png?v=0.8.7";
+    "assets/tiles/terrain/grama_base_64.png?v=0.8.15";
 
   let grassPattern64 = null;
 
@@ -61,12 +61,67 @@
         );
     }
 
+    // 0.8.15 — em mapas grandes, desenha somente a região
+    // que pode aparecer na câmera. Antes o jogo preenchia até
+    // 1280x1900 de grama em TODO frame no celular.
+    let drawX = x;
+    let drawY = y;
+    let drawW = w;
+    let drawH = h;
+
+    if (
+      typeof camera !== "undefined" &&
+      Number.isFinite(camera?.x) &&
+      Number.isFinite(camera?.y)
+    ) {
+      const padding = 72;
+      const left =
+        Math.max(
+          x,
+          Math.floor(camera.x) - padding
+        );
+      const top =
+        Math.max(
+          y,
+          Math.floor(camera.y) - padding
+        );
+      const right =
+        Math.min(
+          x + w,
+          Math.ceil(camera.x + W) + padding
+        );
+      const bottom =
+        Math.min(
+          y + h,
+          Math.ceil(camera.y + H) + padding
+        );
+
+      drawX = left;
+      drawY = top;
+      drawW =
+        Math.max(0, right - left);
+      drawH =
+        Math.max(0, bottom - top);
+    }
+
+    if (
+      drawW <= 0 ||
+      drawH <= 0
+    ) {
+      return;
+    }
+
     c.save();
     c.imageSmoothingEnabled = false;
     c.fillStyle =
       grassPattern64 ||
       "#34463b";
-    c.fillRect(x, y, w, h);
+    c.fillRect(
+      drawX,
+      drawY,
+      drawW,
+      drawH
+    );
     c.restore();
   }
 
@@ -1115,8 +1170,8 @@ const playerRoomSprites = {};
 // 0.8.15 — sprites pesados do quarto são carregados somente
 // quando o jogador realmente entra no quarto.
 function getPlayerRoomSprite(key) {
-  if (getPlayerRoomSprite(key)) {
-    return getPlayerRoomSprite(key);
+  if (playerRoomSprites[key]) {
+    return playerRoomSprites[key];
   }
 
   const filename =
@@ -1139,7 +1194,7 @@ function getPlayerRoomSprite(key) {
     { once: true }
   );
 
-  getPlayerRoomSprite(key) = image;
+  playerRoomSprites[key] = image;
   return image;
 }
 
@@ -1370,6 +1425,135 @@ function getAreaLoadingLabel(room) {
     "Nova área";
 }
 
+function warmAreaRoadCaches(room) {
+  try {
+    if (room === "village") {
+      // Cruzamentos e trechos usados exatamente com as dimensões do mapa.
+      getRoadStrip(
+        "pavedVertical",
+        118,
+        279,
+        false
+      );
+
+      getRoadStrip(
+        "pavedVertical",
+        118,
+        80,
+        false
+      );
+
+      getRoadStrip(
+        "pavedHorizontal",
+        504,
+        110,
+        true
+      );
+
+      getRoadStrip(
+        "pavedHorizontal",
+        486,
+        110,
+        true
+      );
+
+      getRoadRaster(
+        "pavedCross",
+        330,
+        330,
+        null
+      );
+
+      const cropTop = 960;
+      const transitionCrop = {
+        x: ROAD_CROPS.pavedToDirt.x,
+        y:
+          ROAD_CROPS.pavedToDirt.y +
+          cropTop,
+        w: ROAD_CROPS.pavedToDirt.w,
+        h:
+          ROAD_CROPS.pavedToDirt.h -
+          cropTop
+      };
+
+      const transitionH =
+        118 *
+        transitionCrop.h /
+        transitionCrop.w;
+
+      getRoadRaster(
+        "pavedToDirt",
+        118,
+        transitionH,
+        transitionCrop
+      );
+
+      getRoadStrip(
+        "dirtVertical",
+        128,
+        880,
+        false
+      );
+      return;
+    }
+
+    if (room === "northRoad") {
+      getRoadStrip(
+        "pavedVertical",
+        270,
+        maps.northRoad?.h || 1320,
+        false
+      );
+      return;
+    }
+
+    if (room === "squareRoad") {
+      getRoadStrip(
+        "pavedHorizontal",
+        1125,
+        200,
+        true
+      );
+      return;
+    }
+
+    if (room === "westRoad") {
+      getRoadStrip(
+        "pavedHorizontal",
+        maps.westRoad?.w || 1400,
+        225,
+        true
+      );
+      return;
+    }
+
+    if (room === "oldRoad") {
+      getRoadStrip(
+        "dirtVertical",
+        110,
+        850,
+        false
+      );
+
+      getRoadRaster(
+        "dirtTRight",
+        285,
+        285
+      );
+
+      getRoadStrip(
+        "dirtHorizontal",
+        230,
+        94,
+        true
+      );
+    }
+  } catch {
+    // Se um navegador não conseguir aquecer um cache,
+    // o renderer normal ainda possui fallback.
+  }
+}
+
 async function preloadAreaAssets(room) {
   if (!room) {
     return;
@@ -1440,6 +1624,11 @@ async function preloadAreaAssets(room) {
     }
 
     await Promise.all(tasks);
+
+    // Pré-monta as versões reduzidas que serão realmente desenhadas.
+    // Assim o primeiro frame da nova área não precisa redimensionar
+    // PNGs de mais de 1000px enquanto o jogador já está vendo a cena.
+    warmAreaRoadCaches(room);
 
     // Dá ao navegador um frame inteiro para concluir upload
     // das texturas para a camada gráfica antes de revelar o mapa.
@@ -4121,12 +4310,21 @@ function drawCharacterSprite(
       state &&
       loadedAreaRoom !== state.room
     ) {
-      ensureAreaLoaded(
-        state.room
-      ).catch(() => {
-        areaLoadingOverlay = false;
-        transitionBusy = false;
-      });
+      if (transitionBusy) {
+        // Uma transição existente já mantém a tela preta.
+        // Apenas inicia o preload e deixa essa transição decidir
+        // quando remover a cobertura.
+        preloadAreaAssets(
+          state.room
+        ).catch(() => {});
+      } else {
+        ensureAreaLoaded(
+          state.room
+        ).catch(() => {
+          areaLoadingOverlay = false;
+          transitionBusy = false;
+        });
+      }
 
       requestAnimationFrame(frame);
       return;
