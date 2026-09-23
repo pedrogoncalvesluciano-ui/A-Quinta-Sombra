@@ -2,7 +2,7 @@
 "use strict";
 
 /*
-  A QUINTA SOMBRA — 0.8.11
+  A QUINTA SOMBRA — 0.8.12
 
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
@@ -76,21 +76,21 @@
 
   const roadAssetSources = {
     pavedVertical:
-      "assets/tiles/roads/rua_vertical.png?v=0.8.11",
+      "assets/tiles/roads/rua_vertical.png?v=0.8.12",
     pavedHorizontal:
-      "assets/tiles/roads/rua_horizontal.png?v=0.8.11",
+      "assets/tiles/roads/rua_horizontal.png?v=0.8.12",
     pavedCross:
-      "assets/tiles/roads/cruzamento_4_vias.png?v=0.8.11",
+      "assets/tiles/roads/cruzamento_4_vias.png?v=0.8.12",
     pavedToDirt:
-      "assets/tiles/roads/rua_vertical_terra.png?v=0.8.11",
+      "assets/tiles/roads/rua_vertical_terra.png?v=0.8.12",
     dirtVertical:
-      "assets/tiles/roads/estrada_de_terra.png?v=0.8.11",
+      "assets/tiles/roads/estrada_de_terra.png?v=0.8.12",
     dirtHorizontal:
-      "assets/tiles/roads/estrada_terra_horizontal.png?v=0.8.11",
+      "assets/tiles/roads/estrada_terra_horizontal.png?v=0.8.12",
     dirtTLeft:
-      "assets/tiles/roads/estrada_terra_conexao_t_esquerda.png?v=0.8.11",
+      "assets/tiles/roads/estrada_terra_conexao_t_esquerda.png?v=0.8.12",
     dirtTRight:
-      "assets/tiles/roads/estrada_terra_conexao_t_direita.png?v=0.8.11"
+      "assets/tiles/roads/estrada_terra_conexao_t_direita.png?v=0.8.12"
   };
 
   const roadAssets = {};
@@ -335,15 +335,17 @@
           crop.w *
           (drawWidth / tileWidth);
 
+        // 0.8.12 — overlap mínimo evita frestas transparentes
+        // entre os módulos horizontais.
         ctx.drawImage(
           roadAssets[key],
           crop.x,
           crop.y,
           sourceWidth,
           crop.h,
-          Math.round(px),
+          Math.floor(px) - 1,
           0,
-          Math.ceil(drawWidth),
+          Math.ceil(drawWidth) + 2,
           h
         );
       }
@@ -366,6 +368,8 @@
           crop.h *
           (drawHeight / tileHeight);
 
+        // 0.8.12 — overlap mínimo evita a linha de grama
+        // que aparecia entre módulos verticais.
         ctx.drawImage(
           roadAssets[key],
           crop.x,
@@ -373,9 +377,9 @@
           crop.w,
           sourceHeight,
           0,
-          Math.round(py),
+          Math.floor(py) - 1,
           w,
-          Math.ceil(drawHeight)
+          Math.ceil(drawHeight) + 2
         );
       }
     }
@@ -1982,58 +1986,122 @@ function drawCharacterSprite(
         }
       }
 
-      // Depois do segundo cruzamento, a rua vertical volta
-      // apenas a partir da borda inferior do sprite.
+      // 0.8.12 — transição asfalto -> terra mais curta e suave.
+      // O sprite original tinha muito asfalto antes da terra;
+      // este recorte elimina boa parte desse trecho "descendo".
+      const transitionCropInset = 520;
+      const transitionCrop = {
+        x: ROAD_CROPS.pavedToDirt.x,
+        y:
+          ROAD_CROPS.pavedToDirt.y +
+          transitionCropInset,
+        w: ROAD_CROPS.pavedToDirt.w,
+        h:
+          ROAD_CROPS.pavedToDirt.h -
+          transitionCropInset
+      };
+
+      // Começa levemente dentro do final do cruzamento para não
+      // existir uma linha seca entre os dois sprites.
       const transitionY =
-        lowerCrossBottom + 8;
+        lowerCrossBottom - 10;
+
+      // A transição abre um pouco antes da estrada de terra,
+      // fazendo o caminho parecer alargar naturalmente.
+      const transitionW = 132;
+      const transitionX =
+        villageRoadCenterX -
+        transitionW / 2;
+
+      const transitionH =
+        transitionW *
+        transitionCrop.h /
+        transitionCrop.w;
+
+      // Estrada de terra mais larga e começando antes do fim
+      // da transição. Ela é desenhada primeiro; o sprite de
+      // transição fica por cima e esconde a emenda.
+      const dirtW = 130;
+      const dirtX =
+        villageRoadCenterX -
+        dirtW / 2;
+
+      const dirtOverlap = 64;
+      const dirtStartY =
+        transitionY +
+        transitionH -
+        dirtOverlap;
 
       drawRoadTiledVertical(
-        "pavedVertical",
-        villageMainX,
-        lowerCrossBottom,
-        villageMainW,
+        "dirtVertical",
+        dirtX,
+        dirtStartY,
+        dirtW,
         Math.max(
           0,
-          transitionY - lowerCrossBottom
-        )
+          m.h - dirtStartY
+        ),
+        "#655442"
       );
-
-      // Transição visual do asfalto para a estrada de terra ao sul.
-      const transitionH =
-        villageMainW *
-        ROAD_CROPS.pavedToDirt.h /
-        ROAD_CROPS.pavedToDirt.w;
 
       if (
         !drawRoadAsset(
           "pavedToDirt",
-          villageMainX,
+          transitionX,
           transitionY,
-          villageMainW,
-          transitionH
+          transitionW,
+          transitionH,
+          transitionCrop
         )
       ) {
         rect(
-          villageMainX,
+          transitionX,
           transitionY,
-          villageMainW,
+          transitionW,
           transitionH,
           "#655442"
         );
       }
 
-      drawRoadTiledVertical(
-        "dirtVertical",
-        villageRoadCenterX - 47,
-        transitionY + transitionH - 10,
-        94,
-        m.h - (
-          transitionY +
-          transitionH -
-          10
-        ),
-        "#655442"
+      // Gradiente curto no trecho final: aproxima a cor do
+      // sprite de transição da estrada de terra sem esconder
+      // a textura de pedras e marcas de roda.
+      const blendH = 86;
+      const blendY =
+        transitionY +
+        transitionH -
+        blendH;
+
+      const roadBlend =
+        c.createLinearGradient(
+          0,
+          blendY,
+          0,
+          blendY + blendH
+        );
+
+      roadBlend.addColorStop(
+        0,
+        "rgba(101,84,66,0)"
       );
+      roadBlend.addColorStop(
+        0.45,
+        "rgba(101,84,66,0.08)"
+      );
+      roadBlend.addColorStop(
+        1,
+        "rgba(101,84,66,0.22)"
+      );
+
+      c.save();
+      c.fillStyle = roadBlend;
+      c.fillRect(
+        dirtX - 3,
+        blendY,
+        dirtW + 6,
+        blendH
+      );
+      c.restore();
 
       // Sem extensão de calçada até a casa:
       // os PNGs de rua já carregam suas próprias calçadas.
@@ -24312,7 +24380,7 @@ updateHud = function() {
   }
 };
 
-$("version").textContent = "PROTÓTIPO · 0.8.11";
+$("version").textContent = "PROTÓTIPO · 0.8.12";
   
   requestAnimationFrame(frame);
   showBootSplash();
