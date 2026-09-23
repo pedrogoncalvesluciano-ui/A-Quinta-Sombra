@@ -2,7 +2,7 @@
 "use strict";
 
 /*
-  A QUINTA SOMBRA — 0.8.12
+  A QUINTA SOMBRA — 0.8.13
 
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
@@ -76,21 +76,21 @@
 
   const roadAssetSources = {
     pavedVertical:
-      "assets/tiles/roads/rua_vertical.png?v=0.8.12",
+      "assets/tiles/roads/rua_vertical.png?v=0.8.13",
     pavedHorizontal:
-      "assets/tiles/roads/rua_horizontal.png?v=0.8.12",
+      "assets/tiles/roads/rua_horizontal.png?v=0.8.13",
     pavedCross:
-      "assets/tiles/roads/cruzamento_4_vias.png?v=0.8.12",
+      "assets/tiles/roads/cruzamento_4_vias.png?v=0.8.13",
     pavedToDirt:
-      "assets/tiles/roads/rua_vertical_terra.png?v=0.8.12",
+      "assets/tiles/roads/rua_vertical_terra.png?v=0.8.13",
     dirtVertical:
-      "assets/tiles/roads/estrada_de_terra.png?v=0.8.12",
+      "assets/tiles/roads/estrada_de_terra.png?v=0.8.13",
     dirtHorizontal:
-      "assets/tiles/roads/estrada_terra_horizontal.png?v=0.8.12",
+      "assets/tiles/roads/estrada_terra_horizontal.png?v=0.8.13",
     dirtTLeft:
-      "assets/tiles/roads/estrada_terra_conexao_t_esquerda.png?v=0.8.12",
+      "assets/tiles/roads/estrada_terra_conexao_t_esquerda.png?v=0.8.13",
     dirtTRight:
-      "assets/tiles/roads/estrada_terra_conexao_t_direita.png?v=0.8.12"
+      "assets/tiles/roads/estrada_terra_conexao_t_direita.png?v=0.8.13"
   };
 
   const roadAssets = {};
@@ -1886,7 +1886,7 @@ function drawCharacterSprite(
         m.h
       );
 
-      // 0.8.12 — transições de rua mais suaves.
+      // 0.8.13 — transições de rua mais suaves e estrada de terra mais larga.
       const villageRoadCenterX = 649;
       const villageMainW = 118;
       const villageMainX =
@@ -1911,7 +1911,7 @@ function drawCharacterSprite(
 
       // Pequena sobreposição fica escondida pelo sprite do cruzamento.
       // Isso elimina a linha seca entre a rua reta e a conexão.
-      const roadJoinOverlap = 12;
+      const roadJoinOverlap = 20;
 
       drawRoadTiledVertical(
         "pavedVertical",
@@ -2000,8 +2000,8 @@ function drawCharacterSprite(
       // =====================================================
 
       // A imagem original de transição possui bastante asfalto no topo.
-      // Recortamos essa parte para a descida ficar menor.
-      const transitionCropTop = 520;
+      // O recorte agora é maior para a descida ficar curta e a terra aparecer antes.
+      const transitionCropTop = 680;
 
       const transitionCrop = {
         x: ROAD_CROPS.pavedToDirt.x,
@@ -2024,12 +2024,13 @@ function drawCharacterSprite(
         transitionCrop.h /
         transitionCrop.w;
 
-      // Terra mais larga e entrando por baixo da transição.
-      const dirtW = 132;
+      // Terra mais larga e entrando bem por baixo da transição,
+      // formando uma abertura gradual em vez de um degrau visual.
+      const dirtW = 146;
       const dirtX =
         villageRoadCenterX - dirtW / 2;
 
-      const dirtOverlap = 58;
+      const dirtOverlap = 74;
       const dirtStartY =
         transitionY +
         transitionH -
@@ -2075,9 +2076,9 @@ function drawCharacterSprite(
       const blendY =
         transitionY +
         transitionH -
-        72;
+        92;
 
-      const blendH = 84;
+      const blendH = 112;
 
       const asphaltToDirtGradient =
         c.createLinearGradient(
@@ -2099,7 +2100,7 @@ function drawCharacterSprite(
 
       asphaltToDirtGradient.addColorStop(
         1,
-        "rgba(104,84,63,0.25)"
+        "rgba(104,84,63,0.20)"
       );
 
       c.fillStyle =
@@ -2113,7 +2114,7 @@ function drawCharacterSprite(
       );
 
       // Laterais suaves para a terra crescer de 118px para 132px.
-      const sideBlendH = 76;
+      const sideBlendH = 104;
 
       const leftBlend =
         c.createLinearGradient(
@@ -2130,7 +2131,7 @@ function drawCharacterSprite(
 
       leftBlend.addColorStop(
         1,
-        "rgba(91,72,54,0.18)"
+        "rgba(91,72,54,0.16)"
       );
 
       c.fillStyle = leftBlend;
@@ -2151,7 +2152,7 @@ function drawCharacterSprite(
 
       rightBlend.addColorStop(
         0,
-        "rgba(91,72,54,0.18)"
+        "rgba(91,72,54,0.16)"
       );
 
       rightBlend.addColorStop(
@@ -24446,7 +24447,7 @@ updateHud = function() {
   }
 };
 
-$("version").textContent = "PROTÓTIPO · 0.8.12";
+$("version").textContent = "PROTÓTIPO · 0.8.13";
   
   requestAnimationFrame(frame);
   showBootSplash();
