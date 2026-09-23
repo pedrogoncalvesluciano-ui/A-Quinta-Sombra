@@ -2,7 +2,7 @@
 "use strict";
 
 /*
-  A QUINTA SOMBRA — 0.8.9
+  A QUINTA SOMBRA — 0.8.10
 
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
@@ -71,38 +71,37 @@
   }
 
   // =========================================================
-  // 0.8.9 — ASSETS MODULARES DE RUAS
+  // 0.8.10 — ASSETS DE RUAS + CACHE DE PERFORMANCE
   // =========================================================
 
   const roadAssetSources = {
     pavedVertical:
-      "assets/tiles/roads/rua_vertical.png?v=0.8.9",
+      "assets/tiles/roads/rua_vertical.png?v=0.8.10",
     pavedHorizontal:
-      "assets/tiles/roads/rua_horizontal.png?v=0.8.9",
+      "assets/tiles/roads/rua_horizontal.png?v=0.8.10",
     pavedCross:
-      "assets/tiles/roads/cruzamento_4_vias.png?v=0.8.9",
+      "assets/tiles/roads/cruzamento_4_vias.png?v=0.8.10",
     pavedToDirt:
-      "assets/tiles/roads/rua_vertical_terra.png?v=0.8.9",
+      "assets/tiles/roads/rua_vertical_terra.png?v=0.8.10",
     dirtVertical:
-      "assets/tiles/roads/estrada_de_terra.png?v=0.8.9",
+      "assets/tiles/roads/estrada_de_terra.png?v=0.8.10",
     dirtHorizontal:
-      "assets/tiles/roads/estrada_terra_horizontal.png?v=0.8.9",
+      "assets/tiles/roads/estrada_terra_horizontal.png?v=0.8.10",
     dirtTLeft:
-      "assets/tiles/roads/estrada_terra_conexao_t_esquerda.png?v=0.8.9",
+      "assets/tiles/roads/estrada_terra_conexao_t_esquerda.png?v=0.8.10",
     dirtTRight:
-      "assets/tiles/roads/estrada_terra_conexao_t_direita.png?v=0.8.9"
+      "assets/tiles/roads/estrada_terra_conexao_t_direita.png?v=0.8.10"
   };
 
   const roadAssets = {};
 
   for (const [key, src] of Object.entries(roadAssetSources)) {
     const image = new Image();
+    image.decoding = "async";
     image.src = src;
     roadAssets[key] = image;
   }
 
-  // Recortes retiram apenas as margens transparentes dos PNGs.
-  // Assim a escala no mapa corresponde ao tamanho real da rua.
   const ROAD_CROPS = {
     pavedVertical: {
       x: 280, y: 4, w: 528, h: 1440
@@ -127,6 +126,112 @@
     }
   };
 
+  // Os PNGs originais têm mais de 1000 px.
+  // Redimensioná-los em todo frame travava principalmente no celular.
+  // Cada combinação usada pelo mapa é rasterizada uma única vez.
+  const roadRasterCache = new Map();
+  const roadStripCache = new Map();
+
+  function roadImageReady(key) {
+    const image = roadAssets[key];
+
+    return Boolean(
+      image &&
+      image.complete &&
+      image.naturalWidth > 0
+    );
+  }
+
+  function makeRoadCanvas(width, height) {
+    const canvas =
+      document.createElement("canvas");
+
+    canvas.width =
+      Math.max(1, Math.ceil(width));
+
+    canvas.height =
+      Math.max(1, Math.ceil(height));
+
+    return canvas;
+  }
+
+  function getRoadRaster(
+    key,
+    width,
+    height,
+    crop = ROAD_CROPS[key] || null
+  ) {
+    if (!roadImageReady(key)) {
+      return null;
+    }
+
+    const w =
+      Math.max(1, Math.ceil(width));
+
+    const h =
+      Math.max(1, Math.ceil(height));
+
+    const cropKey =
+      crop
+        ? [
+            crop.x,
+            crop.y,
+            crop.w,
+            crop.h
+          ].join(",")
+        : "full";
+
+    const cacheKey =
+      key +
+      "|" +
+      w +
+      "x" +
+      h +
+      "|" +
+      cropKey;
+
+    if (roadRasterCache.has(cacheKey)) {
+      return roadRasterCache.get(cacheKey);
+    }
+
+    const layer =
+      makeRoadCanvas(w, h);
+
+    const ctx =
+      layer.getContext("2d");
+
+    ctx.imageSmoothingEnabled = false;
+
+    if (crop) {
+      ctx.drawImage(
+        roadAssets[key],
+        crop.x,
+        crop.y,
+        crop.w,
+        crop.h,
+        0,
+        0,
+        w,
+        h
+      );
+    } else {
+      ctx.drawImage(
+        roadAssets[key],
+        0,
+        0,
+        w,
+        h
+      );
+    }
+
+    roadRasterCache.set(
+      cacheKey,
+      layer
+    );
+
+    return layer;
+  }
+
   function drawRoadAsset(
     key,
     x,
@@ -135,43 +240,152 @@
     h,
     crop = ROAD_CROPS[key] || null
   ) {
-    const image = roadAssets[key];
+    const raster =
+      getRoadRaster(
+        key,
+        w,
+        h,
+        crop
+      );
 
-    if (
-      !image ||
-      !image.complete ||
-      image.naturalWidth <= 0
-    ) {
+    if (!raster) {
       return false;
     }
 
     c.save();
     c.imageSmoothingEnabled = false;
+    c.drawImage(
+      raster,
+      Math.round(x),
+      Math.round(y)
+    );
+    c.restore();
 
-    if (crop) {
-      c.drawImage(
-        image,
-        crop.x,
-        crop.y,
-        crop.w,
-        crop.h,
-        x,
-        y,
-        w,
-        h
-      );
-    } else {
-      c.drawImage(
-        image,
-        x,
-        y,
-        w,
-        h
+    return true;
+  }
+
+  function getRoadStrip(
+    key,
+    width,
+    height,
+    horizontal
+  ) {
+    if (!roadImageReady(key)) {
+      return null;
+    }
+
+    const crop =
+      ROAD_CROPS[key];
+
+    if (!crop) {
+      return getRoadRaster(
+        key,
+        width,
+        height,
+        null
       );
     }
 
-    c.restore();
-    return true;
+    const w =
+      Math.max(1, Math.ceil(width));
+
+    const h =
+      Math.max(1, Math.ceil(height));
+
+    const cacheKey =
+      (
+        horizontal
+          ? "h|"
+          : "v|"
+      ) +
+      key +
+      "|" +
+      w +
+      "x" +
+      h;
+
+    if (roadStripCache.has(cacheKey)) {
+      return roadStripCache.get(cacheKey);
+    }
+
+    const layer =
+      makeRoadCanvas(w, h);
+
+    const ctx =
+      layer.getContext("2d");
+
+    ctx.imageSmoothingEnabled = false;
+
+    if (horizontal) {
+      const tileWidth =
+        h * crop.w / crop.h;
+
+      for (
+        let px = 0;
+        px < w - 0.01;
+        px += tileWidth
+      ) {
+        const drawWidth =
+          Math.min(
+            tileWidth,
+            w - px
+          );
+
+        const sourceWidth =
+          crop.w *
+          (drawWidth / tileWidth);
+
+        ctx.drawImage(
+          roadAssets[key],
+          crop.x,
+          crop.y,
+          sourceWidth,
+          crop.h,
+          Math.round(px),
+          0,
+          Math.ceil(drawWidth),
+          h
+        );
+      }
+    } else {
+      const tileHeight =
+        w * crop.h / crop.w;
+
+      for (
+        let py = 0;
+        py < h - 0.01;
+        py += tileHeight
+      ) {
+        const drawHeight =
+          Math.min(
+            tileHeight,
+            h - py
+          );
+
+        const sourceHeight =
+          crop.h *
+          (drawHeight / tileHeight);
+
+        ctx.drawImage(
+          roadAssets[key],
+          crop.x,
+          crop.y,
+          crop.w,
+          sourceHeight,
+          0,
+          Math.round(py),
+          w,
+          Math.ceil(drawHeight)
+        );
+      }
+    }
+
+    roadStripCache.set(
+      cacheKey,
+      layer
+    );
+
+    return layer;
   }
 
   function drawRoadTiledVertical(
@@ -182,58 +396,33 @@
     height,
     fallback = "#69665d"
   ) {
-    const crop = ROAD_CROPS[key];
+    const strip =
+      getRoadStrip(
+        key,
+        width,
+        height,
+        false
+      );
 
-    if (!crop) {
-      if (!drawRoadAsset(key, x, y, width, height)) {
-        rect(x, y, width, height, fallback);
-      }
+    if (!strip) {
+      rect(
+        x,
+        y,
+        width,
+        height,
+        fallback
+      );
       return;
     }
 
-    const tileHeight =
-      width * crop.h / crop.w;
-
-    for (
-      let py = y;
-      py < y + height - 0.01;
-      py += tileHeight
-    ) {
-      const drawHeight =
-        Math.min(
-          tileHeight,
-          y + height - py
-        );
-
-      const sourceHeight =
-        crop.h *
-        (drawHeight / tileHeight);
-
-      const ok =
-        drawRoadAsset(
-          key,
-          x,
-          py,
-          width,
-          drawHeight,
-          {
-            x: crop.x,
-            y: crop.y,
-            w: crop.w,
-            h: sourceHeight
-          }
-        );
-
-      if (!ok) {
-        rect(
-          x,
-          py,
-          width,
-          drawHeight,
-          fallback
-        );
-      }
-    }
+    c.save();
+    c.imageSmoothingEnabled = false;
+    c.drawImage(
+      strip,
+      Math.round(x),
+      Math.round(y)
+    );
+    c.restore();
   }
 
   function drawRoadTiledHorizontal(
@@ -244,58 +433,33 @@
     height,
     fallback = "#69665d"
   ) {
-    const crop = ROAD_CROPS[key];
+    const strip =
+      getRoadStrip(
+        key,
+        width,
+        height,
+        true
+      );
 
-    if (!crop) {
-      if (!drawRoadAsset(key, x, y, width, height)) {
-        rect(x, y, width, height, fallback);
-      }
+    if (!strip) {
+      rect(
+        x,
+        y,
+        width,
+        height,
+        fallback
+      );
       return;
     }
 
-    const tileWidth =
-      height * crop.w / crop.h;
-
-    for (
-      let px = x;
-      px < x + width - 0.01;
-      px += tileWidth
-    ) {
-      const drawWidth =
-        Math.min(
-          tileWidth,
-          x + width - px
-        );
-
-      const sourceWidth =
-        crop.w *
-        (drawWidth / tileWidth);
-
-      const ok =
-        drawRoadAsset(
-          key,
-          px,
-          y,
-          drawWidth,
-          height,
-          {
-            x: crop.x,
-            y: crop.y,
-            w: sourceWidth,
-            h: crop.h
-          }
-        );
-
-      if (!ok) {
-        rect(
-          px,
-          y,
-          drawWidth,
-          height,
-          fallback
-        );
-      }
-    }
+    c.save();
+    c.imageSmoothingEnabled = false;
+    c.drawImage(
+      strip,
+      Math.round(x),
+      Math.round(y)
+    );
+    c.restore();
   }
 
   const W = 480;
@@ -1803,9 +1967,8 @@ function drawCharacterSprite(
         "#655442"
       );
 
-      // Entrada curta já existente da casa da família.
-      // O novo asset de extensão/calçada até a casa NÃO é usado.
-      rect(420, 710, 190, 45, "#706b5f");
+      // Sem extensão de calçada até a casa:
+      // os PNGs de rua já carregam suas próprias calçadas.
 
       // Postes simples, sem colisão, para dar leitura de bairro residencial.
       for (const [lx, ly] of [
@@ -1815,20 +1978,6 @@ function drawCharacterSprite(
         rect(lx, ly, 4, 34, "#343a39");
         rect(lx - 4, ly - 3, 12, 5, "#4d5350");
         rect(lx - 2, ly - 1, 8, 3, "#d2b777");
-      }
-
-      for (let y = 0; y < 1040; y += 16) {
-        for (let x = 614; x < 686; x += 14) {
-          rect(x, y, 10, 9, "#858071");
-        }
-      }
-
-      for (const roadY of [390, 760]) {
-        for (let x = 0; x < 1280; x += 16) {
-          rect(x, roadY + 8, 11, 8, "#858071");
-          rect(x + 7, roadY + 28, 11, 8, "#7b7669");
-          rect(x, roadY + 50, 11, 8, "#858071");
-        }
       }
 
       for (let i = 0; i < 32; i++) {
@@ -17567,51 +17716,6 @@ function v076SetOutdoorRoom(room, x, y, facing) {
   save();
 }
 
-function v076DrawRoadTexture(x, y, w, h, horizontal = false) {
-  rect(x, y, w, h, "#69665d");
-
-  // Sombra nas bordas dá espessura ao asfalto.
-  if (horizontal) {
-    rect(x, y, w, 5, "#4f514c55");
-    rect(x, y + h - 5, w, 5, "#3f444155");
-  } else {
-    rect(x, y, 5, h, "#4f514c55");
-    rect(x + w - 5, y, 5, h, "#3f444155");
-  }
-
-  // Desgaste determinístico: rachaduras e remendos leves.
-  const count = horizontal
-    ? Math.max(4, Math.floor(w / 150))
-    : Math.max(4, Math.floor(h / 150));
-
-  for (let i = 0; i < count; i++) {
-    const a = hash(i + x, y + h);
-    const b = hash(i + y, x + w);
-
-    if (horizontal) {
-      const px = x + 35 + a * Math.max(1, w - 70);
-      const py = y + 16 + b * Math.max(1, h - 32);
-      rect(px, py, 19, 2, "#4c4c4745");
-      rect(px + 7, py + 2, 2, 8, "#4c4c4738");
-    } else {
-      const px = x + 16 + a * Math.max(1, w - 32);
-      const py = y + 35 + b * Math.max(1, h - 70);
-      rect(px, py, 2, 20, "#4c4c4745");
-      rect(px + 2, py + 8, 8, 2, "#4c4c4738");
-    }
-  }
-
-  if (horizontal) {
-    for (let px = x + 28; px < x + w - 20; px += 58) {
-      rect(px, y + h / 2 - 2, 25, 4, "#b9ad87");
-    }
-  } else {
-    for (let py = y + 28; py < y + h - 20; py += 58) {
-      rect(x + w / 2 - 2, py, 4, 25, "#b9ad87");
-    }
-  }
-}
-
 function v076DrawNorthRoad() {
   const m = maps.northRoad;
 
@@ -17645,12 +17749,6 @@ function v076DrawNorthRoad() {
     270,
     m.h
   );
-
-  // Pequenas entradas para as casas.
-  for (const y of [430, 735, 1040]) {
-    rect(280, y, 70, 38, "#777268");
-    rect(550, y + 10, 70, 38, "#777268");
-  }
 
   // Postes alternados deixam a rua mais longa e legível.
   for (let y = 310; y < 1220; y += 210) {
@@ -24146,7 +24244,7 @@ updateHud = function() {
   }
 };
 
-$("version").textContent = "PROTÓTIPO · 0.8.9";
+$("version").textContent = "PROTÓTIPO · 0.8.10";
   
   requestAnimationFrame(frame);
   showBootSplash();
