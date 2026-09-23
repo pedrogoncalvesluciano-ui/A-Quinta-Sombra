@@ -1393,7 +1393,7 @@ function clearPlayerRoomMemory(nextRoom) {
     const key of
     Object.keys(playerRoomSprites)
   ) {
-    delete getPlayerRoomSprite(key);
+    delete playerRoomSprites[key];
   }
 
   roomPositionChecked = false;
