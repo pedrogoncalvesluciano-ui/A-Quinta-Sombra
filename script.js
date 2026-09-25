@@ -2,7 +2,7 @@
 "use strict";
 
 /*
-  A QUINTA SOMBRA — 0.8.22
+  A QUINTA SOMBRA — 0.8.23
 
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
@@ -3641,21 +3641,6 @@ function drawCharacterSprite(
       }
     );
 
-    const activeButton =
-      root.querySelector(".choice-option.active");
-
-    if (
-      activeButton &&
-      document.activeElement !== activeButton
-    ) {
-      try {
-        activeButton.focus({
-          preventScroll: true
-        });
-      } catch {
-        activeButton.focus();
-      }
-    }
   }
 
   function moveDialogueChoice(delta) {
@@ -4815,9 +4800,13 @@ function drawCharacterSprite(
   window.addEventListener("blur", () => {
     keys.clear();
 
+    const choiceVisible =
+      !$("choiceScene").hidden;
+
     if (
       mode === "game" &&
       !dialog &&
+      !choiceVisible &&
       !transitionBusy &&
       $("overlay").hidden
     ) {
@@ -4834,7 +4823,15 @@ function drawCharacterSprite(
       keys.clear();
       save();
 
-      if (mode === "game" && $("overlay").hidden) {
+      const choiceVisible =
+        !$("choiceScene").hidden;
+
+      if (
+        mode === "game" &&
+        $("overlay").hidden &&
+        !dialog &&
+        !choiceVisible
+      ) {
         modal(
           "Pausado",
           "O jogo foi pausado ao trocar de aba.",
@@ -9880,6 +9877,7 @@ function v0640RecoverInputLock() {
 
   const transitionEl = $("transition");
   const dialogEl = $("dialog");
+  const choiceEl = $("choiceScene");
 
   const transitionVisible =
     transitionEl.classList.contains("active") &&
@@ -9889,18 +9887,33 @@ function v0640RecoverInputLock() {
     !dialogEl.hidden &&
     Number.parseFloat(getComputedStyle(dialogEl).opacity || "1") > 0.05;
 
+  const choiceVisible =
+    Boolean(
+      choiceEl &&
+      !choiceEl.hidden &&
+      Number.parseFloat(
+        getComputedStyle(choiceEl).opacity || "1"
+      ) > 0.05
+    );
+
   // Se não existe nenhuma interface realmente visível bloqueando o jogo,
   // nenhum lock antigo pode impedir o movimento.
+  // IMPORTANTE: choiceScene também é um diálogo válido.
   if (
     $("overlay").hidden &&
     !transitionVisible &&
     !dialogVisible &&
+    !choiceVisible &&
     !state.dawnCollapse?.active &&
     !state.wakeUp?.active
   ) {
     transitionBusy = false;
 
-    if (dialog && dialogEl.hidden) {
+    if (
+      dialog &&
+      dialogEl.hidden &&
+      !dialog.choiceMode
+    ) {
       dialog = null;
     }
   }
@@ -27170,7 +27183,7 @@ window.addEventListener(
   true
 );
 
-$("version").textContent = "PROTÓTIPO · 0.8.22";
+$("version").textContent = "PROTÓTIPO · 0.8.23";
   
   requestAnimationFrame(frame);
   showBootSplash();
