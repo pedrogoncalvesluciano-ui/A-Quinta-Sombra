@@ -7,9 +7,9 @@
   <title>A Quinta Sombra</title>
 
   <link rel="preload" as="image" href="assets/ui/logo.png" fetchpriority="high">
-  <link rel="stylesheet" href="style.css?v=0.8.18">
+  <link rel="stylesheet" href="style.css?v=0.8.21">
   <link rel="stylesheet" href="journal.css?v=0.5.0">
-<script src="script.js?v=0.8.18" defer></script>
+<script src="script.js?v=0.8.21" defer></script>
 </head>
 
 <body>
@@ -66,6 +66,8 @@
         </span>
       </div>
     </div>
+
+    <div id="eventToast" hidden role="status" aria-live="polite"></div>
 
     <div id="prompt" hidden></div>
 
@@ -139,7 +141,7 @@
       </div>
     </section>
 
-  <span id="version">PROTÓTIPO · 0.8.18</span>
+  <span id="version">PROTÓTIPO · 0.8.21</span>
   </main>
   <div id="bootSplash" role="status" aria-label="A Quinta Sombra — carregando">
     <img id="bootLogo" src="assets/ui/logo.png" alt="A Quinta Sombra" fetchpriority="high" loading="eager" decoding="async">
