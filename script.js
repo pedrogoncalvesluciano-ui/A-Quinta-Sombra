@@ -3545,17 +3545,6 @@ function drawCharacterSprite(
     }
   }
 
-  function choiceLocationLabel() {
-    if (!state) {
-      return "FORGOTTEN";
-    }
-
-    return (
-      roomNames[state.room] ||
-      "FORGOTTEN"
-    );
-  }
-
   function renderChoiceDialog() {
     if (
       !dialog ||
@@ -3566,9 +3555,6 @@ function drawCharacterSprite(
 
     $("dialog").hidden = true;
     $("choiceScene").hidden = false;
-
-    $("choiceLocation").textContent =
-      choiceLocationLabel();
 
     $("choiceSpeaker").textContent =
       dialog.speaker || "Você";
