@@ -7,9 +7,9 @@
   <title>A Quinta Sombra</title>
 
   <link rel="preload" as="image" href="assets/ui/logo.png" fetchpriority="high">
-  <link rel="stylesheet" href="style.css?v=0.8.17">
+  <link rel="stylesheet" href="style.css?v=0.8.18">
   <link rel="stylesheet" href="journal.css?v=0.5.0">
-<script src="script.js?v=0.8.17" defer></script>
+<script src="script.js?v=0.8.18" defer></script>
 </head>
 
 <body>
@@ -75,6 +75,27 @@
       <button id="next">Continuar <kbd>E</kbd></button>
     </section>
 
+    <section id="choiceScene" class="choice-scene" hidden aria-live="polite">
+      <div class="choice-shade" aria-hidden="true"></div>
+
+      <header class="choice-topbar">
+        <strong id="choiceLocation">FORGOTTEN</strong>
+
+        <nav class="choice-tools" aria-label="Atalhos durante o diálogo">
+          <button id="choiceCodex" type="button">Códice <kbd>C</kbd></button>
+          <button id="choiceMissions" type="button">Missões</button>
+          <button id="choiceSettings" type="button">Configurações</button>
+        </nav>
+      </header>
+
+      <div class="choice-panel">
+        <span id="choiceSpeaker" class="choice-speaker"></span>
+        <p id="choiceSpeech" class="choice-speech"></p>
+        <div id="choiceOptions" class="choice-options" role="listbox" aria-label="Escolhas de diálogo"></div>
+        <small class="choice-help">↑ ↓ / W S · selecionar &nbsp; E / ENTER · confirmar</small>
+      </div>
+    </section>
+
     <section id="overlay" hidden>
       <div class="card">
         <span class="eyebrow" id="modalLabel">A QUINTA SOMBRA</span>
@@ -118,7 +139,7 @@
       </div>
     </section>
 
-  <span id="version">PROTÓTIPO · 0.8.17</span>
+  <span id="version">PROTÓTIPO · 0.8.18</span>
   </main>
   <div id="bootSplash" role="status" aria-label="A Quinta Sombra — carregando">
     <img id="bootLogo" src="assets/ui/logo.png" alt="A Quinta Sombra" fetchpriority="high" loading="eager" decoding="async">
