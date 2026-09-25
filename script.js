@@ -3639,23 +3639,23 @@ function drawCharacterSprite(
 
         root.append(button);
       }
-
-      const activeButton =
-        root.querySelector(".choice-option.active");
-
-      if (
-        activeButton &&
-        document.activeElement !== activeButton
-      ) {
-        try {
-          activeButton.focus({
-            preventScroll: true
-          });
-        } catch {
-          activeButton.focus();
-        }
-      }
     );
+
+    const activeButton =
+      root.querySelector(".choice-option.active");
+
+    if (
+      activeButton &&
+      document.activeElement !== activeButton
+    ) {
+      try {
+        activeButton.focus({
+          preventScroll: true
+        });
+      } catch {
+        activeButton.focus();
+      }
+    }
   }
 
   function moveDialogueChoice(delta) {
