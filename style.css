@@ -305,13 +305,14 @@ kbd {
   position: absolute;
   inset: 0;
   z-index: 45;
-  pointer-events: none;
+  pointer-events: auto;
   font-family: Georgia, "Times New Roman", serif;
 }
 
 .choice-shade {
   position: absolute;
   inset: 0;
+  pointer-events: auto;
   background:
     linear-gradient(
       to bottom,
@@ -377,7 +378,7 @@ kbd {
   position: absolute;
   left: 50%;
   bottom: 4.5%;
-  width: min(64%, 720px);
+  width: min(68%, 760px);
   transform: translateX(-50%);
   padding: 18px 20px 16px;
   background: #0b0f14f7;
