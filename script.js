@@ -2,7 +2,7 @@
 "use strict";
 
 /*
-  A QUINTA SOMBRA — 0.8.15
+  A QUINTA SOMBRA — 0.8.16
 
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
@@ -22,26 +22,9 @@
   const canvas = $("canvas");
   const c = canvas.getContext("2d");
 
-  // 0.8.7 — grama global.
-  // 64x64 é o tile padrão. A versão 128x128 permanece disponível em:
-  // assets/tiles/terrain/grama_base_128.png
-  const grassTile64 = new Image();
-  grassTile64.src =
-    "assets/tiles/terrain/grama_base_64.png?v=0.8.15";
-
-  let grassPattern64 = null;
-
-  grassTile64.addEventListener(
-    "load",
-    () => {
-      grassPattern64 =
-        c.createPattern(
-          grassTile64,
-          "repeat"
-        );
-    },
-    { once: true }
-  );
+  // =========================================================
+  // 0.8.16 — TERRENO 100% CANVAS
+  // =========================================================
 
   function drawGrassGround(
     x,
@@ -49,21 +32,6 @@
     w,
     h
   ) {
-    if (
-      !grassPattern64 &&
-      grassTile64.complete &&
-      grassTile64.naturalWidth > 0
-    ) {
-      grassPattern64 =
-        c.createPattern(
-          grassTile64,
-          "repeat"
-        );
-    }
-
-    // 0.8.15 — em mapas grandes, desenha somente a região
-    // que pode aparecer na câmera. Antes o jogo preenchia até
-    // 1280x1900 de grama em TODO frame no celular.
     let drawX = x;
     let drawY = y;
     let drawW = w;
@@ -74,34 +42,37 @@
       Number.isFinite(camera?.x) &&
       Number.isFinite(camera?.y)
     ) {
-      const padding = 72;
-      const left =
+      const padding = 40;
+
+      drawX =
         Math.max(
           x,
           Math.floor(camera.x) - padding
         );
-      const top =
+
+      drawY =
         Math.max(
           y,
           Math.floor(camera.y) - padding
         );
+
       const right =
         Math.min(
           x + w,
           Math.ceil(camera.x + W) + padding
         );
+
       const bottom =
         Math.min(
           y + h,
           Math.ceil(camera.y + H) + padding
         );
 
-      drawX = left;
-      drawY = top;
       drawW =
-        Math.max(0, right - left);
+        Math.max(0, right - drawX);
+
       drawH =
-        Math.max(0, bottom - top);
+        Math.max(0, bottom - drawY);
     }
 
     if (
@@ -111,109 +82,73 @@
       return;
     }
 
-    c.save();
-    c.imageSmoothingEnabled = false;
-    c.fillStyle =
-      grassPattern64 ||
-      "#34463b";
-    c.fillRect(
+    rect(
       drawX,
       drawY,
       drawW,
-      drawH
+      drawH,
+      "#253a2c"
     );
-    c.restore();
+
+    // Textura simples e determinística.
+    // Só é desenhada na região visível.
+    const step = 18;
+    const startX =
+      Math.floor(drawX / step) * step;
+    const startY =
+      Math.floor(drawY / step) * step;
+
+    for (
+      let gy = startY;
+      gy < drawY + drawH;
+      gy += step
+    ) {
+      for (
+        let gx = startX;
+        gx < drawX + drawW;
+        gx += step
+      ) {
+        const n = hash(gx, gy);
+
+        if (n > 0.72) {
+          rect(
+            gx + 3,
+            gy + 5,
+            3,
+            2,
+            n > 0.88
+              ? "#3f5c3a"
+              : "#304a33"
+          );
+        }
+
+        if (n < 0.10) {
+          rect(
+            gx + 11,
+            gy + 10,
+            2,
+            2,
+            "#1f3126"
+          );
+        }
+      }
+    }
   }
 
   // =========================================================
-  // 0.8.10 — ASSETS DE RUAS + CACHE DE PERFORMANCE
+  // 0.8.16 — RUAS 100% CANVAS
   // =========================================================
 
-  const roadAssetSources = {
-    pavedVertical:
-      "assets/tiles/roads/rua_vertical.png?v=0.8.15",
-    pavedHorizontal:
-      "assets/tiles/roads/rua_horizontal.png?v=0.8.15",
-    pavedCross:
-      "assets/tiles/roads/cruzamento_4_vias.png?v=0.8.15",
-    pavedToDirt:
-      "assets/tiles/roads/rua_vertical_terra.png?v=0.8.15",
-    dirtVertical:
-      "assets/tiles/roads/estrada_de_terra.png?v=0.8.15",
-    dirtHorizontal:
-      "assets/tiles/roads/estrada_terra_horizontal.png?v=0.8.15",
-    dirtTLeft:
-      "assets/tiles/roads/estrada_terra_conexao_t_esquerda.png?v=0.8.15",
-    dirtTRight:
-      "assets/tiles/roads/estrada_terra_conexao_t_direita.png?v=0.8.15"
-  };
-
-  const roadAssets = {};
-
-  // 0.8.14 — imagens de rua passam a carregar somente quando
-  // realmente entram no campo de visão. Isso evita decodificar
-  // todos os PNGs grandes de uma vez no celular.
-  function getRoadImage(key) {
-    if (roadAssets[key]) {
-      return roadAssets[key];
-    }
-
-    const src = roadAssetSources[key];
-
-    if (!src) {
-      return null;
-    }
-
-    const image = new Image();
-    image.decoding = "async";
-    image.src = src;
-    roadAssets[key] = image;
-
-    return image;
-  }
-
+  // Mantido apenas porque algumas partes antigas usam as proporções
+  // deste objeto para calcular a altura da transição.
   const ROAD_CROPS = {
-    pavedVertical: {
-      // Recorte interno evita a linha escura das bordas do PNG
-      // quando o trecho vertical é repetido.
-      x: 280, y: 16, w: 528, h: 1416
-    },
-    pavedHorizontal: {
-      x: 0, y: 276, w: 1448, h: 535
-    },
     pavedToDirt: {
-      x: 274, y: 25, w: 538, h: 1381
-    },
-    dirtVertical: {
-      // Mesmo tratamento na terra para a repetição ficar contínua.
-      x: 313, y: 28, w: 462, h: 1392
-    },
-    dirtHorizontal: {
-      x: 0, y: 360, w: 1448, h: 382
-    },
-    dirtTLeft: {
-      x: 0, y: 0, w: 988, h: 1254
-    },
-    dirtTRight: {
-      x: 255, y: 0, w: 999, h: 1254
+      x: 0,
+      y: 25,
+      w: 538,
+      h: 1381
     }
   };
-
-  // Os PNGs originais têm mais de 1000 px.
-  // Redimensioná-los em todo frame travava principalmente no celular.
-  // Cada combinação usada pelo mapa é rasterizada uma única vez.
-  const roadRasterCache = new Map();
-  const roadStripCache = new Map();
-
-  function roadImageReady(key) {
-    const image = getRoadImage(key);
-
-    return Boolean(
-      image &&
-      image.complete &&
-      image.naturalWidth > 0
-    );
-  }
 
   function roadRectVisible(
     x,
@@ -238,94 +173,475 @@
     );
   }
 
-  function makeRoadCanvas(width, height) {
-    const canvas =
-      document.createElement("canvas");
+  function drawRoadWear(
+    x,
+    y,
+    w,
+    h,
+    horizontal = false,
+    dirt = false
+  ) {
+    const step = dirt ? 24 : 34;
 
-    canvas.width =
-      Math.max(1, Math.ceil(width));
+    if (horizontal) {
+      for (
+        let px = x + 12;
+        px < x + w - 10;
+        px += step
+      ) {
+        const n = hash(px, y);
 
-    canvas.height =
-      Math.max(1, Math.ceil(height));
+        if (n > 0.45) {
+          rect(
+            px,
+            y + h * (0.28 + n * 0.35),
+            dirt ? 5 : 7,
+            dirt ? 3 : 2,
+            dirt
+              ? "#6f5943"
+              : "#4a4d4d"
+          );
+        }
+      }
+    } else {
+      for (
+        let py = y + 12;
+        py < y + h - 10;
+        py += step
+      ) {
+        const n = hash(x, py);
 
-    return canvas;
+        if (n > 0.45) {
+          rect(
+            x + w * (0.28 + n * 0.35),
+            py,
+            dirt ? 3 : 2,
+            dirt ? 5 : 7,
+            dirt
+              ? "#6f5943"
+              : "#4a4d4d"
+          );
+        }
+      }
+    }
   }
 
-  function getRoadRaster(
-    key,
-    width,
-    height,
-    crop = ROAD_CROPS[key] || null
+  function drawPavedVertical(
+    x,
+    y,
+    w,
+    h
   ) {
-    if (!roadImageReady(key)) {
-      return null;
+    if (
+      h <= 0 ||
+      !roadRectVisible(x,y,w,h)
+    ) {
+      return;
     }
 
-    const w =
-      Math.max(1, Math.ceil(width));
+    const sidewalk =
+      Math.max(11, Math.round(w * 0.19));
 
-    const h =
-      Math.max(1, Math.ceil(height));
-
-    const cropKey =
-      crop
-        ? [
-            crop.x,
-            crop.y,
-            crop.w,
-            crop.h
-          ].join(",")
-        : "full";
-
-    const cacheKey =
-      key +
-      "|" +
-      w +
-      "x" +
-      h +
-      "|" +
-      cropKey;
-
-    if (roadRasterCache.has(cacheKey)) {
-      return roadRasterCache.get(cacheKey);
-    }
-
-    const layer =
-      makeRoadCanvas(w, h);
-
-    const ctx =
-      layer.getContext("2d");
-
-    ctx.imageSmoothingEnabled = false;
-
-    if (crop) {
-      ctx.drawImage(
-        getRoadImage(key),
-        crop.x,
-        crop.y,
-        crop.w,
-        crop.h,
-        0,
-        0,
-        w,
-        h
-      );
-    } else {
-      ctx.drawImage(
-        getRoadImage(key),
-        0,
-        0,
-        w,
-        h
-      );
-    }
-
-    roadRasterCache.set(
-      cacheKey,
-      layer
+    rect(
+      x,
+      y,
+      w,
+      h,
+      "#74736d"
     );
 
-    return layer;
+    rect(
+      x + sidewalk,
+      y,
+      w - sidewalk * 2,
+      h,
+      "#3f4345"
+    );
+
+    rect(
+      x + sidewalk - 3,
+      y,
+      3,
+      h,
+      "#2b2e30"
+    );
+
+    rect(
+      x + w - sidewalk,
+      y,
+      3,
+      h,
+      "#2b2e30"
+    );
+
+    for (
+      let py = y + 18;
+      py < y + h - 10;
+      py += 46
+    ) {
+      rect(
+        x + w / 2 - 2,
+        py,
+        4,
+        20,
+        "#b49f72"
+      );
+    }
+
+    drawRoadWear(
+      x + sidewalk,
+      y,
+      w - sidewalk * 2,
+      h,
+      false,
+      false
+    );
+  }
+
+  function drawPavedHorizontal(
+    x,
+    y,
+    w,
+    h
+  ) {
+    if (
+      w <= 0 ||
+      !roadRectVisible(x,y,w,h)
+    ) {
+      return;
+    }
+
+    const sidewalk =
+      Math.max(11, Math.round(h * 0.19));
+
+    rect(
+      x,
+      y,
+      w,
+      h,
+      "#74736d"
+    );
+
+    rect(
+      x,
+      y + sidewalk,
+      w,
+      h - sidewalk * 2,
+      "#3f4345"
+    );
+
+    rect(
+      x,
+      y + sidewalk - 3,
+      w,
+      3,
+      "#2b2e30"
+    );
+
+    rect(
+      x,
+      y + h - sidewalk,
+      w,
+      3,
+      "#2b2e30"
+    );
+
+    for (
+      let px = x + 18;
+      px < x + w - 10;
+      px += 46
+    ) {
+      rect(
+        px,
+        y + h / 2 - 2,
+        20,
+        4,
+        "#b49f72"
+      );
+    }
+
+    drawRoadWear(
+      x,
+      y + sidewalk,
+      w,
+      h - sidewalk * 2,
+      true,
+      false
+    );
+  }
+
+  function drawDirtVertical(
+    x,
+    y,
+    w,
+    h
+  ) {
+    if (
+      h <= 0 ||
+      !roadRectVisible(x,y,w,h)
+    ) {
+      return;
+    }
+
+    rect(
+      x,
+      y,
+      w,
+      h,
+      "#735b43"
+    );
+
+    rect(
+      x + w * 0.23,
+      y,
+      Math.max(3,w * 0.08),
+      h,
+      "#66503d"
+    );
+
+    rect(
+      x + w * 0.69,
+      y,
+      Math.max(3,w * 0.08),
+      h,
+      "#66503d"
+    );
+
+    drawRoadWear(
+      x,
+      y,
+      w,
+      h,
+      false,
+      true
+    );
+  }
+
+  function drawDirtHorizontal(
+    x,
+    y,
+    w,
+    h
+  ) {
+    if (
+      w <= 0 ||
+      !roadRectVisible(x,y,w,h)
+    ) {
+      return;
+    }
+
+    rect(
+      x,
+      y,
+      w,
+      h,
+      "#735b43"
+    );
+
+    rect(
+      x,
+      y + h * 0.23,
+      w,
+      Math.max(3,h * 0.08),
+      "#66503d"
+    );
+
+    rect(
+      x,
+      y + h * 0.69,
+      w,
+      Math.max(3,h * 0.08),
+      "#66503d"
+    );
+
+    drawRoadWear(
+      x,
+      y,
+      w,
+      h,
+      true,
+      true
+    );
+  }
+
+  function drawCanvasCross(
+    x,
+    y,
+    w,
+    h
+  ) {
+    if (!roadRectVisible(x,y,w,h)) {
+      return;
+    }
+
+    const roadW =
+      Math.round(w * 0.42);
+
+    const roadH =
+      Math.round(h * 0.42);
+
+    const cx =
+      x + w / 2;
+
+    const cy =
+      y + h / 2;
+
+    rect(
+      x,
+      cy - roadH / 2,
+      w,
+      roadH,
+      "#3f4345"
+    );
+
+    rect(
+      cx - roadW / 2,
+      y,
+      roadW,
+      h,
+      "#3f4345"
+    );
+
+    // Quatro blocos simples de calçada nos cantos.
+    const sw =
+      Math.max(10, Math.round(w * 0.08));
+
+    rect(
+      x,
+      y,
+      cx - roadW / 2 - x,
+      cy - roadH / 2 - y,
+      "#74736d"
+    );
+    rect(
+      cx + roadW / 2,
+      y,
+      x + w - (cx + roadW / 2),
+      cy - roadH / 2 - y,
+      "#74736d"
+    );
+    rect(
+      x,
+      cy + roadH / 2,
+      cx - roadW / 2 - x,
+      y + h - (cy + roadH / 2),
+      "#74736d"
+    );
+    rect(
+      cx + roadW / 2,
+      cy + roadH / 2,
+      x + w - (cx + roadW / 2),
+      y + h - (cy + roadH / 2),
+      "#74736d"
+    );
+
+    for (
+      let px = x + 22;
+      px < x + w - 16;
+      px += 54
+    ) {
+      rect(
+        px,
+        cy - 2,
+        22,
+        4,
+        "#b49f72"
+      );
+    }
+
+    for (
+      let py = y + 22;
+      py < y + h - 16;
+      py += 54
+    ) {
+      rect(
+        cx - 2,
+        py,
+        4,
+        22,
+        "#b49f72"
+      );
+    }
+  }
+
+  function drawCanvasPavedToDirt(
+    x,
+    y,
+    w,
+    h
+  ) {
+    if (!roadRectVisible(x,y,w,h)) {
+      return;
+    }
+
+    const gradient =
+      c.createLinearGradient(
+        0,
+        y,
+        0,
+        y + h
+      );
+
+    gradient.addColorStop(
+      0,
+      "#3f4345"
+    );
+    gradient.addColorStop(
+      0.34,
+      "#514a40"
+    );
+    gradient.addColorStop(
+      0.68,
+      "#66513f"
+    );
+    gradient.addColorStop(
+      1,
+      "#735b43"
+    );
+
+    c.save();
+    c.fillStyle = gradient;
+    c.fillRect(
+      Math.round(x),
+      Math.round(y),
+      Math.round(w),
+      Math.round(h)
+    );
+    c.restore();
+
+    // Marcação central desaparece aos poucos.
+    for (
+      let py = y + 8;
+      py < y + h * 0.48;
+      py += 32
+    ) {
+      const alpha =
+        Math.max(
+          0,
+          1 -
+          (py - y) /
+          (h * 0.50)
+        );
+
+      c.fillStyle =
+        `rgba(180,159,114,${alpha * 0.85})`;
+
+      c.fillRect(
+        Math.round(x + w / 2 - 2),
+        Math.round(py),
+        4,
+        14
+      );
+    }
+
+    drawRoadWear(
+      x,
+      y + h * 0.45,
+      w,
+      h * 0.55,
+      false,
+      true
+    );
   }
 
   function drawRoadAsset(
@@ -333,170 +649,53 @@
     x,
     y,
     w,
-    h,
-    crop = ROAD_CROPS[key] || null
+    h
   ) {
-    if (
-      !roadRectVisible(
-        x,
-        y,
-        w,
-        h
-      )
-    ) {
+    if (!roadRectVisible(x,y,w,h)) {
       return true;
     }
 
-    const raster =
-      getRoadRaster(
-        key,
-        w,
-        h,
-        crop
+    if (key === "pavedCross") {
+      drawCanvasCross(x,y,w,h);
+      return true;
+    }
+
+    if (key === "pavedToDirt") {
+      drawCanvasPavedToDirt(x,y,w,h);
+      return true;
+    }
+
+    if (
+      key === "dirtTRight" ||
+      key === "dirtTLeft"
+    ) {
+      drawDirtVertical(
+        x + w * 0.31,
+        y,
+        w * 0.38,
+        h
       );
 
-    if (!raster) {
-      return false;
-    }
-
-    c.save();
-    c.imageSmoothingEnabled = false;
-    c.drawImage(
-      raster,
-      Math.round(x),
-      Math.round(y)
-    );
-    c.restore();
-
-    return true;
-  }
-
-  function getRoadStrip(
-    key,
-    width,
-    height,
-    horizontal
-  ) {
-    if (!roadImageReady(key)) {
-      return null;
-    }
-
-    const crop =
-      ROAD_CROPS[key];
-
-    if (!crop) {
-      return getRoadRaster(
-        key,
-        width,
-        height,
-        null
-      );
-    }
-
-    const w =
-      Math.max(1, Math.ceil(width));
-
-    const h =
-      Math.max(1, Math.ceil(height));
-
-    const cacheKey =
-      (
-        horizontal
-          ? "h|"
-          : "v|"
-      ) +
-      key +
-      "|" +
-      w +
-      "x" +
-      h;
-
-    if (roadStripCache.has(cacheKey)) {
-      return roadStripCache.get(cacheKey);
-    }
-
-    const layer =
-      makeRoadCanvas(w, h);
-
-    const ctx =
-      layer.getContext("2d");
-
-    ctx.imageSmoothingEnabled = false;
-
-    if (horizontal) {
-      const tileWidth =
-        h * crop.w / crop.h;
-
-      for (
-        let px = 0;
-        px < w - 0.01;
-        px += tileWidth
-      ) {
-        const drawWidth =
-          Math.min(
-            tileWidth,
-            w - px
-          );
-
-        const sourceWidth =
-          crop.w *
-          (drawWidth / tileWidth);
-
-        // 0.8.12 — overlap mínimo evita frestas transparentes
-        // entre os módulos horizontais.
-        ctx.drawImage(
-          getRoadImage(key),
-          crop.x,
-          crop.y,
-          sourceWidth,
-          crop.h,
-          Math.floor(px) - 1,
-          0,
-          Math.ceil(drawWidth) + 2,
-          h
+      if (key === "dirtTRight") {
+        drawDirtHorizontal(
+          x + w * 0.50,
+          y + h * 0.34,
+          w * 0.50,
+          h * 0.32
+        );
+      } else {
+        drawDirtHorizontal(
+          x,
+          y + h * 0.34,
+          w * 0.50,
+          h * 0.32
         );
       }
-    } else {
-      const tileHeight =
-        w * crop.h / crop.w;
 
-      for (
-        let py = 0;
-        py < h - 0.01;
-        py += tileHeight
-      ) {
-        const drawHeight =
-          Math.min(
-            tileHeight,
-            h - py
-          );
-
-        const sourceHeight =
-          crop.h *
-          (drawHeight / tileHeight);
-
-        // 0.8.12 — overlap mínimo evita a linha de grama
-        // que aparecia entre módulos verticais.
-        ctx.drawImage(
-          getRoadImage(key),
-          crop.x,
-          crop.y,
-          crop.w,
-          sourceHeight,
-          0,
-          Math.floor(py) - 1,
-          w,
-          Math.ceil(drawHeight) + 2
-        );
-      }
+      return true;
     }
 
-    roadStripCache.set(
-      cacheKey,
-      layer
-    );
-
-    return layer;
+    return false;
   }
 
   function drawRoadTiledVertical(
@@ -507,45 +706,16 @@
     height,
     fallback = "#69665d"
   ) {
-    if (
-      height <= 0 ||
-      !roadRectVisible(
-        x,
-        y,
-        width,
-        height
-      )
-    ) {
-      return;
-    }
-
-    const strip =
-      getRoadStrip(
-        key,
-        width,
-        height,
-        false
-      );
-
-    if (!strip) {
-      rect(
-        x,
-        y,
-        width,
-        height,
-        fallback
+    if (key === "dirtVertical") {
+      drawDirtVertical(
+        x,y,width,height
       );
       return;
     }
 
-    c.save();
-    c.imageSmoothingEnabled = false;
-    c.drawImage(
-      strip,
-      Math.round(x),
-      Math.round(y)
+    drawPavedVertical(
+      x,y,width,height
     );
-    c.restore();
   }
 
   function drawRoadTiledHorizontal(
@@ -556,46 +726,28 @@
     height,
     fallback = "#69665d"
   ) {
-    if (
-      width <= 0 ||
-      !roadRectVisible(
-        x,
-        y,
-        width,
-        height
-      )
-    ) {
-      return;
-    }
-
-    const strip =
-      getRoadStrip(
-        key,
-        width,
-        height,
-        true
-      );
-
-    if (!strip) {
-      rect(
-        x,
-        y,
-        width,
-        height,
-        fallback
+    if (key === "dirtHorizontal") {
+      drawDirtHorizontal(
+        x,y,width,height
       );
       return;
     }
 
-    c.save();
-    c.imageSmoothingEnabled = false;
-    c.drawImage(
-      strip,
-      Math.round(x),
-      Math.round(y)
+    drawPavedHorizontal(
+      x,y,width,height
     );
-    c.restore();
   }
+
+  // Compatibilidade com o antigo aquecimento de cache.
+  function getRoadRaster() {
+    return null;
+  }
+
+  function getRoadStrip() {
+    return null;
+  }
+
+  const roadAssets = {};
 
   const W = 480;
   const H = 270;
@@ -679,59 +831,39 @@
     };
 
     try {
-      // Sprites de personagens e do quarto carregam em segundo plano.
-      // A tela inicial NÃO espera mais por eles.
-      const logoReady = await waitForBootImage(
-        logo,
-        5000
-      );
-
-      if (!logoReady) {
-        if (logo) {
-          logo.hidden = true;
-        }
-
-        if (status) {
-          status.textContent = "Abrindo o menu…";
-        }
-
-        await pause(450);
-        return;
+      if (status) {
+        status.textContent =
+          "Preparando o jogo…";
       }
 
-      if (typeof logo.decode === "function") {
-        await Promise.race([
-          logo.decode().catch(() => {}),
-          pause(1200)
-        ]);
-      }
+      await pause(220);
 
       if (status) {
         status.hidden = true;
       }
 
-      // Logo visível por alguns segundos, sem bloquear por assets grandes.
+      // Título em texto/CSS: nenhuma imagem é carregada na abertura.
       await fadeOpacity(
         logo,
         0,
         1,
-        1800
+        700
       );
 
-      await pause(1800);
+      await pause(700);
 
       await fadeOpacity(
         logo,
         1,
         0,
-        900
+        450
       );
 
       await fadeOpacity(
         splash,
         1,
         0,
-        500
+        300
       );
     } catch (error) {
       console.warn(
@@ -1145,57 +1277,13 @@ for (const kind of Object.keys(characterSpriteSheets)) {
   }
 }
 
-const playerRoomSpriteNames = {
-  floor: "chao-player.png",
-  walls: "paredes-player.png",
-  bed: "cama-player.png",
-  shelf: "estante-player.png",
-  desk: "escrivaninha-player.png",
-  nightstand: "criado-mudo-player.png",
-  lampOff: "luminaria-player-off.png",
-  lampOn: "luminaria-player-on.png",
-  rug: "tapete-player.png",
-  backpack: "mochila-player.png",
-  clothes: "roupas-player.png",
-  shoes: "tenis-player.png",
-  flipflops: "chinelo-player.png",
-  trash: "lixeira-player.png",
-  poster1: "cartaz-escola-player-01.png",
-  poster2: "cartaz-escola-player-02.png",
-  poster3: "cartaz-escola-player-03.png"
-};
-
+const playerRoomSpriteNames = {};
 const playerRoomSprites = {};
 
-// 0.8.15 — sprites pesados do quarto são carregados somente
-// quando o jogador realmente entra no quarto.
-function getPlayerRoomSprite(key) {
-  if (playerRoomSprites[key]) {
-    return playerRoomSprites[key];
-  }
-
-  const filename =
-    playerRoomSpriteNames[key];
-
-  if (!filename) {
-    return null;
-  }
-
-  const image = new Image();
-  image.decoding = "async";
-  image.src =
-    `assets/sprites/house/player-room/${filename}?v=0.8.15`;
-
-  image.addEventListener(
-    "load",
-    () => {
-      roomPositionChecked = false;
-    },
-    { once: true }
-  );
-
-  playerRoomSprites[key] = image;
-  return image;
+// 0.8.16 — nenhum cenário/móvel usa imagem.
+// A função permanece por compatibilidade com chamadas antigas.
+function getPlayerRoomSprite() {
+  return null;
 }
 
 // Sprites dos personagens são comuns a várias áreas.
@@ -1222,29 +1310,7 @@ function spriteReady(image) {
 // 0.8.15 — CARREGAMENTO PROCEDURAL POR ÁREA
 // =========================================================
 
-const AREA_ROAD_ASSETS = {
-  village: [
-    "pavedVertical",
-    "pavedHorizontal",
-    "pavedCross",
-    "pavedToDirt",
-    "dirtVertical"
-  ],
-  northRoad: [
-    "pavedVertical"
-  ],
-  squareRoad: [
-    "pavedHorizontal"
-  ],
-  westRoad: [
-    "pavedHorizontal"
-  ],
-  oldRoad: [
-    "dirtVertical",
-    "dirtHorizontal",
-    "dirtTRight"
-  ]
-};
+const AREA_ROAD_ASSETS = {};
 
 const OUTDOOR_AREA_ROOMS =
   new Set([
@@ -1346,56 +1412,11 @@ function waitForAreaImage(
   });
 }
 
-function clearRoadAreaMemory(nextRoom) {
-  roadRasterCache.clear();
-  roadStripCache.clear();
-
-  const needed =
-    new Set(
-      AREA_ROAD_ASSETS[nextRoom] || []
-    );
-
-  for (
-    const [
-      key,
-      image
-    ] of Object.entries(roadAssets)
-  ) {
-    if (needed.has(key)) {
-      continue;
-    }
-
-    try {
-      image.removeAttribute("src");
-      image.src = "";
-    } catch {}
-
-    delete roadAssets[key];
-  }
+function clearRoadAreaMemory() {
+  // 0.8.16 — sem imagens ambientais ou caches de rua.
 }
 
-function clearPlayerRoomMemory(nextRoom) {
-  if (nextRoom === "bedroom") {
-    return;
-  }
-
-  for (
-    const image of
-    Object.values(playerRoomSprites)
-  ) {
-    try {
-      image.removeAttribute("src");
-      image.src = "";
-    } catch {}
-  }
-
-  for (
-    const key of
-    Object.keys(playerRoomSprites)
-  ) {
-    delete playerRoomSprites[key];
-  }
-
+function clearPlayerRoomMemory() {
   roomPositionChecked = false;
 }
 
@@ -1425,139 +1446,12 @@ function getAreaLoadingLabel(room) {
     "Nova área";
 }
 
-function warmAreaRoadCaches(room) {
-  try {
-    if (room === "village") {
-      // Cruzamentos e trechos usados exatamente com as dimensões do mapa.
-      getRoadStrip(
-        "pavedVertical",
-        118,
-        279,
-        false
-      );
-
-      getRoadStrip(
-        "pavedVertical",
-        118,
-        80,
-        false
-      );
-
-      getRoadStrip(
-        "pavedHorizontal",
-        504,
-        110,
-        true
-      );
-
-      getRoadStrip(
-        "pavedHorizontal",
-        486,
-        110,
-        true
-      );
-
-      getRoadRaster(
-        "pavedCross",
-        330,
-        330,
-        null
-      );
-
-      const cropTop = 960;
-      const transitionCrop = {
-        x: ROAD_CROPS.pavedToDirt.x,
-        y:
-          ROAD_CROPS.pavedToDirt.y +
-          cropTop,
-        w: ROAD_CROPS.pavedToDirt.w,
-        h:
-          ROAD_CROPS.pavedToDirt.h -
-          cropTop
-      };
-
-      const transitionH =
-        118 *
-        transitionCrop.h /
-        transitionCrop.w;
-
-      getRoadRaster(
-        "pavedToDirt",
-        118,
-        transitionH,
-        transitionCrop
-      );
-
-      getRoadStrip(
-        "dirtVertical",
-        128,
-        880,
-        false
-      );
-      return;
-    }
-
-    if (room === "northRoad") {
-      getRoadStrip(
-        "pavedVertical",
-        270,
-        maps.northRoad?.h || 1320,
-        false
-      );
-      return;
-    }
-
-    if (room === "squareRoad") {
-      getRoadStrip(
-        "pavedHorizontal",
-        1125,
-        200,
-        true
-      );
-      return;
-    }
-
-    if (room === "westRoad") {
-      getRoadStrip(
-        "pavedHorizontal",
-        maps.westRoad?.w || 1400,
-        225,
-        true
-      );
-      return;
-    }
-
-    if (room === "oldRoad") {
-      getRoadStrip(
-        "dirtVertical",
-        110,
-        850,
-        false
-      );
-
-      getRoadRaster(
-        "dirtTRight",
-        285,
-        285
-      );
-
-      getRoadStrip(
-        "dirtHorizontal",
-        230,
-        94,
-        true
-      );
-    }
-  } catch {
-    // Se um navegador não conseguir aquecer um cache,
-    // o renderer normal ainda possui fallback.
-  }
+function warmAreaRoadCaches() {
+  // Canvas procedural não precisa de aquecimento de textura.
 }
 
 async function preloadAreaAssets(room) {
-  if (!room) {
-    return;
-  }
+  if (!room) return;
 
   if (loadedAreaRoom === room) {
     return;
@@ -1573,44 +1467,12 @@ async function preloadAreaAssets(room) {
   loadingAreaRoom = room;
 
   areaLoadPromise = (async () => {
-    // Só depois da tela preta limpamos o que pertencia à área anterior.
-    clearRoadAreaMemory(room);
-    clearPlayerRoomMemory(room);
+    clearRoadAreaMemory();
+    clearPlayerRoomMemory();
 
     const tasks = [];
 
-    if (OUTDOOR_AREA_ROOMS.has(room)) {
-      tasks.push(
-        waitForAreaImage(grassTile64)
-      );
-    }
-
-    const roadKeys =
-      AREA_ROAD_ASSETS[room] || [];
-
-    for (const key of roadKeys) {
-      tasks.push(
-        waitForAreaImage(
-          getRoadImage(key)
-        )
-      );
-    }
-
-    if (room === "bedroom") {
-      for (
-        const key of
-        Object.keys(playerRoomSpriteNames)
-      ) {
-        tasks.push(
-          waitForAreaImage(
-            getPlayerRoomSprite(key)
-          )
-        );
-      }
-    }
-
-    // O protagonista é comum e precisa estar pronto antes
-    // de revelar qualquer área jogável.
+    // Únicas imagens permitidas: sprites dos personagens.
     const playerSheets =
       characterSpriteSheets.player;
 
@@ -1625,17 +1487,8 @@ async function preloadAreaAssets(room) {
 
     await Promise.all(tasks);
 
-    // Pré-monta as versões reduzidas que serão realmente desenhadas.
-    // Assim o primeiro frame da nova área não precisa redimensionar
-    // PNGs de mais de 1000px enquanto o jogador já está vendo a cena.
-    warmAreaRoadCaches(room);
-
-    // Dá ao navegador um frame inteiro para concluir upload
-    // das texturas para a camada gráfica antes de revelar o mapa.
     await new Promise(resolve =>
-      requestAnimationFrame(() =>
-        requestAnimationFrame(resolve)
-      )
+      requestAnimationFrame(resolve)
     );
 
     loadedAreaRoom = room;
@@ -1912,73 +1765,98 @@ function drawSpriteCropStretch(image, x, y, w, h) {
 }
 
 function drawPlayerRoomBackground(m) {
-  // Base escura atrás das paredes.
-  rect(0, 0, m.w, m.h, "#241f1b");
+  rect(
+    0,
+    0,
+    m.w,
+    m.h,
+    "#1d1a18"
+  );
 
-  // O piso entra 2 unidades sob as paredes. A parede é desenhada depois,
-  // então esse pequeno sangramento elimina frestas sem aparecer.
-  const floorX = housePoint(58);
-  const floorY = housePoint(76);
-  const floorW = housePoint(524);
-  const floorH = housePoint(282);
+  const floorX =
+    housePoint(58);
+  const floorY =
+    housePoint(76);
+  const floorW =
+    housePoint(524);
+  const floorH =
+    housePoint(282);
 
-  if (
-    !drawSpriteCropStretch(
-      getPlayerRoomSprite("floor"),
-      floorX,
-      floorY,
-      floorW,
-      floorH
-    )
+  rect(
+    floorX,
+    floorY,
+    floorW,
+    floorH,
+    "#5b4938"
+  );
+
+  // Tábuas/piso provisório em Canvas.
+  for (
+    let py = floorY + 8;
+    py < floorY + floorH;
+    py += 18
   ) {
     rect(
       floorX,
-      floorY,
+      py,
       floorW,
-      floorH,
-      "#61503d"
+      1,
+      "#46392e"
     );
   }
 
-  // Parede de fundo.
-  drawSprite(
-    getPlayerRoomSprite("walls"),
-    0,
-    0,
-    m.w,
-    m.h
-  );
+  // Paredes simples.
+  const wall = housePoint(18);
 
-  // Pôsteres retirados temporariamente.
+  rect(
+    floorX - wall,
+    floorY - wall,
+    floorW + wall * 2,
+    wall,
+    "#333737"
+  );
+  rect(
+    floorX - wall,
+    floorY,
+    wall,
+    floorH + wall,
+    "#303434"
+  );
+  rect(
+    floorX + floorW,
+    floorY,
+    wall,
+    floorH + wall,
+    "#303434"
+  );
+  rect(
+    floorX - wall,
+    floorY + floorH,
+    floorW + wall * 2,
+    wall,
+    "#2a2e2e"
+  );
 }
 
-// A faixa inferior é redesenhada DEPOIS do personagem.
-// Assim o player pode andar nessa área e parecer passar atrás/por baixo
-// da parede, em vez de ficar bloqueado ou desenhado sobre ela.
-function drawPlayerRoomForeground(m) {
-  if (!spriteReady(getPlayerRoomSprite("walls"))) return;
+funfunction drawPlayerRoomForeground(m) {
+  const foregroundY =
+    housePoint(316);
 
-  const foregroundY = housePoint(316);
-
-  c.save();
-  c.beginPath();
-  c.rect(
-    0,
+  rect(
+    housePoint(40),
     foregroundY,
-    m.w,
-    m.h - foregroundY
-  );
-  c.clip();
-
-  drawSprite(
-    getPlayerRoomSprite("walls"),
-    0,
-    0,
-    m.w,
-    m.h
+    housePoint(560),
+    housePoint(28),
+    "#292d2d"
   );
 
-  c.restore();
+  rect(
+    housePoint(40),
+    foregroundY,
+    housePoint(560),
+    housePoint(4),
+    "#55564f"
+  );
 }
 
 function drawPlayerRoomClutter() {
@@ -5772,11 +5650,6 @@ function chapterObjective() {
   }[q.phase];
 }
 
-const clueImages = {
-  list: "assets/ui/journal/supply-list.png",
-  note: "assets/ui/journal/note-parents.png"
-};
-
 function openJournal(view = "book") {
   chapter();
 
@@ -5871,13 +5744,15 @@ function renderJournalView(view) {
           renderJournalView(id);
 
         const thumbnail =
-          document.createElement("img");
+          document.createElement("div");
 
-        thumbnail.src = clueImages[id];
-        thumbnail.alt =
+        thumbnail.className =
+          "journal-card-placeholder";
+
+        thumbnail.textContent =
           id === "list"
-            ? "Lista de mantimentos"
-            : "Bilhete dos pais";
+            ? "LISTA\nDE MANTIMENTOS"
+            : "BILHETE\nDOS PAIS";
 
         card.append(thumbnail);
 
@@ -5898,29 +5773,33 @@ function renderJournalView(view) {
   } else {
     const id = view;
 
-    const image = document.createElement("img");
+    const clue =
+      document.createElement("div");
 
-    image.className = "journal-clue-image";
-    image.src = clueImages[id];
-    image.alt =
+    clue.className =
+      "journal-clue-canvas";
+
+    const clueTitle =
+      document.createElement("strong");
+
+    clueTitle.textContent =
       id === "list"
-        ? "Lista de mantimentos coletada"
-        : "Bilhete dos pais coletado";
+        ? "LISTA DE MANTIMENTOS"
+        : "BILHETE DOS PAIS";
 
-    image.title = "Clique para ampliar";
+    const clueBody =
+      document.createElement("p");
 
-    image.onclick = () =>
-      enlargeClue(id);
+    clueBody.textContent =
+      clueText[id] ||
+      "Registro sem conteúdo.";
 
-    page.append(image);
+    clue.append(
+      clueTitle,
+      clueBody
+    );
 
-    const hint = document.createElement("p");
-
-    hint.className = "journal-hint";
-    hint.textContent =
-      "Clique na pista para ampliar.";
-
-    page.append(hint);
+    page.append(clue);
   }
 
   const rail = document.createElement("aside");
@@ -5964,21 +5843,12 @@ function renderJournalView(view) {
 }
 
 function enlargeClue(id) {
-  const image = document.createElement("img");
-
-  image.src = clueImages[id];
-  image.alt =
-    id === "list"
-      ? "Lista de mantimentos ampliada"
-      : "Bilhete dos pais ampliado";
-
-  image.className = "journal-clue-large";
-
   modal(
     id === "list"
       ? "Lista de mantimentos"
       : "Bilhete dos pais",
-    "",
+    clueText[id] ||
+      "Registro sem conteúdo.",
     [
       [
         "Voltar ao celular",
@@ -5987,8 +5857,6 @@ function enlargeClue(id) {
       ["Fechar", closeModal]
     ]
   );
-
-  $("modalText").append(image);
 }
 
 function showPhoto(first) {
@@ -8749,27 +8617,117 @@ desk: [536, 172, 48, 146, .32, .18, .58, .74],
   clothes: [70, 275, 58, 40, .16, .38, .68, .42]
 };
 function roomItemBounds(key) {
-  const [x,y,w,h] = roomItems[key].map(housePoint);
-  const image = getPlayerRoomSprite(key);
-  const crop = spriteReady(image) ? getSpriteCrop(image) : {w,h};
-  const sourceW = crop.w;
-  const sourceH = crop.h;
-  const scale = Math.min(w/sourceW,h/sourceH);
-  const width = sourceW*scale, height = sourceH*scale;
+  const spec =
+    roomItems[key];
 
-  // Móveis de parede e mochila ficam alinhados pelo topo visível.
-  const wallAligned = ["bed","shelf","nightstand","lampOff","lampOn","backpack"].includes(key);
+  if (!spec) {
+    return {
+      x: 0,
+      y: 0,
+      w: 0,
+      h: 0
+    };
+  }
+
+  const [x,y,w,h] =
+    spec.slice(0,4).map(housePoint);
 
   return {
-    x: key === "desk" ? x+w-width : x+(w-width)/2,
-    y: wallAligned ? y : y+h-height,
-    w: width,
-    h: height
+    x,
+    y,
+    w,
+    h
   };
 }
+
 function drawRoomItem(key) {
-  const b = roomItemBounds(key);
-  drawSpriteContain(getPlayerRoomSprite(key),b.x,b.y,b.w,b.h);
+  const b =
+    roomItemBounds(key);
+
+  if (
+    b.w <= 0 ||
+    b.h <= 0
+  ) {
+    return;
+  }
+
+  const palette = {
+    bed: ["#514338","#77604b"],
+    rug: ["#4f3d35","#70584c"],
+    nightstand: ["#4b3d31","#695342"],
+    lampOff: ["#5b5447","#8b7858"],
+    lampOn: ["#8f7446","#d0ad67"],
+    shelf: ["#40362f","#675445"],
+    desk: ["#493a2e","#705947"],
+    backpack: ["#25383b","#38535a"],
+    flipflops: ["#4a4038","#79695b"],
+    trash: ["#34393a","#555d5e"],
+    shoes: ["#2c3033","#4a5054"],
+    clothes: ["#3b4950","#5d6c73"]
+  };
+
+  const colors =
+    palette[key] ||
+    ["#3d3b38","#5c5750"];
+
+  rect(
+    b.x,
+    b.y,
+    b.w,
+    b.h,
+    colors[0]
+  );
+
+  rect(
+    b.x + 3,
+    b.y + 3,
+    Math.max(2,b.w - 6),
+    Math.max(2,b.h - 6),
+    colors[1]
+  );
+
+  if (key === "bed") {
+    rect(
+      b.x + b.w * 0.10,
+      b.y + b.h * 0.08,
+      b.w * 0.80,
+      b.h * 0.24,
+      "#b3a487"
+    );
+  }
+
+  if (
+    key === "lampOn"
+  ) {
+    c.save();
+    const glow =
+      c.createRadialGradient(
+        b.x + b.w / 2,
+        b.y + b.h / 2,
+        2,
+        b.x + b.w / 2,
+        b.y + b.h / 2,
+        Math.max(b.w,b.h)
+      );
+
+    glow.addColorStop(
+      0,
+      "rgba(228,193,111,.24)"
+    );
+    glow.addColorStop(
+      1,
+      "rgba(228,193,111,0)"
+    );
+
+    c.fillStyle = glow;
+    c.fillRect(
+      b.x - b.w,
+      b.y - b.h,
+      b.w * 3,
+      b.h * 3
+    );
+    c.restore();
+  }
 }
 function roomCollision(o) {
   const key = o.roomItem || {
@@ -25155,7 +25113,7 @@ updateHud = function() {
   }
 };
 
-$("version").textContent = "PROTÓTIPO · 0.8.15";
+$("version").textContent = "PROTÓTIPO · 0.8.16";
   
   requestAnimationFrame(frame);
   showBootSplash();
