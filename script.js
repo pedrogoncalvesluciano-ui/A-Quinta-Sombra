@@ -27590,6 +27590,15 @@ function v0825OpenTopicMenu({
             });
         }
       });
+
+      choices.push({
+        id: "close-topics",
+        label: "Encerrar conversa",
+        tone: "SAIR",
+        effect: () => {
+          selectedAction = null;
+        }
+      });
     }
 
     if (
