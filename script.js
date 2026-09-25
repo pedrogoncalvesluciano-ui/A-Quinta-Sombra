@@ -26482,6 +26482,10 @@ function v0820EnsurePostWest() {
     p.finished = false;
   }
 
+  if (typeof p.coreSeen !== "boolean") {
+    p.coreSeen = false;
+  }
+
   if (
     state.storyFlags?.chapter4Complete &&
     !p.started
@@ -26499,7 +26503,6 @@ function v0820PostWestActive() {
   return Boolean(
     state &&
     p?.started &&
-    !p.finished &&
     state.stage !== "prologue" &&
     state.storyFlags?.chapter4Complete &&
     state.day < 8
@@ -26973,13 +26976,14 @@ update = function(dt) {
     const p = v0820EnsurePostWest();
 
     if (
+      !p.coreSeen &&
       p.brotherTalks > 0 &&
       p.policeTalks > 0 &&
       p.florindaTalks > 0 &&
       p.raimundoTalks > 0 &&
       p.marketTalks > 0
     ) {
-      p.finished = true;
+      p.coreSeen = true;
 
       v06Toast(
         "Você reuniu novas versões sobre o que aconteceu depois da Rua Oeste.",
