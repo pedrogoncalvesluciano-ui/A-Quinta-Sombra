@@ -2,7 +2,7 @@
 "use strict";
 
 /*
-  A QUINTA SOMBRA — 0.8.16
+  A QUINTA SOMBRA — 0.8.17
 
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
@@ -833,30 +833,56 @@
     try {
       if (status) {
         status.textContent =
-          "Preparando o jogo…";
+          "Carregando identidade do jogo…";
       }
 
-      await pause(220);
+      const logoReady =
+        await waitForBootImage(
+          logo,
+          5000
+        );
+
+      if (!logoReady) {
+        if (logo) {
+          logo.hidden = true;
+        }
+
+        if (status) {
+          status.textContent =
+            "Abrindo o menu…";
+        }
+
+        await pause(250);
+        return;
+      }
+
+      if (
+        typeof logo.decode === "function"
+      ) {
+        await Promise.race([
+          logo.decode().catch(() => {}),
+          pause(900)
+        ]);
+      }
 
       if (status) {
         status.hidden = true;
       }
 
-      // Título em texto/CSS: nenhuma imagem é carregada na abertura.
       await fadeOpacity(
         logo,
         0,
         1,
-        700
+        900
       );
 
-      await pause(700);
+      await pause(900);
 
       await fadeOpacity(
         logo,
         1,
         0,
-        450
+        500
       );
 
       await fadeOpacity(
@@ -25141,7 +25167,7 @@ updateHud = function() {
   }
 };
 
-$("version").textContent = "PROTÓTIPO · 0.8.16";
+$("version").textContent = "PROTÓTIPO · 0.8.17";
   
   requestAnimationFrame(frame);
   showBootSplash();
