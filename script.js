@@ -1838,7 +1838,7 @@ function drawPlayerRoomBackground(m) {
   );
 }
 
-funfunction drawPlayerRoomForeground(m) {
+function drawPlayerRoomForeground(m) {
   const foregroundY =
     housePoint(316);
 
@@ -10984,18 +10984,46 @@ update = function(dt) {
 const roomUpdateBeforeFix=update;
 let roomPositionChecked=false;
 update=function(dt) {
-  if (state?.room!=="bedroom") roomPositionChecked=false;
-  if (state?.room==="bedroom" && !roomPositionChecked && spriteReady(getPlayerRoomSprite("bed")) && spriteReady(getPlayerRoomSprite("desk")) && spriteReady(getPlayerRoomSprite("shelf")) && spriteReady(getPlayerRoomSprite("nightstand"))) {
+  if (state?.room!=="bedroom") {
+    roomPositionChecked=false;
+  }
+
+  if (
+    state?.room==="bedroom" &&
+    !roomPositionChecked
+  ) {
     roomPositionChecked=true;
+
     if (solid(state.x,state.y)) {
-      search: for(let radius=4;radius<200;radius+=4) {
-        for(let angle=0;angle<Math.PI*2;angle+=Math.PI/8) {
-          const x=state.x+Math.cos(angle)*radius,y=state.y+Math.sin(angle)*radius;
-          if(!solid(x,y)){state.x=x;state.y=y;break search;}
+      search:
+      for (
+        let radius=4;
+        radius<200;
+        radius+=4
+      ) {
+        for (
+          let angle=0;
+          angle<Math.PI*2;
+          angle+=Math.PI/8
+        ) {
+          const x=
+            state.x+
+            Math.cos(angle)*radius;
+
+          const y=
+            state.y+
+            Math.sin(angle)*radius;
+
+          if (!solid(x,y)) {
+            state.x=x;
+            state.y=y;
+            break search;
+          }
         }
       }
     }
   }
+
   roomUpdateBeforeFix(dt);
 };
 
