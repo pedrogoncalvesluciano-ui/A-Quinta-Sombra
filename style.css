@@ -170,6 +170,39 @@ nav button span {
   font-weight: normal;
 }
 
+
+#eventToast {
+  position: absolute;
+  z-index: 60;
+  top: calc(5% + 58px);
+  left: 4%;
+  width: min(46%, 620px);
+  max-width: calc(100% - 8%);
+  padding: 10px 14px 11px;
+  background:
+    linear-gradient(90deg, #0a1118f3, #0d151de8 82%, #0d151d00);
+  border-left: 2px solid #c39f61;
+  border-top: 1px solid #8c765440;
+  color: #ead7ad;
+  font: clamp(10px, 1vw, 14px)/1.45 monospace;
+  letter-spacing: .015em;
+  text-shadow: 1px 1px #000;
+  box-shadow: 0 10px 24px #0005;
+  pointer-events: none;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+#eventToast::before {
+  content: "ACONTECIMENTO";
+  display: block;
+  margin-bottom: 4px;
+  color: #9e8761;
+  font: 7px/1.2 monospace;
+  letter-spacing: .18em;
+}
+
+
 .clock {
   position: absolute;
   right: 4%;
@@ -880,35 +913,44 @@ h2 {
 
 /* COMO JOGAR — retângulo grande */
 .help-card {
-  width: min(940px, 88%);
-  max-height: 91%;
-  padding: 24px 28px 20px;
+  width: min(1040px, 92%);
+  max-height: 92%;
+  padding: 28px 32px 22px;
+  border-color: #a58a5f66;
+  background:
+    radial-gradient(circle at 82% 12%, #b68f3d12, transparent 25%),
+    linear-gradient(135deg, #141d21ef, #080d11f7);
 }
 
 .help-intro {
-  max-width: 760px;
-  margin: 0 0 16px;
-  color: #969e98;
-  font: 11px/1.55 system-ui, sans-serif;
+  max-width: 860px;
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  border-left: 2px solid #b49257;
+  background: #0b1217a6;
+  color: #abb2ac;
+  font: 11px/1.6 system-ui, sans-serif;
 }
 
 .help-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 9px;
+  gap: 11px;
 }
 
 .control-card {
-  min-height: 82px;
+  min-height: 92px;
   display: grid;
-  grid-template-columns: 38px 1fr;
-  gap: 11px;
+  grid-template-columns: 42px 1fr;
+  gap: 12px;
   align-items: start;
-  padding: 11px 12px;
-  border: 1px solid #73654835;
+  padding: 13px 14px;
+  border: 1px solid #806d4d45;
   background:
-    linear-gradient(110deg, #182022b8, #10161994);
-  box-shadow: inset 0 1px #ffffff05;
+    linear-gradient(115deg, #1a2428d1, #0d1418b8);
+  box-shadow:
+    inset 0 1px #ffffff07,
+    0 8px 22px #0003;
 }
 
 .control-card:hover {
@@ -1002,16 +1044,20 @@ h2 {
   font: italic 9px/1.5 Georgia, serif;
 }
 
-/* CRÉDITOS — quadrado menor */
+/* CRÉDITOS — painel maior e mais confortável */
 .credits-card {
-  width: min(470px, 62%);
-  aspect-ratio: 1 / 1;
-  max-height: 82%;
+  width: min(780px, 86%);
+  min-height: min(560px, 78vh);
+  max-height: 90%;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 34px 46px;
+  padding: 42px 64px;
   text-align: center;
+  border-color: #a4885b66;
+  background:
+    radial-gradient(circle at 50% 18%, #b08d4914, transparent 30%),
+    linear-gradient(145deg, #151d20f2, #080d10fa);
 }
 
 .credits-card .eyebrow,
@@ -1051,19 +1097,20 @@ h2 {
 
 .credit-entry {
   display: grid;
-  gap: 7px;
-  margin: 12px 0;
+  gap: 8px;
+  margin: 16px 0;
+  padding: 8px 0;
 }
 
 .credit-entry small {
-  color: #7f817a;
-  font: 7px monospace;
-  letter-spacing: .19em;
+  color: #8d8d84;
+  font: 8px monospace;
+  letter-spacing: .2em;
 }
 
 .credit-entry strong {
-  color: #d4bc87;
-  font: normal 18px Georgia, serif;
+  color: #dcc493;
+  font: normal clamp(19px, 2vw, 27px) Georgia, serif;
   letter-spacing: .02em;
 }
 
@@ -1131,8 +1178,17 @@ h2 {
   }
 
   .credits-card {
-    width: min(430px, 70%);
-    padding: 24px 34px;
+    width: min(680px, 90%);
+    min-height: auto;
+    padding: 24px 30px;
+  }
+
+  #eventToast {
+    top: calc(5% + 52px);
+    left: 3%;
+    width: min(68%, 560px);
+    font-size: 9px;
+    padding: 8px 10px 9px;
   }
 }
 
