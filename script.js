@@ -2,7 +2,7 @@
 "use strict";
 
 /*
-  A QUINTA SOMBRA — 0.8.21
+  A QUINTA SOMBRA — 0.8.22
 
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
@@ -3653,6 +3653,22 @@ function drawCharacterSprite(
 
         root.append(button);
       }
+
+      const activeButton =
+        root.querySelector(".choice-option.active");
+
+      if (
+        activeButton &&
+        document.activeElement !== activeButton
+      ) {
+        try {
+          activeButton.focus({
+            preventScroll: true
+          });
+        } catch {
+          activeButton.focus();
+        }
+      }
     );
   }
 
@@ -3683,6 +3699,15 @@ function drawCharacterSprite(
     $("choiceScene").hidden = true;
     $("choiceOptions")
       .replaceChildren();
+
+    if (
+      document.activeElement &&
+      document.activeElement.classList?.contains(
+        "choice-option"
+      )
+    ) {
+      document.activeElement.blur();
+    }
   }
 
   function chooseDialogueOption(index) {
@@ -3769,7 +3794,21 @@ function drawCharacterSprite(
         config.after
     };
 
+    if (state) {
+      state.walk = 0;
+    }
+
+    near = null;
+    $("prompt").hidden = true;
     $("dialog").hidden = true;
+
+    if (
+      document.activeElement &&
+      typeof document.activeElement.blur === "function"
+    ) {
+      document.activeElement.blur();
+    }
+
     renderChoiceDialog();
   }
 
@@ -4977,15 +5016,6 @@ function drawCharacterSprite(
   // =========================================================
 
   $("next").onclick = advance;
-
-  $("choiceCodex").onclick =
-    openChoiceCodex;
-
-  $("choiceMissions").onclick =
-    openChoiceMissions;
-
-  $("choiceSettings").onclick =
-    openChoiceSettings;
 
   $("play").onclick = () => {
     if (saveAvailable) {
@@ -27055,7 +27085,106 @@ updateHud = function() {
 };
 
 
-$("version").textContent = "PROTÓTIPO · 0.8.21";
+
+// =========================================================
+// 0.8.22 — BLOQUEIO TOTAL DE INPUT DURANTE ESCOLHAS
+// Esta camada roda por último e impede listeners antigos de
+// movimentarem o player ou abrirem interfaces durante sayChoice.
+// =========================================================
+
+function v0822ChoiceInputLock(event) {
+  if (
+    mode !== "game" ||
+    !dialog?.choiceMode
+  ) {
+    return;
+  }
+
+  const key =
+    String(event.key || "").toLowerCase();
+
+  event.preventDefault();
+  event.stopImmediatePropagation();
+
+  keys.clear();
+
+  if (state) {
+    state.walk = 0;
+  }
+
+  if (
+    ["arrowup", "w"].includes(key)
+  ) {
+    if (!event.repeat) {
+      moveDialogueChoice(-1);
+    }
+    return;
+  }
+
+  if (
+    ["arrowdown", "s"].includes(key)
+  ) {
+    if (!event.repeat) {
+      moveDialogueChoice(1);
+    }
+    return;
+  }
+
+  if (/^[1-4]$/.test(key)) {
+    if (event.repeat) return;
+
+    const index =
+      Number(key) - 1;
+
+    if (
+      index >= 0 &&
+      index < dialog.choices.length
+    ) {
+      chooseDialogueOption(index);
+    }
+
+    return;
+  }
+
+  if (
+    key === "e" ||
+    key === "enter" ||
+    key === " "
+  ) {
+    if (!event.repeat) {
+      chooseDialogueOption(
+        dialog.selected || 0
+      );
+    }
+
+    return;
+  }
+
+  // ESC, C, J, I, L, WASD lateral e qualquer outro atalho
+  // ficam bloqueados até a resposta ser confirmada.
+}
+
+window.addEventListener(
+  "keydown",
+  v0822ChoiceInputLock,
+  true
+);
+
+window.addEventListener(
+  "keyup",
+  event => {
+    if (
+      dialog?.choiceMode
+    ) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      keys.clear();
+    }
+  },
+  true
+);
+
+$("version").textContent = "PROTÓTIPO · 0.8.22";
   
   requestAnimationFrame(frame);
   showBootSplash();
