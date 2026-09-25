@@ -264,6 +264,208 @@ kbd {
   margin-left: 8px;
 }
 
+/* =========================================================
+   0.8.18 — DIÁLOGOS COM ESCOLHAS
+   ========================================================= */
+
+.choice-scene {
+  position: absolute;
+  inset: 0;
+  z-index: 45;
+  pointer-events: none;
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+.choice-shade {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(
+      to bottom,
+      #05090d2c 0%,
+      #05090d48 48%,
+      #05090dc4 100%
+    );
+  backdrop-filter: brightness(.78);
+}
+
+.choice-topbar {
+  position: absolute;
+  top: 3%;
+  left: 8%;
+  right: 8%;
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 9px 13px;
+  background: #10161dde;
+  border: 1px solid #526070;
+  box-shadow: 0 8px 22px #0006;
+  pointer-events: auto;
+}
+
+#choiceLocation {
+  color: #ddd4bd;
+  font: 600 clamp(10px,1vw,14px) monospace;
+  letter-spacing: .04em;
+}
+
+.choice-tools {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  max-width: none;
+}
+
+.choice-tools button {
+  padding: 7px 11px;
+  border: 1px solid #485464;
+  background: #111820e8;
+  color: #d8d2c3;
+  font: 10px monospace;
+  white-space: nowrap;
+}
+
+.choice-tools button:hover,
+.choice-tools button:focus-visible {
+  background: #222b36;
+  border-color: #b28e51;
+}
+
+.choice-tools kbd {
+  margin-left: 5px;
+  padding: 1px 4px;
+  font-size: 8px;
+}
+
+.choice-panel {
+  position: absolute;
+  left: 50%;
+  bottom: 4.5%;
+  width: min(64%, 720px);
+  transform: translateX(-50%);
+  padding: 18px 20px 16px;
+  background: #0b0f14f7;
+  border-top: 2px solid #b58d46;
+  border-left: 1px solid #202936;
+  border-right: 1px solid #202936;
+  border-bottom: 1px solid #202936;
+  box-shadow: 0 18px 54px #000c;
+  pointer-events: auto;
+}
+
+.choice-speaker {
+  display: block;
+  margin-bottom: 8px;
+  color: #d0a453;
+  font: 700 10px monospace;
+  letter-spacing: .04em;
+}
+
+.choice-speech {
+  margin: 0 0 14px;
+  color: #ede7d8;
+  font-size: clamp(14px,1.45vw,20px);
+  line-height: 1.45;
+}
+
+.choice-options {
+  display: grid;
+  gap: 7px;
+}
+
+.choice-option {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  text-align: left;
+  border: 1px solid #354151;
+  background: #19212ce8;
+  color: #d8d8d1;
+  font: italic clamp(11px,1.05vw,15px) Georgia,serif;
+  transition:
+    border-color .14s,
+    background .14s,
+    transform .14s;
+}
+
+.choice-option:hover,
+.choice-option.active {
+  border-color: #b58d46;
+  background: #252f3d;
+  transform: translateX(3px);
+}
+
+.choice-option-index {
+  color: #b58d46;
+  font: 10px monospace;
+}
+
+.choice-option-tone {
+  color: #8f99a6;
+  font: 8px monospace;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.choice-help {
+  display: block;
+  margin-top: 10px;
+  color: #737e88;
+  font: 8px monospace;
+  letter-spacing: .05em;
+  text-align: right;
+}
+
+@media (max-width: 720px), (pointer: coarse) {
+  .choice-topbar {
+    left: 3%;
+    right: 3%;
+    top: 2%;
+    min-height: 42px;
+    padding: 6px 8px;
+  }
+
+  .choice-tools {
+    gap: 4px;
+  }
+
+  .choice-tools button {
+    padding: 6px 7px;
+    font-size: 8px;
+  }
+
+  .choice-tools kbd {
+    display: none;
+  }
+
+  .choice-panel {
+    width: 94%;
+    bottom: 3%;
+    padding: 13px 14px 11px;
+  }
+
+  .choice-speech {
+    font-size: 13px;
+    margin-bottom: 10px;
+  }
+
+  .choice-option {
+    min-height: 38px;
+    padding: 7px 9px;
+    font-size: 11px;
+  }
+
+  .choice-help {
+    display: none;
+  }
+}
+
 /* PAUSA, AJUDA E CRÉDITOS */
 
 #overlay {
