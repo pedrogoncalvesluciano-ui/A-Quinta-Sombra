@@ -2,7 +2,7 @@
 "use strict";
 
 /*
-  A QUINTA SOMBRA — 0.8.17
+  A QUINTA SOMBRA — 0.8.18
 
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
@@ -3462,8 +3462,353 @@ function drawCharacterSprite(
   }
 
   
+  // =========================================================
+  // 0.8.18 — SISTEMA DE DIÁLOGOS COM ESCOLHAS
+  // =========================================================
+
+  function ensureDialogueMemory() {
+    if (!state) return null;
+
+    if (!state.dialogueMemory) {
+      state.dialogueMemory = {
+        trust: {},
+        flags: {},
+        history: []
+      };
+    }
+
+    if (!state.dialogueMemory.trust) {
+      state.dialogueMemory.trust = {};
+    }
+
+    if (!state.dialogueMemory.flags) {
+      state.dialogueMemory.flags = {};
+    }
+
+    if (!Array.isArray(state.dialogueMemory.history)) {
+      state.dialogueMemory.history = [];
+    }
+
+    return state.dialogueMemory;
+  }
+
+  function adjustDialogueTrust(person, amount) {
+    const memory =
+      ensureDialogueMemory();
+
+    if (!memory || !person) return;
+
+    const current =
+      Number(memory.trust[person]) || 0;
+
+    memory.trust[person] =
+      Math.max(
+        -5,
+        Math.min(
+          5,
+          current + amount
+        )
+      );
+  }
+
+  function rememberDialogueChoice(id, choice) {
+    const memory =
+      ensureDialogueMemory();
+
+    if (!memory) return;
+
+    memory.history.push({
+      id,
+      choice:
+        choice.id ||
+        choice.label,
+      day:
+        state.day ?? 0,
+      minute:
+        Math.floor(state.minutes || 0)
+    });
+
+    if (memory.history.length > 40) {
+      memory.history.shift();
+    }
+  }
+
+  function setDialogueFlag(flag, value = true) {
+    const memory =
+      ensureDialogueMemory();
+
+    if (
+      memory &&
+      flag
+    ) {
+      memory.flags[flag] = value;
+    }
+  }
+
+  function choiceLocationLabel() {
+    if (!state) {
+      return "FORGOTTEN";
+    }
+
+    return (
+      roomNames[state.room] ||
+      "FORGOTTEN"
+    );
+  }
+
+  function renderChoiceDialog() {
+    if (
+      !dialog ||
+      !dialog.choiceMode
+    ) {
+      return;
+    }
+
+    $("dialog").hidden = true;
+    $("choiceScene").hidden = false;
+
+    $("choiceLocation").textContent =
+      choiceLocationLabel();
+
+    $("choiceSpeaker").textContent =
+      dialog.speaker || "Você";
+
+    $("choiceSpeech").textContent =
+      dialog.text || "";
+
+    const root =
+      $("choiceOptions");
+
+    root.replaceChildren();
+
+    dialog.choices.forEach(
+      (choice, index) => {
+        const button =
+          document.createElement("button");
+
+        button.type = "button";
+        button.className =
+          "choice-option" +
+          (
+            index === dialog.selected
+              ? " active"
+              : ""
+          );
+
+        button.setAttribute(
+          "role",
+          "option"
+        );
+
+        button.setAttribute(
+          "aria-selected",
+          index === dialog.selected
+            ? "true"
+            : "false"
+        );
+
+        const number =
+          document.createElement("span");
+
+        number.className =
+          "choice-option-index";
+
+        number.textContent =
+          String(index + 1)
+            .padStart(2,"0");
+
+        const label =
+          document.createElement("span");
+
+        label.textContent =
+          choice.label;
+
+        const tone =
+          document.createElement("span");
+
+        tone.className =
+          "choice-option-tone";
+
+        tone.textContent =
+          choice.tone || "";
+
+        button.append(
+          number,
+          label,
+          tone
+        );
+
+        button.onmouseenter = () => {
+          if (
+            dialog &&
+            dialog.choiceMode
+          ) {
+            dialog.selected = index;
+            renderChoiceDialog();
+          }
+        };
+
+        button.onclick = () =>
+          chooseDialogueOption(index);
+
+        root.append(button);
+      }
+    );
+  }
+
+  function moveDialogueChoice(delta) {
+    if (
+      !dialog ||
+      !dialog.choiceMode
+    ) {
+      return;
+    }
+
+    const count =
+      dialog.choices.length;
+
+    if (!count) return;
+
+    dialog.selected =
+      (
+        dialog.selected +
+        delta +
+        count
+      ) % count;
+
+    renderChoiceDialog();
+  }
+
+  function closeChoiceVisual() {
+    $("choiceScene").hidden = true;
+    $("choiceOptions")
+      .replaceChildren();
+  }
+
+  function chooseDialogueOption(index) {
+    if (
+      !dialog ||
+      !dialog.choiceMode
+    ) {
+      return;
+    }
+
+    const current = dialog;
+    const choice =
+      current.choices[index];
+
+    if (!choice) return;
+
+    rememberDialogueChoice(
+      current.id,
+      choice
+    );
+
+    if (
+      typeof choice.effect === "function"
+    ) {
+      choice.effect();
+    }
+
+    const followup =
+      choice.next || null;
+
+    const after =
+      current.after;
+
+    dialog = null;
+    closeChoiceVisual();
+
+    if (
+      Array.isArray(followup) &&
+      followup.length
+    ) {
+      say(
+        followup,
+        after
+      );
+    } else if (
+      typeof followup === "function"
+    ) {
+      followup(after);
+    } else {
+      if (after) {
+        after();
+      }
+
+      save();
+    }
+  }
+
+  function sayChoice(config) {
+    if (
+      !config ||
+      !Array.isArray(config.choices) ||
+      config.choices.length < 2
+    ) {
+      return;
+    }
+
+    keys.clear();
+
+    dialog = {
+      choiceMode: true,
+      id:
+        config.id ||
+        "choice-" + Date.now(),
+      speaker:
+        config.speaker ||
+        "Você",
+      text:
+        config.text ||
+        "",
+      choices:
+        config.choices.slice(0,4),
+      selected: 0,
+      after:
+        config.after
+    };
+
+    $("dialog").hidden = true;
+    renderChoiceDialog();
+  }
+
+  function openChoiceCodex() {
+    if (
+      state?.investigation &&
+      typeof openJournal === "function"
+    ) {
+      openJournal("book");
+      return;
+    }
+
+    modal(
+      "Códice",
+      "Ainda não há registros suficientes para preencher o códice.",
+      [["Voltar", closeModal]]
+    );
+  }
+
+  function openChoiceMissions() {
+    modal(
+      "Missões",
+      $("objective").textContent ||
+        "Nenhum objetivo ativo.",
+      [["Voltar", closeModal]]
+    );
+  }
+
+  function openChoiceSettings() {
+    modal(
+      "Configurações",
+      "CONTROLES\nWASD / SETAS · mover\nE / ENTER · confirmar\nESC · pausar\n\nAs opções visuais e de áudio serão ampliadas conforme os sistemas do jogo forem fechados.",
+      [["Voltar", closeModal]]
+    );
+  }
+
   function say(lines, after) {
     keys.clear();
+    closeChoiceVisual();
 
     dialog = {
       lines: lines.map(line =>
@@ -3478,14 +3823,32 @@ function drawCharacterSprite(
   }
 
   function renderDialog() {
-    const line = dialog.lines[dialog.i];
+    if (
+      dialog?.choiceMode
+    ) {
+      renderChoiceDialog();
+      return;
+    }
 
-    $("speaker").textContent = line[0];
-    $("speech").textContent = line[1];
+    const line =
+      dialog.lines[dialog.i];
+
+    $("speaker").textContent =
+      line[0];
+
+    $("speech").textContent =
+      line[1];
   }
 
   function advance() {
     if (!dialog) {
+      return;
+    }
+
+    if (dialog.choiceMode) {
+      chooseDialogueOption(
+        dialog.selected || 0
+      );
       return;
     }
 
@@ -4306,6 +4669,56 @@ function drawCharacterSprite(
     }
 
     if (
+      dialog?.choiceMode &&
+      mode === "game" &&
+      !transitionBusy &&
+      $("overlay").hidden
+    ) {
+      if (
+        ["arrowup","w"].includes(key)
+      ) {
+        event.preventDefault();
+        moveDialogueChoice(-1);
+        return;
+      }
+
+      if (
+        ["arrowdown","s"].includes(key)
+      ) {
+        event.preventDefault();
+        moveDialogueChoice(1);
+        return;
+      }
+
+      if (
+        /^[1-4]$/.test(key)
+      ) {
+        event.preventDefault();
+
+        const index =
+          Number(key) - 1;
+
+        if (
+          index <
+          dialog.choices.length
+        ) {
+          chooseDialogueOption(index);
+        }
+
+        return;
+      }
+
+      if (
+        key === "e" ||
+        key === "enter"
+      ) {
+        event.preventDefault();
+        advance();
+        return;
+      }
+    }
+
+    if (
       key === "escape" &&
       mode === "game" &&
       !transitionBusy
@@ -4558,6 +4971,15 @@ function drawCharacterSprite(
   // =========================================================
 
   $("next").onclick = advance;
+
+  $("choiceCodex").onclick =
+    openChoiceCodex;
+
+  $("choiceMissions").onclick =
+    openChoiceMissions;
+
+  $("choiceSettings").onclick =
+    openChoiceSettings;
 
   $("play").onclick = () => {
     if (saveAvailable) {
@@ -6125,10 +6547,55 @@ interact = function (action) {
         ]
       ],
       () => {
-        q.phase = "clues";
+        sayChoice({
+          id: "brother-footsteps",
+          speaker: "Irmão",
+          text: "Você vai sair de novo?",
+          choices: [
+            {
+              id: "protect",
+              label: "Fica aqui. Eu vou descobrir quem entrou.",
+              tone: "PROTEGER",
+              effect: () => {
+                adjustDialogueTrust(
+                  "brother",
+                  1
+                );
 
-        updateHud();
-        save();
+                setDialogueFlag(
+                  "brotherProtectedAfterFootsteps"
+                );
+              },
+              next: [
+                [
+                  "Irmão",
+                  "Tá... mas volta logo."
+                ]
+              ]
+            },
+            {
+              id: "investigate",
+              label: "Antes, me conta exatamente o que você ouviu.",
+              tone: "INVESTIGAR",
+              effect: () => {
+                setDialogueFlag(
+                  "brotherQuestionedAboutFootsteps"
+                );
+              },
+              next: [
+                [
+                  "Irmão",
+                  "Foram passos lentos. Eu só sei que vinham de baixo."
+                ]
+              ]
+            }
+          ],
+          after: () => {
+            q.phase = "clues";
+            updateHud();
+            save();
+          }
+        });
       }
     );
 
@@ -13244,8 +13711,49 @@ interact = function(action) {
         ["Funcionário", "Mas o recibo não mudou."]
       ],
       () => {
-        state.memoryFacts.marketTimeChecked = true;
-        v0650RecordContradiction("marketTime");
+        sayChoice({
+          id: "market-time-contradiction",
+          speaker: "Funcionário",
+          text: "Eu sei que parece estranho. O que você quer saber?",
+          choices: [
+            {
+              id: "pressure",
+              label: "O recibo não mudou. Sua lembrança mudou.",
+              tone: "PRESSIONAR",
+              effect: () => {
+                setDialogueFlag(
+                  "marketEmployeePressed"
+                );
+              },
+              next: [
+                [
+                  "Funcionário",
+                  "Eu sei. É isso que está me incomodando."
+                ]
+              ]
+            },
+            {
+              id: "observe",
+              label: "Tudo bem. Me diga só o que você lembra com certeza.",
+              tone: "OBSERVAR",
+              effect: () => {
+                setDialogueFlag(
+                  "marketEmployeeObserved"
+                );
+              },
+              next: [
+                [
+                  "Funcionário",
+                  "Do relógio. Eu lembro de ter olhado para ele."
+                ]
+              ]
+            }
+          ],
+          after: () => {
+            state.memoryFacts.marketTimeChecked = true;
+            v0650RecordContradiction("marketTime");
+          }
+        });
       }
     );
     return;
@@ -25167,7 +25675,7 @@ updateHud = function() {
   }
 };
 
-$("version").textContent = "PROTÓTIPO · 0.8.17";
+$("version").textContent = "PROTÓTIPO · 0.8.18";
   
   requestAnimationFrame(frame);
   showBootSplash();
