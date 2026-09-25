@@ -2,7 +2,7 @@
 "use strict";
 
 /*
-  A QUINTA SOMBRA — 0.8.23
+  A QUINTA SOMBRA — 0.8.24
 
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
@@ -7003,7 +7003,7 @@ let v06ToastText = "";
 let v06ToastUntil = 0;
 let v06ToastTimer = null;
 
-function v06Toast(text, seconds = 1.5) {
+function v06Toast(text, seconds = 3.8) {
   v06ToastText = text;
   v06ToastUntil = elapsed + seconds;
 
@@ -7032,7 +7032,7 @@ function v06Toast(text, seconds = 1.5) {
         $("eventToast").hidden = true;
       }
     },
-    Math.max(0.8, seconds) * 1000
+    Math.max(3.2, seconds) * 1000
   );
 }
 
@@ -12075,10 +12075,13 @@ update = function(dt) {
 
   if (
     state.room === "square" &&
-    state.x <= 44 &&
-    left
+    state.x >= maps.square.w - 44 &&
+    (
+      keys.has("d") ||
+      keys.has("arrowright")
+    )
   ) {
-    state.x = 44;
+    state.x = maps.square.w - 44;
     v0648ReturnFromSquare();
     return;
   }
@@ -19290,20 +19293,25 @@ function v076DrawSquareRoad() {
     200
   );
 
-  c.fillStyle = "#706b5f";
-  c.beginPath();
-  c.arc(1135, 367, 118, 0, Math.PI * 2);
-  c.fill();
+  // 0.8.24 — legado sem rotatória:
+  // mesmo em saves antigos, a Rua da Praça termina em ligação reta.
+  drawRoadTiledHorizontal(
+    "pavedHorizontal",
+    1080,
+    270,
+    320,
+    200
+  );
 
-  c.strokeStyle = "#8a867b";
-  c.lineWidth = 18;
-  c.beginPath();
-  c.arc(1135, 367, 126, -Math.PI * 0.58, Math.PI * 0.58);
-  c.stroke();
+  rect(
+    1080,
+    330,
+    320,
+    140,
+    "#716e66"
+  );
 
-  // Caminho de pedestres da rua sem saída até a praça.
-  rect(1210, 337, 190, 60, "#7b786f");
-  for (let x = 1220; x < 1390; x += 28) {
+  for (let x = 1090; x < 1390; x += 28) {
     rect(x, 347, 18, 10, "#8d897f");
     rect(x + 8, 370, 18, 10, "#817e75");
   }
@@ -19416,10 +19424,10 @@ v0648GoSquare = function() {
     "Leste de Forgotten",
     () => {
       v076SetOutdoorRoom(
-        "squareRoad",
-        70,
+        "square",
+        maps.square.w - 70,
         367,
-        "right"
+        "left"
       );
     }
   );
@@ -19434,9 +19442,9 @@ v0648ReturnFromSquare = function() {
     "",
     () => {
       v076SetOutdoorRoom(
-        "squareRoad",
-        1190,
-        367,
+        "village",
+        maps.village.w - 58,
+        424,
         "left"
       );
     }
@@ -20429,13 +20437,15 @@ update = function(dt) {
     state.storyFlags.squareObserverArmed &&
     !state.storyFlags.squareObserverSeen
   ) {
-    if (state.x >= 850) {
+    // 0.8.24: a praça fica no fim da Rua da Praça.
+    // Depois da conversa, sair da praça significa seguir para a direita.
+    if (state.x <= 1020) {
       state.eventDirector.squareReturnReady = true;
     }
 
     if (
       state.eventDirector.squareReturnReady &&
-      state.x <= 820 &&
+      state.x >= 1135 &&
       !dialog &&
       $("overlay").hidden
     ) {
@@ -27183,7 +27193,295 @@ window.addEventListener(
   true
 );
 
-$("version").textContent = "PROTÓTIPO · 0.8.23";
+
+// =========================================================
+// 0.8.24 — RUA DA PRAÇA + PRAÇA EM UMA ÚNICA ÁREA
+// A antiga squareRoad deixa de ser uma tela separada.
+// A praça preserva suas coordenadas e fica no fim da rua.
+// =========================================================
+
+const V0824_SQUARE_ROAD_START = 1080;
+const V0824_SQUARE_W = 2500;
+const V0824_SQUARE_H = 760;
+
+if (maps.squareRoad) {
+  maps.squareRoad.doors = [];
+}
+
+if (maps.square) {
+  const plazaObjects =
+    maps.square.objects.filter(
+      o => o.x < V0824_SQUARE_ROAD_START
+    );
+
+  maps.square.w = V0824_SQUARE_W;
+  maps.square.h = V0824_SQUARE_H;
+  maps.square.doors = [];
+
+  maps.square.objects = [
+    ...plazaObjects,
+
+    // Casas da Rua da Praça. A via segue para a direita até o bairro.
+    obj(1270, 70, 235, 165, "building"),
+    obj(1615, 72, 225, 165, "building"),
+    obj(1950, 68, 235, 170, "building"),
+
+    obj(1310, 515, 235, 165, "building"),
+    obj(1665, 520, 225, 160, "building"),
+    obj(2005, 510, 235, 170, "building")
+  ];
+}
+
+roomNames.square =
+  "Rua da praça · leste de Forgotten";
+
+v0648DrawSquareEnvironment = function(m) {
+  drawGrassGround(
+    0,
+    0,
+    m.w,
+    m.h
+  );
+
+  // PRAÇA CENTRAL — mantém a área antiga e suas interações.
+  rect(330, 185, 330, 390, "#77746a");
+  rect(0, 430, 1080, 86, "#77746a");
+  rect(490, 0, 86, m.h, "#77746a");
+
+  for (let y = 195; y < 565; y += 20) {
+    for (let x = 340; x < 650; x += 24) {
+      const offset =
+        (Math.floor(y / 20) % 2) * 10;
+
+      rect(
+        x + offset,
+        y,
+        16,
+        10,
+        "#858177"
+      );
+    }
+  }
+
+  // Ligação direta entre praça e rua.
+  // Sem rotatória/círculo e sem transição de mapa.
+  rect(
+    1000,
+    330,
+    175,
+    186,
+    "#77746a"
+  );
+
+  drawRoadTiledHorizontal(
+    "pavedHorizontal",
+    1080,
+    270,
+    m.w - 1080,
+    200
+  );
+
+  // Faixa de transição que cobre qualquer junção visível
+  // entre o piso da praça e a textura da rua.
+  rect(
+    1065,
+    330,
+    80,
+    140,
+    "#716e66"
+  );
+
+  for (let x = 1080; x < 1160; x += 24) {
+    rect(
+      x,
+      347,
+      16,
+      9,
+      "#858177"
+    );
+
+    rect(
+      x + 7,
+      375,
+      16,
+      9,
+      "#817e75"
+    );
+  }
+
+  // Árvores da praça.
+  for (const [tx, ty] of [
+    [345, 135],
+    [650, 145],
+    [340, 610],
+    [660, 610],
+    [70, 360],
+    [1010, 350]
+  ]) {
+    rect(tx, ty, 8, 30, "#493f31");
+    rect(tx - 17, ty - 19, 42, 30, "#244438");
+    rect(tx - 10, ty - 30, 29, 26, "#315441");
+  }
+
+  // Bancos.
+  for (const [bx, by] of [
+    [370, 420],
+    [600, 420],
+    [425, 545],
+    [570, 545]
+  ]) {
+    rect(bx, by, 60, 8, "#5d4a38");
+    rect(bx + 7, by + 8, 5, 12, "#3f342b");
+    rect(bx + 48, by + 8, 5, 12, "#3f342b");
+  }
+
+  // Postes ao longo da Rua da Praça.
+  for (const [lx, ly] of [
+    [1240, 285],
+    [1585, 285],
+    [1930, 285],
+    [2270, 285],
+    [1240, 455],
+    [1585, 455],
+    [1930, 455],
+    [2270, 455]
+  ]) {
+    rect(lx, ly, 4, 34, "#343a39");
+    rect(lx - 4, ly - 3, 12, 5, "#4d5350");
+    rect(lx - 2, ly - 1, 8, 3, "#d2b777");
+  }
+
+  txt(
+    "PRAÇA CENTRAL",
+    1090,
+    255,
+    "#bbaa88",
+    7
+  );
+
+  v071DrawSquareAmbientWorld();
+
+  for (const o of m.objects) {
+    building(o);
+  }
+};
+
+const v0824PrepareBase =
+  prepareSystems;
+
+prepareSystems = function() {
+  v0824PrepareBase();
+
+  if (!state) {
+    return;
+  }
+
+  // Migração de saves feitos na antiga tela separada squareRoad.
+  if (state.room === "squareRoad") {
+    const oldX =
+      Number.isFinite(state.x)
+        ? state.x
+        : 70;
+
+    state.room = "square";
+    state.x = Math.max(
+      1140,
+      Math.min(
+        maps.square.w - 70,
+        2500 - oldX
+      )
+    );
+
+    state.y = Math.max(
+      40,
+      Math.min(
+        maps.square.h - 40,
+        Number.isFinite(state.y)
+          ? state.y
+          : 367
+      )
+    );
+
+    state.facing =
+      oldX > 700
+        ? "left"
+        : "right";
+
+    state.walk = 0;
+    keys.clear();
+    near = null;
+    save();
+  }
+};
+
+const v0824UpdateBase =
+  update;
+
+update = function(dt) {
+  v0824UpdateBase(dt);
+
+  if (
+    !state ||
+    mode !== "game" ||
+    dialog ||
+    transitionBusy ||
+    !$("overlay").hidden
+  ) {
+    return;
+  }
+
+  if (
+    state.room === "square" &&
+    state.x <= V0824_SQUARE_ROAD_START &&
+    !state.storyFlags?.squareVisited
+  ) {
+    state.storyFlags.squareVisited = true;
+    state.storyFlags.squareVisitCount =
+      (state.storyFlags.squareVisitCount || 0) + 1;
+
+    v06Toast(
+      "Praça central · procure alguém que possa ter visto seus pais.",
+      4.2
+    );
+
+    updateHud();
+    save();
+  }
+};
+
+const v0824HudBase =
+  updateHud;
+
+updateHud = function() {
+  v0824HudBase();
+
+  if (
+    !state ||
+    state.room !== "square"
+  ) {
+    return;
+  }
+
+  const inPlaza =
+    state.x <= V0824_SQUARE_ROAD_START;
+
+  $("location").textContent =
+    inPlaza
+      ? "Praça central · Forgotten"
+      : "Rua da praça · leste de Forgotten";
+
+  if (
+    state.storyFlags?.marketParentsConfirmed &&
+    !state.squareManFirstSpeechDone &&
+    !inPlaza
+  ) {
+    $("objective").textContent =
+      "Siga a rua até a praça central.";
+  }
+};
+
+
+$("version").textContent = "PROTÓTIPO · 0.8.24";
   
   requestAnimationFrame(frame);
   showBootSplash();
