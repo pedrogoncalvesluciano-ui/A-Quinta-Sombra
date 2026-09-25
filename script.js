@@ -2,7 +2,7 @@
 "use strict";
 
 /*
-  A QUINTA SOMBRA — 0.8.25
+  A QUINTA SOMBRA — 0.8.26
 
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
@@ -28706,7 +28706,382 @@ updateHud = function() {
 };
 
 
-$("version").textContent = "PROTÓTIPO · 0.8.25";
+
+// =========================================================
+// 0.8.26 — ABERTURA CANÔNICA + IDADES + PROGRESSÃO POR AÇÕES
+// =========================================================
+
+function v0826Pause(ms) {
+  return new Promise(
+    resolve => setTimeout(resolve, ms)
+  );
+}
+
+async function v0826NarrationSequence(
+  lines,
+  {
+    title = "",
+    hold = 1650,
+    firstHold = 1100,
+    lastHold = 1900
+  } = {}
+) {
+  transitionBusy = true;
+  keys.clear();
+  near = null;
+  $("prompt").hidden = true;
+
+  const transition =
+    $("transition");
+
+  const titleEl =
+    $("transitionTitle");
+
+  const hintEl =
+    $("transitionHint");
+
+  titleEl.textContent = title;
+  hintEl.textContent = "";
+  transition.classList.add("active");
+
+  await v0826Pause(firstHold);
+
+  for (
+    let i = 0;
+    i < lines.length;
+    i++
+  ) {
+    const line = lines[i];
+
+    titleEl.textContent =
+      line.title || title;
+
+    hintEl.textContent =
+      line.text || "";
+
+    await v0826Pause(
+      line.hold || hold
+    );
+  }
+
+  await v0826Pause(lastHold);
+
+  transition.classList.remove(
+    "active"
+  );
+
+  transitionBusy = false;
+  keys.clear();
+}
+
+const v0826NewGameBase =
+  newGame;
+
+newGame = function() {
+  state = initial();
+
+  state.protagonistName =
+    "Estevão Lancaster";
+
+  state.protagonistAge = 13;
+  state.brotherAge = 8;
+
+  state.storyFlags =
+    state.storyFlags || {};
+
+  state.storyFlags
+    .progressionByDiscovery = true;
+
+  enterGame();
+
+  state.walk = 0;
+  keys.clear();
+  near = null;
+  $("prompt").hidden = true;
+
+  void (async () => {
+    await v0826NarrationSequence(
+      [
+        {
+          text:
+            "Forgotten não é uma cidade grande.",
+          hold: 1900
+        },
+        {
+          text:
+            "As pessoas aqui se conhecem. Se cumprimentam na rua. Sabem o nome umas das outras — e o nome dos pais, e às vezes até o nome dos avós.",
+          hold: 3300
+        },
+        {
+          text:
+            "É esse tipo de lugar onde nada costuma acontecer.",
+          hold: 2300
+        },
+        {
+          text:
+            "Pelo menos foi isso que eu sempre pensei.",
+          hold: 2600
+        }
+      ],
+      {
+        title:
+          "FORGOTTEN",
+        firstHold: 900,
+        lastHold: 900
+      }
+    );
+
+    $("prompt").hidden = true;
+    updateHud();
+  })();
+};
+
+familyConversation = function() {
+  if (
+    state.familyFarewell ||
+    dialog ||
+    transitionBusy
+  ) {
+    return;
+  }
+
+  state.walk = 0;
+  state.facing = "up";
+  openingStaticUntil =
+    elapsed + 1.8;
+
+  say(
+    [
+      [
+        "Pai",
+        "Filho, fica de olho no seu irmão um pouquinho, tá?"
+      ],
+      ["Estevão", "Tá, pai."],
+      [
+        "Mãe",
+        "Estamos saindo daqui. Não vamos demorar muito."
+      ],
+      [
+        "Pai",
+        "Ah, e se o tio Norberto ligar, fala que eu retorno depois."
+      ],
+      ["Estevão", "Tá."],
+      [
+        "Irmão",
+        "Posso ir junto?"
+      ],
+      [
+        "Pai",
+        "Não hoje, campeão. Vamos comprar as coisas rápido e já voltar."
+      ],
+      [
+        "Mãe",
+        "Deixei uma porção para vocês na cozinha. Fiquem dentro de casa."
+      ],
+      [
+        "Pai",
+        "Qualquer coisa, manda mensagem. O celular está carregado, né?"
+      ],
+      ["Estevão", "Tá."],
+      [
+        "Mãe",
+        "E não deixa seu irmão sair sozinho."
+      ],
+      ["Estevão", "Eu sei."]
+    ],
+    () => {
+      state.familyFarewell = true;
+
+      state.storyFlags =
+        state.storyFlags || {};
+
+      state.storyFlags
+        .norbertoMentioned = true;
+
+      updateHud();
+      save();
+    }
+  );
+};
+
+async function v0826ParentsLeaveTransition() {
+  await v0826NarrationSequence(
+    [
+      {
+        title: "14:05",
+        text:
+          "Eles saíram a pé.",
+        hold: 1800
+      },
+      {
+        title: "14:20",
+        text:
+          "O mercado não ficava longe.",
+        hold: 1800
+      },
+      {
+        title: "18:13",
+        text:
+          "Liguei para minha mãe. Sem sinal.",
+        hold: 2200
+      },
+      {
+        title: "18:14",
+        text:
+          "Meu pai estava fora de área.",
+        hold: 2200
+      },
+      {
+        title: "19:41",
+        text:
+          "Meu irmão perguntou onde eles estavam. Eu disse que provavelmente estavam voltando.",
+        hold: 3000
+      },
+      {
+        title: "22:17",
+        text:
+          "Nenhuma mensagem. Nenhuma ligação.",
+        hold: 2400
+      },
+      {
+        title: "23:00",
+        text:
+          "Meus pais não voltaram.",
+        hold: 3000
+      }
+    ],
+    {
+      firstHold: 700,
+      lastHold: 950
+    }
+  );
+
+  state.minutes = 1380;
+  state.stage = "parents";
+  state.room = "bedroom";
+  state.x = housePoint(180);
+  state.y = housePoint(235);
+  state.facing = "down";
+  state.walk = 0;
+
+  keys.clear();
+  near = null;
+
+  updateHud();
+  save();
+
+  v06Toast(
+    "Verifique o quarto dos seus pais.",
+    4.2
+  );
+}
+
+const v0826InteractBase =
+  interact;
+
+interact = function(action) {
+  prepareSystems();
+
+  if (
+    action === "gate" &&
+    state?.stage ===
+      "prologue" &&
+    state.familyFarewell
+  ) {
+    state.walk = 0;
+    keys.clear();
+
+    void v0826ParentsLeaveTransition();
+
+    return;
+  }
+
+  v0826InteractBase(action);
+};
+
+// ---------------------------------------------------------
+// IDADES CANÔNICAS + DIRETRIZ DE PROGRESSÃO
+// ---------------------------------------------------------
+
+const v0826PrepareBase =
+  prepareSystems;
+
+prepareSystems = function() {
+  v0826PrepareBase();
+
+  if (!state) {
+    return;
+  }
+
+  let changed = false;
+
+  if (
+    state.protagonistName !==
+      "Estevão Lancaster"
+  ) {
+    state.protagonistName =
+      "Estevão Lancaster";
+    changed = true;
+  }
+
+  if (
+    state.protagonistAge !== 13
+  ) {
+    state.protagonistAge = 13;
+    changed = true;
+  }
+
+  if (
+    state.brotherAge !== 8
+  ) {
+    state.brotherAge = 8;
+    changed = true;
+  }
+
+  state.storyFlags =
+    state.storyFlags || {};
+
+  if (
+    state.storyFlags
+      .progressionByDiscovery !==
+      true
+  ) {
+    state.storyFlags
+      .progressionByDiscovery =
+      true;
+    changed = true;
+  }
+
+  // O oeste continua sendo liberado pelo progresso com Osmar,
+  // independentemente do número do dia/noite.
+  if (
+    state.forgottenAlive
+      ?.completed?.osmar ||
+    state.forgottenAlive
+      ?.osmarStage >= 3
+  ) {
+    if (
+      !state.storyFlags
+        .osmarWestUnlocked
+    ) {
+      state.storyFlags
+        .osmarWestUnlocked =
+        true;
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    save();
+  }
+};
+
+// Futuras áreas devem consultar flags de descoberta/progresso;
+// o relógio serve para atmosfera, risco e cenas pontuais,
+// não como trava arbitrária de capítulo.
+
+
+$("version").textContent = "PROTÓTIPO · 0.8.26";
   
   requestAnimationFrame(frame);
   showBootSplash();
