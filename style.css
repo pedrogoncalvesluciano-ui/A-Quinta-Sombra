@@ -417,12 +417,12 @@ h2 {
 
 .journal-book-sprite{
   position:absolute;
-  inset:0;
-  background-image:url("assets/ui/journal/journal-opening.png");
-  background-repeat:no-repeat;
-  background-size:300% 200%;
-  background-position:100% 100%;
-  opacity:.96;
+  inset:12px;
+  border:1px solid #756346;
+  background:
+    linear-gradient(90deg,#c5b18d 0 48%,#927b5a 49% 51%,#c5b18d 52% 100%);
+  box-shadow:inset 0 0 24px #4a3925aa;
+  opacity:.92;
 }
 
 .journal-page-title{
@@ -531,11 +531,37 @@ h2 {
   cursor:pointer;
 }
 
-.journal-card img{
-  display:block;
+.journal-card-placeholder{
+  display:grid;
+  place-items:center;
   width:100%;
-  height:170px;
-  object-fit:cover;
+  min-height:120px;
+  white-space:pre-line;
+  text-align:center;
+  background:#d1bc91;
+  color:#4a3b2b;
+  border:1px solid #8a7353;
+  font:700 12px monospace;
+  letter-spacing:.08em;
+}
+
+.journal-clue-canvas{
+  max-width:460px;
+  min-height:250px;
+  margin:18px auto;
+  padding:28px;
+  background:#d1bc91;
+  color:#3d3125;
+  border:1px solid #8a7353;
+  box-shadow:0 8px 24px #0008;
+  font:13px/1.7 monospace;
+}
+
+.journal-clue-canvas strong{
+  display:block;
+  margin-bottom:22px;
+  text-align:center;
+  letter-spacing:.12em;
 }
 
 /* Abertura do logotipo, antes do menu */
@@ -548,11 +574,13 @@ h2 {
   background: #000;
 }
 #bootLogo {
-  display: block;
-  width: min(80vw, 900px);
-  max-height: 80vh;
-  object-fit: contain;
-  opacity: 0;
+  display:block;
+  opacity:0;
+  color:#d6c4a0;
+  font:700 clamp(30px,7vw,76px) monospace;
+  letter-spacing:.18em;
+  text-align:center;
+  text-shadow:0 0 18px #9a774655;
 }
 
 #bootStatus {
@@ -570,7 +598,6 @@ h2 {
 /* =========================================================
    0.6.27 — COMO JOGAR E CRÉDITOS
    Painéis preparados para receber arte de fundo futuramente.
-   Basta definir --panel-art: url("caminho-da-imagem.png");
    ========================================================= */
 
 #overlay.info-overlay {
