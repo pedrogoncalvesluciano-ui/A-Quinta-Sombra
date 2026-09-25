@@ -2,7 +2,7 @@
 "use strict";
 
 /*
-  A QUINTA SOMBRA — 0.8.18
+  A QUINTA SOMBRA — 0.8.19
 
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
@@ -25675,7 +25675,662 @@ updateHud = function() {
   }
 };
 
-$("version").textContent = "PROTÓTIPO · 0.8.18";
+
+// =========================================================
+// 0.8.19 — INTEGRAÇÃO NARRATIVA DE DIÁLOGOS
+// Reage a escolhas anteriores, pistas conhecidas e contradições.
+// Não cria rotas narrativas paralelas; apenas varia postura,
+// informação e continuidade das conversas existentes.
+// =========================================================
+
+function v0819DialogueFlag(name) {
+  return Boolean(
+    ensureDialogueMemory()?.flags?.[name]
+  );
+}
+
+function v0819Remember(name, value = true) {
+  setDialogueFlag(name, value);
+  save();
+}
+
+const v0819PoliceParentsBase =
+  v0630PoliceParents;
+
+v0630PoliceParents = function() {
+  prepareSystems();
+
+  const knowsMarketMismatch =
+    Boolean(
+      state.memoryFacts?.marketTimeChecked
+    );
+
+  if (
+    knowsMarketMismatch &&
+    !v0819DialogueFlag("policeToldMarketTime")
+  ) {
+    state.policeReportedEvents.parentsDay =
+      state.day;
+
+    state.policeReports.parents =
+      (state.policeReports.parents || 0) + 1;
+
+    say(
+      [
+        ["Você", "Eu descobri uma coisa no mercado."],
+        ["Anísio", "O quê?"],
+        ["Você", "O funcionário lembra dos meus pais chegando quase às quatro. O recibo marca 14:20."],
+        ["Anísio", "Você conferiu o recibo?"],
+        ["Você", "Conferi. Ele também viu."],
+        ["Anísio", "Certo. Isso entra no caso como contradição de horário, não como prova de crime."],
+        ["Anísio", "Mas se mais alguma lembrança não bater com registro físico, me traga."]
+      ],
+      () => {
+        v0819Remember(
+          "policeToldMarketTime"
+        );
+      }
+    );
+
+    return;
+  }
+
+  v0819PoliceParentsBase();
+};
+
+const v0819PoliceContradictionBase =
+  v0650PoliceContradiction;
+
+v0650PoliceContradiction = function() {
+  prepareSystems();
+
+  if (
+    !v0650HasContradiction("policeRecord") &&
+    state.memoryFacts?.marketTimeChecked
+  ) {
+    const employeeTone =
+      v0819DialogueFlag("marketEmployeePressed")
+        ? "pressionou"
+        : v0819DialogueFlag("marketEmployeeObserved")
+          ? "ouviu"
+          : "conferiu";
+
+    say(
+      [
+        ["Você", "Tem outro horário que não fecha."],
+        ["Anísio", "O do mercado? Eu anotei."],
+        ["Você", "Sim. Eu " + employeeTone + " o funcionário e o recibo continuava em 14:20."],
+        ["Anísio", "Então olha isso."],
+        ["Anísio", "Este relatório é do caso dos seus pais. Está assinado por mim e datado de ontem."],
+        ["Você", "E qual é o problema?"],
+        ["Anísio", "Eu não lembro de escrever."],
+        ["Você", "Mas a assinatura é sua."],
+        ["Anísio", "Exatamente."],
+        ["Anísio", "Agora já são duas memórias que não combinam com registros físicos."]
+      ],
+      () => {
+        state.memoryFacts.policeRecordChecked =
+          true;
+
+        v0650RecordContradiction(
+          "policeRecord"
+        );
+      }
+    );
+
+    return;
+  }
+
+  v0819PoliceContradictionBase();
+};
+
+v070OpenMarketMenu = function() {
+  prepareSystems();
+
+  const buttons = [];
+
+  if (
+    state.food <= 0 &&
+    state.money >= V070_FOOD_PRICE
+  ) {
+    buttons.push([
+      "Comprar comida · R$ " + V070_FOOD_PRICE,
+      () => {
+        closeModal();
+
+        state.money -= V070_FOOD_PRICE;
+        state.food = 1;
+
+        say(
+          [
+            ["Funcionário", "Aqui. É o que dá pra levar sem estragar."],
+            ["Você", "Obrigado."]
+          ],
+          () => {
+            updateHud();
+            save();
+          }
+        );
+      }
+    ]);
+  }
+
+  if (state.food > 0) {
+    buttons.push([
+      "Já estou carregando comida",
+      closeModal
+    ]);
+  } else if (state.money < V070_FOOD_PRICE) {
+    buttons.push([
+      "Sem dinheiro suficiente",
+      closeModal
+    ]);
+  }
+
+  const marketChecked =
+    Boolean(
+      state.memoryFacts?.marketTimeChecked
+    );
+
+  buttons.push([
+    marketChecked
+      ? "Rever o horário dos meus pais"
+      : "Perguntar sobre meus pais",
+    () => {
+      closeModal();
+
+      if (!marketChecked) {
+        say([
+          ["Funcionário", "Eles vieram juntos e saíram juntos."],
+          ["Funcionário", "Seu pai perguntou sobre a estrada do sul. Depois disso eu não vi nenhum dos dois."]
+        ]);
+        return;
+      }
+
+      const pressed =
+        v0819DialogueFlag(
+          "marketEmployeePressed"
+        );
+
+      say([
+        [
+          "Você",
+          "Sobre o horário dos meus pais..."
+        ],
+        [
+          "Funcionário",
+          pressed
+            ? "Eu sei. Você tinha razão em insistir. O recibo continua marcando 14:20."
+            : "Eu conferi de novo. O recibo continua marcando 14:20."
+        ],
+        [
+          "Funcionário",
+          "Mas eu ainda lembro de olhar para o relógio e ver quase quatro da tarde."
+        ],
+        [
+          "Você",
+          "Então não é o recibo que está mudando."
+        ],
+        [
+          "Funcionário",
+          "...Não. É isso que me assusta."
+        ]
+      ]);
+    }
+  ]);
+
+  buttons.push(["Sair", closeModal]);
+
+  modal(
+    "Mercado de Forgotten",
+    "Dinheiro: R$ " + state.money,
+    buttons
+  );
+};
+
+const v0819BrotherFlorindaBase =
+  v0650BrotherFlorindaEvidence;
+
+v0650BrotherFlorindaEvidence = function() {
+  prepareSystems();
+
+  const trust =
+    Number(
+      ensureDialogueMemory()?.trust?.brother
+    ) || 0;
+
+  if (
+    !state.chapter8?.brotherEvidenceSeen &&
+    (
+      trust > 0 ||
+      v0819DialogueFlag(
+        "brotherProtectedAfterFootsteps"
+      ) ||
+      v0819DialogueFlag(
+        "brotherQuestionedAboutFootsteps"
+      )
+    )
+  ) {
+    say(
+      [
+        ["Irmão", "Tem uma coisa que eu não te contei."],
+        [
+          "Você",
+          v0819DialogueFlag(
+            "brotherQuestionedAboutFootsteps"
+          )
+            ? "É sobre os passos que você ouviu?"
+            : "Pode falar. Eu vou acreditar em você."
+        ],
+        ["Irmão", "É sobre a Florinda."],
+        ["Irmão", "Ela entra aqui de noite às vezes."],
+        ["Você", "Você viu ela?"],
+        ["Irmão", "Não. Eu ouço a porta e depois os passos subindo."],
+        ["Irmão", "Eu não contei antes porque achei que você ia dizer que eu estava imaginando."]
+      ],
+      () => {
+        state.chapter8.brotherEvidenceSeen =
+          true;
+
+        adjustDialogueTrust(
+          "brother",
+          1
+        );
+
+        v0819Remember(
+          "brotherSharedFlorindaBecauseTrusted"
+        );
+
+        updateHud();
+      }
+    );
+
+    return;
+  }
+
+  v0819BrotherFlorindaBase();
+};
+
+const v0819ConfrontFlorindaBase =
+  v0650ConfrontFlorinda;
+
+v0650ConfrontFlorinda = function() {
+  prepareSystems();
+
+  if (
+    !state.chapter8?.florindaConfronted &&
+    state.chapter8?.brotherEvidenceSeen &&
+    v0650EnsureInvestigationLog()
+      .contradictions.length >= 3 &&
+    !v0819DialogueFlag(
+      "florindaApproachChosen"
+    )
+  ) {
+    sayChoice({
+      id: "florinda-confrontation",
+      speaker: "Florinda",
+      text: "Você veio aqui por causa do que seu irmão contou, não foi?",
+      choices: [
+        {
+          id: "protect-brother",
+          label: "Não coloca meu irmão no meio disso. Fala comigo.",
+          tone: "PROTEGER",
+          effect: () => {
+            adjustDialogueTrust(
+              "brother",
+              1
+            );
+
+            setDialogueFlag(
+              "florindaApproachChosen",
+              "protect"
+            );
+          },
+          next: [
+            [
+              "Florinda",
+              "Certo. Ele não tem culpa de nada."
+            ]
+          ]
+        },
+        {
+          id: "press-florinda",
+          label: "Você entra na nossa casa à noite. Eu quero saber por quê.",
+          tone: "PRESSIONAR",
+          effect: () => {
+            setDialogueFlag(
+              "florindaApproachChosen",
+              "press"
+            );
+          },
+          next: [
+            [
+              "Florinda",
+              "Porque eu prometi que não deixaria vocês dois sozinhos quando isso acontecesse."
+            ]
+          ]
+        },
+        {
+          id: "observe-florinda",
+          label: "Eu já tenho pistas. Só quero ver se a sua versão combina.",
+          tone: "OBSERVAR",
+          effect: () => {
+            setDialogueFlag(
+              "florindaApproachChosen",
+              "observe"
+            );
+          },
+          next: [
+            [
+              "Florinda",
+              "...Então você aprendeu a não confiar só na memória."
+            ]
+          ]
+        }
+      ],
+      after: () => {
+        v0819ConfrontFlorindaBase();
+      }
+    });
+
+    return;
+  }
+
+  v0819ConfrontFlorindaBase();
+};
+
+const v0819RaimundoSplitBase =
+  v0650RaimundoSplitReveal;
+
+v0650RaimundoSplitReveal = function() {
+  prepareSystems();
+
+  if (
+    !state.chapter8?.splitRevealSeen &&
+    (state.policeReports?.oldMan || 0) > 0
+  ) {
+    say(
+      [
+        ["Você", "A polícia disse que você trabalhou na mina."],
+        ["Raimundo", "Trabalhei. E é por isso que seu sobrenome me incomoda desde que você apareceu."],
+        ["Você", "Lancaster?"],
+        ["Raimundo", "Há quarenta anos, o chefe de lá tinha esse nome."],
+        ["Raimundo", "Split Lancaster."],
+        ["Você", "Parente meu?"],
+        ["Raimundo", "Não sei. Mas naquela cidade, naquela época, esse nome não era comum."],
+        ["Raimundo", "E depois do desabamento, muita gente preferiu esquecer que ele existiu."]
+      ],
+      () => {
+        state.chapter8.splitRevealSeen =
+          true;
+
+        v0650EnsureInvestigationLog()
+          .keyClues.splitReveal = true;
+
+        v0819Remember(
+          "raimundoLinkedPoliceMineInfo"
+        );
+
+        v06Toast(
+          "Nome registrado: Split Lancaster.",
+          2.2
+        );
+
+        updateHud();
+      }
+    );
+
+    return;
+  }
+
+  v0819RaimundoSplitBase();
+};
+
+v086BrotherNight1Choice = function() {
+  prepareSystems();
+
+  say(
+    [
+      ["Irmão", "A polícia achou eles?"],
+      ["Você", "Ainda não."],
+      ["Irmão", "Eles vão voltar, né?"]
+    ],
+    () => {
+      sayChoice({
+        id: "brother-night-1",
+        speaker: "Irmão",
+        text: "Eles vão voltar, né?",
+        choices: [
+          {
+            id: "reassure",
+            label: "Eles só atrasaram. Vão voltar.",
+            tone: "PROTEGER",
+            effect: () => {
+              state.day1Extra.brotherChoice =
+                "reassure";
+
+              if (state.relationship) {
+                state.relationship.brotherCare +=
+                  1;
+              }
+
+              adjustDialogueTrust(
+                "brother",
+                1
+              );
+            },
+            next: [
+              ["Você", "Eles só atrasaram. Vão voltar."],
+              ["Irmão", "Você promete?"],
+              ["Você", "...Eu vou ficar aqui com você."]
+            ]
+          },
+          {
+            id: "honest",
+            label: "Eu não sei. Mas eu tô aqui.",
+            tone: "HONESTO",
+            effect: () => {
+              state.day1Extra.brotherChoice =
+                "honest";
+
+              if (state.relationship) {
+                state.relationship.brotherCare +=
+                  1;
+                state.relationship.brotherTrust +=
+                  1;
+              }
+
+              adjustDialogueTrust(
+                "brother",
+                1
+              );
+
+              setDialogueFlag(
+                "brotherNight1Honest"
+              );
+            },
+            next: [
+              ["Você", "Eu não sei. Mas eu tô aqui com você."],
+              ["Irmão", "Eu tô com medo."],
+              ["Você", "Eu também. A gente vai fazer isso junto."]
+            ]
+          },
+          {
+            id: "distant",
+            label: "A polícia está procurando. Tenta dormir.",
+            tone: "EVITAR",
+            effect: () => {
+              state.day1Extra.brotherChoice =
+                "distant";
+
+              if (state.relationship) {
+                state.relationship.brotherNeglect +=
+                  1;
+                state.relationship.brotherTrust -=
+                  1;
+              }
+
+              adjustDialogueTrust(
+                "brother",
+                -1
+              );
+            },
+            next: [
+              ["Você", "A polícia está procurando. Tenta dormir."],
+              ["Irmão", "Tá..."],
+              ["Você", "Eu vou estar por perto."]
+            ]
+          }
+        ],
+        after: v086AskBrotherLamp
+      });
+    }
+  );
+};
+
+const v0819BrotherWarnFatherBase =
+  v0650BrotherWarnsAboutFather;
+
+v0650BrotherWarnsAboutFather = function() {
+  prepareSystems();
+
+  if (
+    !state.chapter7?.brotherWarned &&
+    chapter()?.clues?.includes("photo")
+  ) {
+    const trusted =
+      (Number(
+        ensureDialogueMemory()?.trust?.brother
+      ) || 0) > 0;
+
+    say(
+      [
+        ["Irmão", "Ele voltou."],
+        ["Você", "Eu vi."],
+        ["Irmão", "Não fala como se estivesse tudo bem."],
+        ["Você", "Por quê?"],
+        ["Irmão", "Ele não perguntou onde eu estava. Ele sempre pergunta primeiro."],
+        [
+          "Irmão",
+          trusted
+            ? "Você disse que ia me ouvir quando alguma coisa parecesse errada."
+            : "Eu sei que parece pouca coisa. Mas tá errado."
+        ]
+      ],
+      () => {
+        sayChoice({
+          id: "father-return-brother-warning",
+          speaker: "Irmão",
+          text: "Compara ele com a fotografia. Agora.",
+          choices: [
+            {
+              id: "believe",
+              label: "Eu acredito em você. Vou conferir a foto.",
+              tone: "PROTEGER",
+              effect: () => {
+                adjustDialogueTrust(
+                  "brother",
+                  1
+                );
+
+                setDialogueFlag(
+                  "brotherBelievedAboutCopy"
+                );
+              },
+              next: [
+                [
+                  "Irmão",
+                  "Não pergunta nada primeiro. Só olha."
+                ]
+              ]
+            },
+            {
+              id: "verify",
+              label: "Eu vou conferir, mas preciso ter certeza.",
+              tone: "INVESTIGAR",
+              effect: () => {
+                setDialogueFlag(
+                  "brotherCopyWarningVerified"
+                );
+              },
+              next: [
+                [
+                  "Irmão",
+                  "Tudo bem. Só não demora."
+                ]
+              ]
+            }
+          ],
+          after: () => {
+            state.chapter7.brotherWarned =
+              true;
+
+            state.copyFather.phase =
+              "suspect";
+
+            updateHud();
+            save();
+          }
+        });
+      }
+    );
+
+    return;
+  }
+
+  v0819BrotherWarnFatherBase();
+};
+
+const v0819CompareFatherPhotoBase =
+  v0650CompareFatherPhoto;
+
+v0650CompareFatherPhoto = function() {
+  prepareSystems();
+
+  if (
+    state.copyFather?.phase === "suspect" &&
+    chapter()?.clues?.includes("photo") &&
+    v0819DialogueFlag(
+      "brotherBelievedAboutCopy"
+    )
+  ) {
+    say(
+      [
+        ["Você", "Pai... olha essa foto."],
+        ["Pai", "Agora não, Estevão."],
+        ["Você", "Meu irmão percebeu uma coisa antes de mim."],
+        ["Pai", "Ele está assustado."],
+        ["Você", "Então responde. Onde essa foto foi tirada?"],
+        ["Pai", "Na praça."],
+        ["Você", "Não foi."],
+        ["Pai", "..."],
+        ["Você", "Foi perto da escada. E você só procurou a resposta depois que eu perguntei."],
+        ["Pai", "Guarda essa foto."],
+        ["Você", "Quem é você?"],
+        ["Pai", "Você não devia ter escutado ele."]
+      ],
+      () => {
+        state.chapter7.photoCompared =
+          true;
+
+        v0650EnsureInvestigationLog()
+          .keyClues.photoCopy = true;
+
+        v0650CopyStaticUntil =
+          elapsed + 1.1;
+
+        v0650StartFatherChase();
+      }
+    );
+
+    return;
+  }
+
+  v0819CompareFatherPhotoBase();
+};
+
+
+$("version").textContent = "PROTÓTIPO · 0.8.19";
   
   requestAnimationFrame(frame);
   showBootSplash();
