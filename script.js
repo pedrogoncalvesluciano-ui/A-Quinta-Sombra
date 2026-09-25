@@ -2,7 +2,7 @@
 "use strict";
 
 /*
-  A QUINTA SOMBRA — 0.8.19
+  A QUINTA SOMBRA — 0.8.20
 
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
@@ -26330,7 +26330,716 @@ v0650CompareFatherPhoto = function() {
 };
 
 
-$("version").textContent = "PROTÓTIPO · 0.8.19";
+
+// =========================================================
+// 0.8.20 — PÓS-RUA OESTE
+// Preenche o intervalo narrativo entre o fim da Rua Oeste e
+// a abertura do próximo bloco principal no dia 8.
+// Mais falas, mensagens e reações sem alterar a cronologia.
+// =========================================================
+
+V081_BROTHER_SCENES.westReturn = {
+  incoming:
+    "Você voltou? Eu ouvi sirene longe e depois ficou tudo quieto. Quieto demais.",
+  options: [
+    {
+      text: "Voltei. Tranca a porta e não abre pra ninguém.",
+      reply: "Tá. Mas me conta o que aconteceu quando você entrar no quarto.",
+      care: 1,
+      trust: 1
+    },
+    {
+      text: "A polícia já sabe. Fica tranquilo por enquanto.",
+      reply: "Quando você fala 'por enquanto' eu fico menos tranquilo.",
+      care: 1,
+      trust: 0
+    },
+    {
+      text: "Não foi nada. Depois eu explico.",
+      reply: "Você sempre fala isso quando foi alguma coisa.",
+      care: 0,
+      trust: -1
+    }
+  ]
+};
+
+V081_BROTHER_SCENES.westPolice = {
+  incoming:
+    "A polícia acreditou em você? Sobre o que tinha na Rua Oeste.",
+  options: [
+    {
+      text: "Acreditaram no que eu vi. Ainda estão verificando o resto.",
+      reply: "Então pelo menos não parece que você inventou tudo.",
+      care: 0,
+      trust: 1
+    },
+    {
+      text: "Eles registraram. Eu não sei no que eles acreditam.",
+      reply: "Isso parece resposta de adulto quando não quer responder.",
+      care: 0,
+      trust: 0
+    },
+    {
+      text: "Não quero falar disso por mensagem.",
+      reply: "Tá. Só não esquece de falar comigo depois.",
+      care: 0,
+      trust: -1
+    }
+  ]
+};
+
+V081_BROTHER_SCENES.westNight = {
+  incoming:
+    "Não consigo dormir. Toda vez que passa um carro eu acho que ele vai parar aqui.",
+  options: [
+    {
+      text: "Se ouvir alguém na porta, me chama antes de chegar perto.",
+      reply: "Eu vou chamar. E vou ficar longe da janela também.",
+      care: 1,
+      trust: 1
+    },
+    {
+      text: "Deixa a luz acesa. Hoje não precisa tentar ser corajoso.",
+      reply: "Eu não tava tentando... mas obrigado.",
+      care: 1,
+      trust: 1
+    },
+    {
+      text: "Tenta dormir. Amanhã a gente pensa nisso.",
+      reply: "Tá. Mas amanhã você não foge da conversa.",
+      care: 0,
+      trust: 0
+    }
+  ]
+};
+
+V081_BROTHER_SCENES.westMorning = {
+  incoming:
+    "Acordei lembrando de uma coisa. Antes dos nossos pais sumirem, a mãe fechou a cortina da sala no meio da tarde. Ela nunca fazia isso.",
+  options: [
+    {
+      text: "Você tem certeza que foi naquele dia?",
+      reply: "Tenho. Eu tava procurando meu carrinho e ela mandou eu sair da sala.",
+      care: 0,
+      trust: 1
+    },
+    {
+      text: "Vou anotar. Se lembrar de outro detalhe, me manda.",
+      reply: "Tá. Eu tô tentando lembrar sem inventar.",
+      care: 1,
+      trust: 1
+    },
+    {
+      text: "Pode ser só coincidência.",
+      reply: "Pode. Mas você vive dizendo pra eu contar quando alguma coisa parece errada.",
+      care: 0,
+      trust: -1
+    }
+  ]
+};
+
+function v0820EnsurePostWest() {
+  if (!state) return null;
+
+  if (
+    !state.postWestBridge ||
+    typeof state.postWestBridge !== "object"
+  ) {
+    state.postWestBridge = {};
+  }
+
+  const p = state.postWestBridge;
+
+  if (!Number.isFinite(p.startedDay)) {
+    p.startedDay = -1;
+  }
+
+  for (const key of [
+    "brotherTalks",
+    "policeTalks",
+    "florindaTalks",
+    "raimundoTalks",
+    "marketTalks"
+  ]) {
+    if (!Number.isFinite(p[key])) {
+      p[key] = 0;
+    }
+  }
+
+  if (!Array.isArray(p.queuedScenes)) {
+    p.queuedScenes = [];
+  }
+
+  if (!Array.isArray(p.notes)) {
+    p.notes = [];
+  }
+
+  if (typeof p.started !== "boolean") {
+    p.started = false;
+  }
+
+  if (typeof p.finished !== "boolean") {
+    p.finished = false;
+  }
+
+  if (
+    state.storyFlags?.chapter4Complete &&
+    !p.started
+  ) {
+    p.started = true;
+    p.startedDay = state.day;
+  }
+
+  return p;
+}
+
+function v0820PostWestActive() {
+  const p = v0820EnsurePostWest();
+
+  return Boolean(
+    state &&
+    p?.started &&
+    !p.finished &&
+    state.stage !== "prologue" &&
+    state.storyFlags?.chapter4Complete &&
+    state.day < 8
+  );
+}
+
+function v0820QueueBrotherScene(id) {
+  const p = v0820EnsurePostWest();
+
+  if (
+    !p ||
+    !V081_BROTHER_SCENES[id] ||
+    p.queuedScenes.includes(id) ||
+    state.phone?.resolvedBrotherScenes?.includes(id) ||
+    state.phone?.pendingBrotherScenes?.includes(id) ||
+    state.phone?.activeBrotherScene === id
+  ) {
+    return false;
+  }
+
+  p.queuedScenes.push(id);
+
+  if (
+    state.phone &&
+    Array.isArray(
+      state.phone.pendingBrotherScenes
+    )
+  ) {
+    state.phone.pendingBrotherScenes.push(id);
+  }
+
+  save();
+  return true;
+}
+
+function v0820AddNote(text) {
+  const p = v0820EnsurePostWest();
+
+  if (
+    p &&
+    text &&
+    !p.notes.includes(text)
+  ) {
+    p.notes.push(text);
+    save();
+  }
+}
+
+const v0820PrepareBase = prepareSystems;
+prepareSystems = function() {
+  v0820PrepareBase();
+
+  if (!state) return;
+
+  const p = v0820EnsurePostWest();
+
+  if (
+    state.day >= 8 &&
+    p?.started
+  ) {
+    p.finished = true;
+  }
+};
+
+function v0820SeedPostWestMessages() {
+  if (!v0820PostWestActive()) return;
+
+  const p = v0820EnsurePostWest();
+
+  v0820QueueBrotherScene("westReturn");
+
+  if (p.policeTalks > 0) {
+    v0820QueueBrotherScene("westPolice");
+  }
+
+  if (
+    p.brotherTalks > 0 ||
+    p.florindaTalks > 0
+  ) {
+    v0820QueueBrotherScene("westNight");
+  }
+
+  if (
+    state.day > p.startedDay
+  ) {
+    v0820QueueBrotherScene("westMorning");
+  }
+}
+
+function v0820TalkBrotherAfterWest() {
+  const p = v0820EnsurePostWest();
+  const index = p.brotherTalks % 4;
+
+  const variants = [
+    [
+      ["Irmão", "Você tá diferente desde que voltou."],
+      ["Você", "Diferente como?"],
+      ["Irmão", "Você fica olhando pra porta antes de responder."],
+      ["Você", "Eu só tô pensando."],
+      ["Irmão", "Na Rua Oeste?"],
+      ["Você", "...Também."]
+    ],
+    [
+      ["Irmão", "Aquele homem te viu?"],
+      ["Você", "Viu."],
+      ["Irmão", "Então ele sabe onde você mora?"],
+      ["Você", "Eu não sei."],
+      ["Irmão", "Essa resposta foi pior que sim."]
+    ],
+    [
+      ["Irmão", "Se a polícia pegou o homem, acabou?"],
+      ["Você", "Não sei se ele era o problema."],
+      ["Irmão", "Então por que ele correu atrás de você?"],
+      ["Você", "Talvez porque estivesse escondendo outra coisa."],
+      ["Irmão", "Aqui todo mundo parece esconder outra coisa."]
+    ],
+    [
+      ["Irmão", "Você vai sair de novo hoje?"],
+      ["Você", "Provavelmente."],
+      ["Irmão", "Então pelo menos fala pra onde vai."],
+      ["Você", "Eu aviso."],
+      ["Irmão", "De verdade, não depois que voltar."]
+    ]
+  ];
+
+  p.brotherTalks += 1;
+
+  if (index === 0) {
+    adjustDialogueTrust(
+      "brother",
+      1
+    );
+  }
+
+  say(
+    variants[index],
+    () => {
+      v0820AddNote(
+        "Meu irmão percebeu que eu voltei da Rua Oeste mais atento à porta e aos sons da casa."
+      );
+      v0820SeedPostWestMessages();
+      updateHud();
+      save();
+    }
+  );
+}
+
+const v0820PoliceBodyBase = v0649PoliceBody;
+v0649PoliceBody = function() {
+  prepareSystems();
+
+  if (
+    state.chapter4?.bodyReported &&
+    v0820PostWestActive()
+  ) {
+    const p = v0820EnsurePostWest();
+    const index = p.policeTalks % 4;
+
+    const variants = [
+      [
+        ["Você", "Descobriram quem era a pessoa da Rua Oeste?"],
+        ["Anísio", "Ainda estamos confirmando a identidade."],
+        ["Você", "E Garcia?"],
+        ["Anísio", "Foi localizado. Antes de chamar alguém de assassino, eu preciso separar o que ele fez do que você acha que ele fez."],
+        ["Você", "Ele correu atrás de mim."],
+        ["Anísio", "Eu sei. Isso também está no registro."]
+      ],
+      [
+        ["Você", "Tem alguma novidade da Rua Oeste?"],
+        ["Anísio", "Tem uma coisa estranha."],
+        ["Você", "O quê?"],
+        ["Anísio", "Dois moradores dizem que não ouviram perseguição nenhuma."],
+        ["Você", "Ele estava correndo atrás de mim no meio da rua."],
+        ["Anísio", "Eu não disse que não aconteceu. Eu disse que ninguém lembra de ter ouvido."]
+      ],
+      [
+        ["Você", "Você acredita que Garcia estava sozinho?"],
+        ["Anísio", "Acredito no que consigo provar."],
+        ["Você", "Isso não respondeu."],
+        ["Anísio", "Exatamente."]
+      ],
+      [
+        ["Anísio", "Não tenho atualização nova."],
+        ["Anísio", "Mas escrevi tudo duas vezes, em lugares diferentes."],
+        ["Você", "Por quê?"],
+        ["Anísio", "Porque ultimamente eu prefiro conferir papel com papel."]
+      ]
+    ];
+
+    p.policeTalks += 1;
+
+    say(
+      variants[index],
+      () => {
+        if (index === 1) {
+          v0820AddNote(
+            "Moradores próximos da Rua Oeste dizem não lembrar de ouvir a perseguição."
+          );
+        }
+
+        v0820SeedPostWestMessages();
+        updateHud();
+        save();
+      }
+    );
+
+    return;
+  }
+
+  v0820PoliceBodyBase();
+};
+
+function v0820TalkFlorindaAfterWest() {
+  const p = v0820EnsurePostWest();
+  const index = p.florindaTalks % 4;
+
+  const variants = [
+    [
+      ["Florinda", "Seu rosto ainda está pálido."],
+      ["Você", "Você sabia que tinha alguma coisa naquela rua."],
+      ["Florinda", "Eu sabia que aquela parte da cidade não fica igual depois de certa hora."],
+      ["Você", "Isso não é uma resposta."],
+      ["Florinda", "É a única que eu consigo dar sem mentir."]
+    ],
+    [
+      ["Você", "Por que você falou das sete horas?"],
+      ["Florinda", "Porque sua mãe também falava."],
+      ["Você", "Minha mãe?"],
+      ["Florinda", "...Eu falei demais."],
+      ["Você", "Não. Falou de menos."],
+      ["Florinda", "Ainda não."]
+    ],
+    [
+      ["Florinda", "Seu irmão veio perguntar se você podia morrer na rua."],
+      ["Você", "Ele perguntou isso pra você?"],
+      ["Florinda", "Perguntou."],
+      ["Florinda", "Talvez você devesse contar um pouco mais pra ele. Criança percebe quando a gente esconde medo."]
+    ],
+    [
+      ["Você", "A Rua Oeste sempre foi daquele jeito?"],
+      ["Florinda", "Não."],
+      ["Você", "Quando mudou?"],
+      ["Florinda", "Essa é a parte ruim."],
+      ["Você", "Qual?"],
+      ["Florinda", "Eu lembro de três respostas diferentes."]
+    ]
+  ];
+
+  p.florindaTalks += 1;
+
+  say(
+    variants[index],
+    () => {
+      if (index === 1) {
+        v0820AddNote(
+          "Florinda deixou escapar que minha mãe também falava sobre não ficar fora perto das sete."
+        );
+      }
+
+      v0820SeedPostWestMessages();
+      updateHud();
+      save();
+    }
+  );
+}
+
+function v0820TalkRaimundoAfterWest() {
+  const p = v0820EnsurePostWest();
+  const index = p.raimundoTalks % 4;
+
+  const variants = [
+    [
+      ["Raimundo", "Você foi pro oeste."],
+      ["Você", "Como todo mundo sabe disso?"],
+      ["Raimundo", "Cidade pequena."],
+      ["Você", "Não tinha ninguém lá."],
+      ["Raimundo", "Cidade pequena não precisa de gente olhando pra notícia correr."]
+    ],
+    [
+      ["Você", "Encontrei um corpo naquela rua."],
+      ["Raimundo", "Corpo é problema de polícia."],
+      ["Você", "E o resto?"],
+      ["Raimundo", "O resto é o motivo de eu ter mandado você prestar atenção na mina."]
+    ],
+    [
+      ["Raimundo", "Seu pai fazia perguntas demais."],
+      ["Você", "Sobre a Rua Oeste?"],
+      ["Raimundo", "Sobre lugares que a cidade prefere tratar como se não existissem."],
+      ["Você", "Ele veio falar com você?"],
+      ["Raimundo", "Veio. Só não lembro se foi uma vez ou duas."]
+    ],
+    [
+      ["Você", "Você também está esquecendo coisas?"],
+      ["Raimundo", "Esquecer é normal."],
+      ["Você", "E lembrar de duas versões?"],
+      ["Raimundo", "Aí é Forgotten."]
+    ]
+  ];
+
+  p.raimundoTalks += 1;
+
+  say(
+    variants[index],
+    () => {
+      if (index === 2) {
+        v0820AddNote(
+          "Raimundo diz que meu pai investigava lugares que Forgotten prefere ignorar."
+        );
+      }
+
+      v0820SeedPostWestMessages();
+      updateHud();
+      save();
+    }
+  );
+}
+
+function v0820TalkMarketAfterWest() {
+  const p = v0820EnsurePostWest();
+  const index = p.marketTalks % 4;
+
+  const variants = [
+    [
+      ["Funcionário", "A polícia passou aqui perguntando da Rua Oeste."],
+      ["Você", "O que eles queriam saber?"],
+      ["Funcionário", "Se alguém estranho tinha comprado alguma coisa antes de ir pra lá."],
+      ["Você", "E tinha?"],
+      ["Funcionário", "Eu ia dizer que não. Aí percebi que não lembro de ontem inteiro."]
+    ],
+    [
+      ["Você", "Você conhece Garcia?"],
+      ["Funcionário", "De vista."],
+      ["Você", "Ele vem aqui?"],
+      ["Funcionário", "Às vezes."],
+      ["Você", "Quando foi a última vez?"],
+      ["Funcionário", "...Eu consigo lembrar dele aqui hoje e também lembrar que não veio."]
+    ],
+    [
+      ["Funcionário", "Você começou a anotar tudo, né?"],
+      ["Você", "Comecei."],
+      ["Funcionário", "Continua."],
+      ["Você", "Por quê?"],
+      ["Funcionário", "Porque eu escrevi uma lista de estoque ontem e hoje tem coisa riscada com a minha letra que eu não lembro de riscar."]
+    ],
+    [
+      ["Você", "Alguma coisa mudou desde ontem?"],
+      ["Funcionário", "A placa de preço daquela prateleira."],
+      ["Você", "Mudou quanto?"],
+      ["Funcionário", "Não é o preço."],
+      ["Funcionário", "É que eu lembro dela sempre ter ficado do outro lado."]
+    ]
+  ];
+
+  p.marketTalks += 1;
+
+  say(
+    variants[index],
+    () => {
+      if (index === 2) {
+        v0820AddNote(
+          "O funcionário encontrou alterações na própria lista de estoque que não lembra de ter feito."
+        );
+      }
+
+      v0820SeedPostWestMessages();
+      updateHud();
+      save();
+    }
+  );
+}
+
+const v0820InteractBase = interact;
+interact = function(action) {
+  prepareSystems();
+
+  if (v0820PostWestActive()) {
+    const p = v0820EnsurePostWest();
+
+    if (
+      action === "brother" &&
+      !state.pendingBrotherRemark &&
+      !dangerActive()
+    ) {
+      v0820TalkBrotherAfterWest();
+      return;
+    }
+
+    if (
+      action === "vendor" &&
+      state.food > 0 &&
+      state.storyFlags?.florindaChapter4ConcernSeen
+    ) {
+      v0820TalkFlorindaAfterWest();
+      return;
+    }
+
+    if (
+      action === "oldManTalk" &&
+      state.storyFlags?.raimundoMet
+    ) {
+      v0820TalkRaimundoAfterWest();
+      return;
+    }
+
+    if (
+      action === "marketClerk" &&
+      state.storyFlags?.marketParentsConfirmed
+    ) {
+      v0820TalkMarketAfterWest();
+      return;
+    }
+
+    if (
+      action === "policeOfficer" &&
+      state.chapter4?.bodyReported &&
+      p.policeTalks === 0
+    ) {
+      v0649PoliceBody();
+      return;
+    }
+  }
+
+  v0820InteractBase(action);
+};
+
+const v0820OpenNotesBase = v081OpenNotes;
+v081OpenNotes = function() {
+  v0820OpenNotesBase();
+
+  const p = state?.postWestBridge;
+
+  if (
+    !p?.notes?.length ||
+    !$("overlay").classList.contains(
+      "phone-overlay"
+    )
+  ) {
+    return;
+  }
+
+  const screen =
+    $("modalText")
+      .querySelector(".phone-screen");
+
+  if (!screen) return;
+
+  v081AppendNoteSection(
+    screen,
+    "DEPOIS DA RUA OESTE",
+    p.notes
+  );
+};
+
+const v0820UpdateBase = update;
+update = function(dt) {
+  v0820UpdateBase(dt);
+
+  if (
+    !state ||
+    mode !== "game" ||
+    dialog ||
+    transitionBusy ||
+    state.gameOver
+  ) {
+    return;
+  }
+
+  if (v0820PostWestActive()) {
+    v0820SeedPostWestMessages();
+
+    const p = v0820EnsurePostWest();
+
+    if (
+      p.brotherTalks > 0 &&
+      p.policeTalks > 0 &&
+      p.florindaTalks > 0 &&
+      p.raimundoTalks > 0 &&
+      p.marketTalks > 0
+    ) {
+      p.finished = true;
+
+      v06Toast(
+        "Você reuniu novas versões sobre o que aconteceu depois da Rua Oeste.",
+        2.7
+      );
+
+      save();
+    }
+  }
+};
+
+const v0820HudBase = updateHud;
+updateHud = function() {
+  v0820HudBase();
+
+  if (
+    !state ||
+    !v0820PostWestActive()
+  ) {
+    return;
+  }
+
+  const p = v0820EnsurePostWest();
+
+  if (p.brotherTalks === 0) {
+    $("objective").textContent =
+      "Volte para casa e converse com seu irmão sobre a Rua Oeste.";
+    return;
+  }
+
+  if (p.policeTalks === 0) {
+    $("objective").textContent =
+      "Pergunte na delegacia se descobriram algo novo sobre a Rua Oeste.";
+    return;
+  }
+
+  if (p.florindaTalks === 0) {
+    $("objective").textContent =
+      "Converse novamente com Florinda. Ela parece saber mais do que contou.";
+    return;
+  }
+
+  if (p.raimundoTalks === 0) {
+    $("objective").textContent =
+      "Pergunte a Raimundo o que ele sabe sobre a parte oeste de Forgotten.";
+    return;
+  }
+
+  if (p.marketTalks === 0) {
+    $("objective").textContent =
+      "Passe no mercado. Veja se alguma lembrança mudou depois do ocorrido.";
+    return;
+  }
+
+  $("objective").textContent =
+    "As versões não combinam. Continue registrando detalhes e descanse quando puder.";
+};
+
+
+$("version").textContent = "PROTÓTIPO · 0.8.20";
   
   requestAnimationFrame(frame);
   showBootSplash();
