@@ -2,7 +2,7 @@
 "use strict";
 
 /*
-  A QUINTA SOMBRA — 0.8.24
+  A QUINTA SOMBRA — 0.8.25
 
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
@@ -27481,7 +27481,1223 @@ updateHud = function() {
 };
 
 
-$("version").textContent = "PROTÓTIPO · 0.8.24";
+
+// =========================================================
+// 0.8.25 — MENUS DE ASSUNTO + OSMAR + OESTE + LUZ DO CELULAR
+// =========================================================
+
+// ---------------------------------------------------------
+// MENU DE ASSUNTOS COM O MESMO VISUAL DE sayChoice
+// Até duas opções de assunto por página + navegação.
+// ---------------------------------------------------------
+
+function v0825OpenTopicMenu({
+  id,
+  speaker,
+  text,
+  topics,
+  page = 0
+}) {
+  const available =
+    (topics || []).filter(
+      item =>
+        item &&
+        item.label &&
+        typeof item.run === "function"
+    );
+
+  if (!available.length) {
+    return;
+  }
+
+  const pageSize = 2;
+  const pageCount =
+    Math.max(
+      1,
+      Math.ceil(
+        available.length / pageSize
+      )
+    );
+
+  const safePage =
+    Math.max(
+      0,
+      Math.min(
+        page,
+        pageCount - 1
+      )
+    );
+
+  const start =
+    safePage * pageSize;
+
+  const visible =
+    available.slice(
+      start,
+      start + pageSize
+    );
+
+  let selectedAction = null;
+
+  const choices =
+    visible.map(
+      (topic, index) => ({
+        id:
+          topic.id ||
+          "topic-" +
+          (start + index + 1),
+        label: topic.label,
+        tone:
+          topic.tone ||
+          "CONVERSAR",
+        effect: () => {
+          selectedAction =
+            topic.run;
+        }
+      })
+    );
+
+  if (pageCount > 1) {
+    if (safePage > 0) {
+      choices.push({
+        id: "previous-page",
+        label: "Voltar aos assuntos anteriores",
+        tone: "VOLTAR",
+        effect: () => {
+          selectedAction = () =>
+            v0825OpenTopicMenu({
+              id,
+              speaker,
+              text,
+              topics: available,
+              page: safePage - 1
+            });
+        }
+      });
+    } else {
+      choices.push({
+        id: "next-page",
+        label: "Ver mais assuntos",
+        tone: "MAIS",
+        effect: () => {
+          selectedAction = () =>
+            v0825OpenTopicMenu({
+              id,
+              speaker,
+              text,
+              topics: available,
+              page: safePage + 1
+            });
+        }
+      });
+    }
+
+    if (
+      safePage > 0 &&
+      safePage < pageCount - 1
+    ) {
+      choices.push({
+        id: "next-page",
+        label: "Ver mais assuntos",
+        tone: "MAIS",
+        effect: () => {
+          selectedAction = () =>
+            v0825OpenTopicMenu({
+              id,
+              speaker,
+              text,
+              topics: available,
+              page: safePage + 1
+            });
+        }
+      });
+    } else if (
+      safePage === pageCount - 1
+    ) {
+      choices.push({
+        id: "close-topics",
+        label: "Encerrar conversa",
+        tone: "SAIR",
+        effect: () => {
+          selectedAction = null;
+        }
+      });
+    }
+  } else {
+    choices.push({
+      id: "close-topics",
+      label: "Encerrar conversa",
+      tone: "SAIR",
+      effect: () => {
+        selectedAction = null;
+      }
+    });
+  }
+
+  sayChoice({
+    id:
+      id +
+      "-page-" +
+      safePage,
+    speaker,
+    text:
+      text ||
+      "Sobre o que você quer falar?",
+    choices,
+    after: () => {
+      const fn =
+        selectedAction;
+
+      selectedAction = null;
+
+      if (
+        typeof fn === "function"
+      ) {
+        fn();
+      }
+    }
+  });
+}
+
+function v0825PoliceTopics() {
+  prepareSystems();
+
+  const topics = [
+    {
+      id: "parents",
+      label: "Falar dos meus pais",
+      tone: "INVESTIGAR",
+      run: v0630PoliceParents
+    }
+  ];
+
+  if (
+    state.storyFlags?.squareObserverSeen
+  ) {
+    topics.push({
+      id: "observer",
+      label:
+        state.storyFlags
+          .squareObserverReported
+          ? "Falar novamente do vulto"
+          : "Falar do vulto preto",
+      tone: "RELATAR",
+      run: v077PoliceObserverReport
+    });
+  }
+
+  if (
+    state.storyEvents
+      .oldManEncounters > 0
+  ) {
+    topics.push({
+      id: "raimundo",
+      label: "Falar do Raimundo",
+      tone: "PERGUNTAR",
+      run: v0630PoliceOldMan
+    });
+  }
+
+  const unreportedVan =
+    state.storyEvents
+      .vanSightings >
+    state.policeReportedEvents
+      .vanSightings;
+
+  if (
+    unreportedVan &&
+    state.day1Extra?.vanWitnessed
+  ) {
+    topics.push({
+      id: "van",
+      label: "Falar da van",
+      tone: "RELATAR",
+      run: v0630PoliceVan
+    });
+  }
+
+  if (state.chapter4?.bodySeen) {
+    topics.push({
+      id: "west",
+      label: "Falar da Rua Oeste",
+      tone: "URGENTE",
+      run: v0649PoliceBody
+    });
+  }
+
+  if (v0650Chapter5Unlocked()) {
+    topics.push({
+      id: "report",
+      label:
+        v0650HasContradiction(
+          "policeRecord"
+        )
+          ? "Rever o registro estranho"
+          : "Conferir um relatório",
+      tone: "ANALISAR",
+      run: v0650PoliceContradiction
+    });
+  }
+
+  if (
+    state.sideQuests?.westCase
+      ?.garciaStatement ||
+    state.sideQuests?.westCase
+      ?.evidenceFound
+  ) {
+    topics.push({
+      id: "west-case",
+      label:
+        "Reabrir o caso da Rua Oeste",
+      tone: "INVESTIGAR",
+      run: v070ResolveWestCase
+    });
+  }
+
+  if (state.chapter8?.complete) {
+    topics.push({
+      id: "insight",
+      label:
+        "Perguntar o que Anísio realmente pensa",
+      tone: "PESSOAL",
+      run: v070PoliceInsight
+    });
+  }
+
+  v0825OpenTopicMenu({
+    id: "police-topics",
+    speaker: "Anísio",
+    text:
+      "Certo. Sobre o que você quer conversar?",
+    topics
+  });
+}
+
+v0630OpenPoliceTopics =
+  v0825PoliceTopics;
+
+function v0825MarketMenu() {
+  prepareSystems();
+
+  const topics = [];
+
+  if (
+    state.food <= 0 &&
+    state.money >= V070_FOOD_PRICE
+  ) {
+    topics.push({
+      id: "buy-food",
+      label:
+        "Comprar comida · R$ " +
+        V070_FOOD_PRICE,
+      tone: "COMPRAR",
+      run: () => {
+        if (
+          state.food > 0 ||
+          state.money <
+            V070_FOOD_PRICE
+        ) {
+          return;
+        }
+
+        state.money -=
+          V070_FOOD_PRICE;
+        state.food = 1;
+
+        say(
+          [
+            [
+              "Funcionário",
+              "Aqui. É o que dá pra levar sem estragar."
+            ],
+            ["Você", "Obrigado."]
+          ],
+          () => {
+            updateHud();
+            save();
+          }
+        );
+      }
+    });
+  }
+
+  const marketChecked =
+    Boolean(
+      state.memoryFacts
+        ?.marketTimeChecked
+    );
+
+  topics.push({
+    id: "parents",
+    label:
+      marketChecked
+        ? "Rever o horário dos meus pais"
+        : "Perguntar sobre meus pais",
+    tone: "INVESTIGAR",
+    run: () => {
+      if (!marketChecked) {
+        say([
+          [
+            "Funcionário",
+            "Eles vieram juntos e saíram juntos."
+          ],
+          [
+            "Funcionário",
+            "Seu pai perguntou sobre a estrada do sul. Depois disso eu não vi nenhum dos dois."
+          ]
+        ]);
+        return;
+      }
+
+      const pressed =
+        v0819DialogueFlag(
+          "marketEmployeePressed"
+        );
+
+      say([
+        [
+          "Você",
+          "Sobre o horário dos meus pais..."
+        ],
+        [
+          "Funcionário",
+          pressed
+            ? "Eu sei. Você tinha razão em insistir. O recibo continua marcando 14:20."
+            : "Eu conferi de novo. O recibo continua marcando 14:20."
+        ],
+        [
+          "Funcionário",
+          "Mas eu ainda lembro de olhar para o relógio e ver quase quatro da tarde."
+        ],
+        [
+          "Você",
+          "Então não é o recibo que está mudando."
+        ],
+        [
+          "Funcionário",
+          "...Não. É isso que me assusta."
+        ]
+      ]);
+    }
+  });
+
+  v0825OpenTopicMenu({
+    id: "market-topics",
+    speaker: "Funcionário",
+    text:
+      "Dinheiro: R$ " +
+      state.money +
+      ". O que você precisa?",
+    topics
+  });
+}
+
+v070OpenMarketMenu =
+  v0825MarketMenu;
+
+// ---------------------------------------------------------
+// OSMAR: conversa encerra a presença dele na casa.
+// A mesma noite libera o oeste e a luz do celular.
+// ---------------------------------------------------------
+
+function v0825UnlockWestFromOsmar() {
+  prepareSystems();
+
+  if (
+    !state ||
+    !state.forgottenAlive
+  ) {
+    return;
+  }
+
+  const f =
+    state.forgottenAlive;
+
+  state.storyFlags =
+    state.storyFlags || {};
+
+  state.storyFlags
+    .osmarWestUnlocked = true;
+
+  f.westPresenceSeen = true;
+  f.westPresenceArmed = false;
+  f.westHintShown = true;
+  f.osmarStage =
+    Math.max(
+      3,
+      f.osmarStage || 0
+    );
+
+  if (!state.flashlight) {
+    state.flashlight = {};
+  }
+
+  const firstPhoneLight =
+    !state.flashlight.owned ||
+    state.flashlight.source !==
+      "phone";
+
+  state.flashlight.owned = true;
+  state.flashlight.on = false;
+  state.flashlight.source =
+    "phone";
+
+  if (
+    !Number.isFinite(
+      state.flashlight.battery
+    ) ||
+    state.flashlight.battery <= 0
+  ) {
+    state.flashlight.battery = 100;
+  }
+
+  state.flashlight.emptyWarned = false;
+
+  if (firstPhoneLight) {
+    v06Toast(
+      "Lanterna do celular liberada · pressione L.",
+      4.4
+    );
+  }
+
+  updateHud();
+  save();
+}
+
+const v0825Chapter4UnlockedBase =
+  v0649Chapter4Unlocked;
+
+v0649Chapter4Unlocked = function() {
+  if (
+    state?.storyFlags
+      ?.osmarWestUnlocked
+  ) {
+    return true;
+  }
+
+  return v0825Chapter4UnlockedBase();
+};
+
+const v0825OsmarHomeBase =
+  v080OsmarHomeNow;
+
+v080OsmarHomeNow = function() {
+  if (
+    state?.forgottenAlive
+      ?.completed?.osmar ||
+    state?.forgottenAlive
+      ?.osmarStage >= 3
+  ) {
+    return false;
+  }
+
+  return v0825OsmarHomeBase();
+};
+
+v080TalkOsmar = function() {
+  prepareSystems();
+
+  const f =
+    state.forgottenAlive;
+
+  if (
+    !f ||
+    f.osmarStage <= 0
+  ) {
+    return;
+  }
+
+  if (
+    f.completed.osmar ||
+    f.osmarStage >= 3
+  ) {
+    say([
+      "A casa está escura. Osmar não está mais aqui."
+    ]);
+    return;
+  }
+
+  if (!v080OsmarHomeNow()) {
+    f.osmarAttempts += 1;
+
+    say(
+      f.osmarAttempts <= 1
+        ? [
+            "A casa está escura. Parece que Osmar não está em casa."
+          ]
+        : [
+            "Ninguém atende.",
+            "Na caixa de correio há um papel preso: “Chego depois da meia-noite. Se precisar, venha antes das três.”"
+          ],
+      save
+    );
+
+    return;
+  }
+
+  say(
+    [
+      [
+        "Osmar",
+        "Oi? Precisa de alguma coisa?"
+      ],
+      [
+        "Você",
+        "A Florinda é sua mãe?"
+      ],
+      [
+        "Osmar",
+        "É. Aconteceu alguma coisa com ela?"
+      ],
+      [
+        "Você",
+        "Não. Meus pais desapareceram. Ela disse que talvez você tivesse visto eles."
+      ],
+      [
+        "Osmar",
+        "Os Lancaster?"
+      ],
+      [
+        "Você",
+        "Foi por volta das duas da tarde, alguns dias atrás."
+      ],
+      [
+        "Osmar",
+        "Eu vi um homem e uma mulher subindo essa rua. Não posso jurar que eram seus pais."
+      ],
+      [
+        "Você",
+        "Para onde eles foram?"
+      ],
+      [
+        "Osmar",
+        "Entraram no mercado. Eu não vi quando saíram."
+      ],
+      [
+        "Osmar",
+        "Desculpa. É só isso que eu consigo afirmar sem inventar."
+      ],
+      [
+        "Osmar",
+        "Vou sair cedo. Se eu lembrar de alguma coisa, falo com a minha mãe."
+      ]
+    ],
+    () => {
+      f.osmarStage = 3;
+
+      v080CompleteFragment(
+        "osmar",
+        "O filho de Florinda"
+      );
+
+      v0825UnlockWestFromOsmar();
+
+      v06Toast(
+        "O caminho oeste está liberado.",
+        4.2
+      );
+    }
+  );
+};
+
+// ---------------------------------------------------------
+// FLORINDA: nunca volta à primeira conversa depois de Osmar.
+// ---------------------------------------------------------
+
+function v0825FlorindaFood() {
+  prepareSystems();
+
+  if (state.food >= 1) {
+    say([
+      [
+        "Florinda",
+        "Você já está levando comida. Entrega primeiro para o seu irmão."
+      ]
+    ]);
+    return;
+  }
+
+  if (state.stock <= 0) {
+    say([
+      [
+        "Florinda",
+        "Eu queria ajudar mais, mas não tenho outra porção para dar agora."
+      ]
+    ]);
+    return;
+  }
+
+  const stockCycle =
+    state.stockCycle;
+
+  say(
+    [
+      [
+        "Florinda",
+        "Leva isso para o seu irmão. Não precisa me devolver nada."
+      ]
+    ],
+    () => {
+      prepareSystems();
+
+      if (
+        state.stockCycle !==
+          stockCycle ||
+        state.stock <= 0 ||
+        state.food >= 1
+      ) {
+        return;
+      }
+
+      state.stock -= 1;
+      state.food = 1;
+
+      if (
+        state.stage ===
+        "supplies"
+      ) {
+        state.stage = "return";
+      }
+
+      updateHud();
+      save();
+    }
+  );
+}
+
+function v0825FlorindaAfterOsmar() {
+  const f =
+    state?.forgottenAlive;
+
+  if (!f) {
+    return;
+  }
+
+  const topics = [];
+
+  topics.push({
+    id: "osmar",
+    label:
+      f.completed.osmar
+        ? "Falar do que Osmar contou"
+        : "Perguntar novamente sobre Osmar",
+    tone: "INVESTIGAR",
+    run: () => {
+      if (!f.completed.osmar) {
+        say([
+          [
+            "Florinda",
+            "Ele costuma chegar depois da meia-noite. A casa é a do lado direito da Rua do Mercado, perto da caixa de correio velha."
+          ],
+          [
+            "Florinda",
+            "Se ele não estiver lá, não fica esperando na rua."
+          ]
+        ]);
+        return;
+      }
+
+      if (
+        !state.storyFlags
+          ?.florindaOsmarFollowupSeen
+      ) {
+        say(
+          [
+            [
+              "Você",
+              "Falei com o Osmar."
+            ],
+            [
+              "Florinda",
+              "Ele estava em casa?"
+            ],
+            [
+              "Você",
+              "Estava. Ele viu um casal parecido com meus pais entrando no mercado."
+            ],
+            [
+              "Florinda",
+              "E viu eles saindo?"
+            ],
+            [
+              "Você",
+              "Não."
+            ],
+            [
+              "Florinda",
+              "Então guarda exatamente assim. Não aumenta a história só porque falta uma parte."
+            ],
+            [
+              "Você",
+              "Ele disse que ia sair cedo."
+            ],
+            [
+              "Florinda",
+              "É o jeito dele. Quando uma coisa incomoda, ele prefere andar a ficar olhando para a mesma parede."
+            ]
+          ],
+          () => {
+            state.storyFlags
+              .florindaOsmarFollowupSeen =
+              true;
+            save();
+          }
+        );
+
+        return;
+      }
+
+      say([
+        [
+          "Florinda",
+          "Osmar já saiu. Se ele lembrar de alguma coisa nova, ele fala comigo."
+        ],
+        [
+          "Florinda",
+          "Por enquanto, fica com o que ele realmente viu: entrada no mercado. Nada além disso."
+        ]
+      ]);
+    }
+  });
+
+  if (
+    state.stock > 0 ||
+    state.food > 0
+  ) {
+    topics.push({
+      id: "food",
+      label: "Falar sobre comida",
+      tone: "PEDIR",
+      run: v0825FlorindaFood
+    });
+  }
+
+  v0825OpenTopicMenu({
+    id: "florinda-topics",
+    speaker: "Florinda",
+    text:
+      "Você voltou. O que precisa?",
+    topics
+  });
+}
+
+// ---------------------------------------------------------
+// LUZ DO CELULAR: remove o item físico da cozinha.
+// ---------------------------------------------------------
+
+if (maps.kitchen) {
+  maps.kitchen.objects =
+    maps.kitchen.objects.filter(
+      o =>
+        o.action !==
+        "flashlightPickup"
+    );
+}
+
+v0649ToggleFlashlight = function() {
+  prepareSystems();
+
+  if (!state.flashlight?.owned) {
+    v06Toast(
+      "A lanterna do celular ainda não foi liberada.",
+      3.8
+    );
+    return;
+  }
+
+  if (
+    state.flashlight.battery <= 0
+  ) {
+    state.flashlight.on = false;
+
+    v06Toast(
+      "A bateria da lanterna do celular acabou.",
+      3.8
+    );
+    return;
+  }
+
+  state.flashlight.on =
+    !state.flashlight.on;
+
+  v06Toast(
+    state.flashlight.on
+      ? "Lanterna do celular ligada"
+      : "Lanterna do celular desligada",
+    3.8
+  );
+
+  updateHud();
+  save();
+};
+
+v0649DrawFlashlightDarkness = function() {
+  if (
+    !state ||
+    state.room !== "westRoad" ||
+    state.dawnCollapse?.active ||
+    state.wakeUp?.active
+  ) {
+    return;
+  }
+
+  const on =
+    state.flashlight?.owned &&
+    state.flashlight.on &&
+    state.flashlight.battery > 0;
+
+  let sx =
+    state.x - camera.x;
+
+  let sy =
+    state.y - camera.y - 9;
+
+  if (on) {
+    if (state.facing === "left") {
+      sx -= 30;
+    } else if (
+      state.facing === "right"
+    ) {
+      sx += 30;
+    } else if (
+      state.facing === "up"
+    ) {
+      sy -= 34;
+    } else {
+      sy += 34;
+    }
+  }
+
+  // 0.8.25: feixe propositalmente menor.
+  // A luz do celular ajuda a navegar, mas não ilumina a rua inteira.
+  const inner =
+    on ? 18 : 10;
+
+  const outer =
+    on ? 122 : 62;
+
+  const gradient =
+    c.createRadialGradient(
+      sx,
+      sy,
+      inner,
+      sx,
+      sy,
+      outer
+    );
+
+  if (on) {
+    gradient.addColorStop(
+      0,
+      "rgba(0,0,0,0.04)"
+    );
+
+    gradient.addColorStop(
+      0.30,
+      "rgba(0,0,0,0.18)"
+    );
+
+    gradient.addColorStop(
+      0.64,
+      "rgba(0,0,0,0.68)"
+    );
+
+    gradient.addColorStop(
+      1,
+      "rgba(0,0,0,0.97)"
+    );
+  } else {
+    gradient.addColorStop(
+      0,
+      "rgba(0,0,0,0.52)"
+    );
+
+    gradient.addColorStop(
+      0.45,
+      "rgba(0,0,0,0.86)"
+    );
+
+    gradient.addColorStop(
+      1,
+      "rgba(0,0,0,0.99)"
+    );
+  }
+
+  c.save();
+  c.fillStyle = gradient;
+  c.fillRect(
+    0,
+    0,
+    W,
+    H
+  );
+
+  if (state.flashlight?.owned) {
+    txt(
+      "CELULAR " +
+      Math.ceil(
+        state.flashlight.battery
+      ) +
+      "% · L",
+      14,
+      H - 14,
+      state.flashlight.battery < 20
+        ? "#c49a83"
+        : "#c9c2ad",
+      7
+    );
+  }
+
+  c.restore();
+};
+
+// ---------------------------------------------------------
+// RUA DA PRAÇA: entrada SEMPRE pela direita; praça à esquerda.
+// ---------------------------------------------------------
+
+v0648GoSquare = function() {
+  if (
+    !state ||
+    transitionBusy ||
+    dialog ||
+    !v0648Chapter2Unlocked() ||
+    !state.storyFlags
+      ?.marketParentsConfirmed
+  ) {
+    return;
+  }
+
+  fade(
+    "Rua da praça",
+    "A praça fica no fim da rua, à esquerda.",
+    () => {
+      v076SetOutdoorRoom(
+        "square",
+        maps.square.w - 72,
+        367,
+        "left"
+      );
+    }
+  );
+};
+
+const v0825SquareDrawBase =
+  v0648DrawSquareEnvironment;
+
+v0648DrawSquareEnvironment =
+  function(m) {
+    v0825SquareDrawBase(m);
+
+    if (m !== maps.square) {
+      return;
+    }
+
+    txt(
+      "← PRAÇA",
+      2200,
+      255,
+      "#d4c49c",
+      8
+    );
+  };
+
+// ---------------------------------------------------------
+// MIGRAÇÃO / CONSISTÊNCIA FINAL
+// ---------------------------------------------------------
+
+const v0825PrepareBase =
+  prepareSystems;
+
+prepareSystems = function() {
+  v0825PrepareBase();
+
+  if (!state) {
+    return;
+  }
+
+  state.storyFlags =
+    state.storyFlags || {};
+
+  const f =
+    state.forgottenAlive;
+
+  if (
+    f?.completed?.osmar
+  ) {
+    f.osmarStage =
+      Math.max(
+        3,
+        f.osmarStage || 0
+      );
+
+    state.storyFlags
+      .osmarWestUnlocked = true;
+
+    f.westPresenceSeen = true;
+    f.westPresenceArmed = false;
+
+    if (!state.flashlight) {
+      state.flashlight = {};
+    }
+
+    state.flashlight.owned = true;
+    state.flashlight.source =
+      "phone";
+
+    if (
+      !Number.isFinite(
+        state.flashlight.battery
+      )
+    ) {
+      state.flashlight.battery =
+        100;
+    }
+
+    if (
+      typeof state.flashlight.on !==
+      "boolean"
+    ) {
+      state.flashlight.on =
+        false;
+    }
+  }
+
+  if (
+    state.flashlight?.owned &&
+    !state.flashlight.source
+  ) {
+    state.flashlight.source =
+      "phone";
+  }
+};
+
+const v0825GetNearBase =
+  getNear;
+
+getNear = function() {
+  prepareSystems();
+
+  const target =
+    v0825GetNearBase();
+
+  if (
+    target?.action ===
+      "v080Osmar" &&
+    (
+      state.forgottenAlive
+        ?.completed?.osmar ||
+      state.forgottenAlive
+        ?.osmarStage >= 3
+    )
+  ) {
+    return null;
+  }
+
+  return target;
+};
+
+const v0825InteractBase =
+  interact;
+
+interact = function(action) {
+  prepareSystems();
+
+  if (
+    action === "vendor" &&
+    state.room === "shop" &&
+    state.forgottenAlive
+      ?.osmarStage >= 1
+  ) {
+    v0825FlorindaAfterOsmar();
+    return;
+  }
+
+  if (
+    action === "flashlightPickup"
+  ) {
+    say([
+      "A gaveta tem ferramentas velhas. A luz que estou usando agora é a lanterna do celular."
+    ]);
+    return;
+  }
+
+  v0825InteractBase(action);
+};
+
+const v0825InventoryBase =
+  v0645OpenInventory;
+
+v0645OpenInventory = function() {
+  v0825InventoryBase();
+
+  if (
+    !state?.flashlight?.owned
+  ) {
+    return;
+  }
+
+  const root =
+    $("modalText");
+
+  if (!root) {
+    return;
+  }
+
+  for (
+    const node of
+      root.querySelectorAll("div")
+  ) {
+    if (
+      node.childElementCount === 0 &&
+      node.textContent
+        ?.startsWith(
+          "• Lanterna · "
+        )
+    ) {
+      node.textContent =
+        node.textContent.replace(
+          "• Lanterna · ",
+          "• Lanterna do celular · "
+        );
+    }
+  }
+};
+
+const v0825HudBase =
+  updateHud;
+
+updateHud = function() {
+  v0825HudBase();
+
+  if (!state) {
+    return;
+  }
+
+  if (
+    state.storyFlags
+      ?.osmarWestUnlocked &&
+    !state.chapter4?.bodySeen &&
+    state.room !== "westRoad"
+  ) {
+    $("objective").textContent =
+      "O caminho oeste está liberado. Use a lanterna do celular (L) e siga para a Rua Oeste.";
+  }
+
+  if (
+    state.room === "square" &&
+    state.x >
+      V0824_SQUARE_ROAD_START &&
+    state.storyFlags
+      ?.marketParentsConfirmed &&
+    !state.squareManFirstSpeechDone
+  ) {
+    $("objective").textContent =
+      "Siga para a esquerda até a praça central.";
+  }
+};
+
+
+$("version").textContent = "PROTÓTIPO · 0.8.25";
   
   requestAnimationFrame(frame);
   showBootSplash();
