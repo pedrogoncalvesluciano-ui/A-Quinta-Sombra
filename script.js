@@ -2,7 +2,7 @@
 "use strict";
 
 /*
-  A QUINTA SOMBRA — 0.8.20
+  A QUINTA SOMBRA — 0.8.21
 
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
@@ -4830,26 +4830,25 @@ function drawCharacterSprite(
     card.className = "card info-card help-card";
     $("overlay").className = "info-overlay";
 
-    $("modalLabel").textContent = "REGISTROS DA CASA";
+    $("modalLabel").textContent = "GUIA DE SOBREVIVÊNCIA";
     $("modalTitle").textContent = "COMO JOGAR";
 
     $("modalText").innerHTML = `
-      <div class="info-art-slot help-art-slot" aria-hidden="true">
-        <span>ESPAÇO RESERVADO PARA ARTE / IMAGEM</span>
-      </div>
+      <div class="info-art-slot help-art-slot" aria-hidden="true"></div>
 
       <div class="help-intro">
-        Explore com calma. Algumas ações já fazem parte do protótipo;
-        outras estão previstas para acompanhar a evolução do jogo.
+        <strong>Forgotten recompensa atenção.</strong>
+        Explore sem pressa, compare o que as pessoas dizem e registre o que não combina.
+        Nem todo perigo aparece como um inimigo na tela.
       </div>
 
       <div class="help-grid">
         <article class="control-card">
           <span class="control-icon">◆</span>
           <div>
-            <strong>ANDAR</strong>
+            <strong>MOVER</strong>
             <kbd>WASD</kbd> <kbd>SETAS</kbd>
-            <p>Mova-se pelos cômodos, pela casa e pela vila.</p>
+            <p>Ande pela casa, pelas ruas e pelas áreas conectadas de Forgotten.</p>
           </div>
         </article>
 
@@ -4858,16 +4857,7 @@ function drawCharacterSprite(
           <div>
             <strong>INTERAGIR</strong>
             <kbd>E</kbd>
-            <p>Fale, examine, colete itens e use portas ou objetos próximos.</p>
-          </div>
-        </article>
-
-        <article class="control-card">
-          <span class="control-icon">✦</span>
-          <div>
-            <strong>ATAQUE</strong>
-            <kbd>ESPAÇO</kbd>
-            <p>Execute o ataque básico quando houver uma ameaça próxima.</p>
+            <p>Converse, examine pistas, use portas e interaja com objetos próximos.</p>
           </div>
         </article>
 
@@ -4875,8 +4865,17 @@ function drawCharacterSprite(
           <span class="control-icon">»</span>
           <div>
             <strong>CORRER</strong>
-            <kbd>SHIFT</kbd>
-            <p>Acelere o movimento quando precisar atravessar uma área rapidamente.</p>
+            <kbd>SHIFT</kbd> <kbd>F</kbd>
+            <p>Corra quando a situação permitir ou quando precisar escapar rapidamente.</p>
+          </div>
+        </article>
+
+        <article class="control-card">
+          <span class="control-icon">✦</span>
+          <div>
+            <strong>DEFESA</strong>
+            <kbd>ESPAÇO</kbd>
+            <p>Use o ataque físico apenas quando houver uma ameaça compatível por perto.</p>
           </div>
         </article>
 
@@ -4885,7 +4884,25 @@ function drawCharacterSprite(
           <div>
             <strong>INVENTÁRIO</strong>
             <kbd>I</kbd>
-            <p>Consulte itens carregados e pistas já coletadas.</p>
+            <p>Veja itens carregados, comida e recursos importantes.</p>
+          </div>
+        </article>
+
+        <article class="control-card">
+          <span class="control-icon">▣</span>
+          <div>
+            <strong>CELULAR</strong>
+            <kbd>C</kbd>
+            <p>Abra mensagens, notas de investigação, internet e outros aplicativos disponíveis.</p>
+          </div>
+        </article>
+
+        <article class="control-card">
+          <span class="control-icon">⌁</span>
+          <div>
+            <strong>LANTERNA</strong>
+            <kbd>L</kbd>
+            <p>Ligue ou desligue a lanterna quando ela estiver disponível. Observe a bateria.</p>
           </div>
         </article>
 
@@ -4894,33 +4911,17 @@ function drawCharacterSprite(
           <div>
             <strong>PAUSAR</strong>
             <kbd>ESC</kbd>
-            <p>Pare o jogo e o relógio enquanto organiza o próximo passo.</p>
-          </div>
-        </article>
-
-        <article class="control-card planned">
-          <span class="control-icon">↝</span>
-          <div>
-            <strong>DASH <em>PLANEJADO</em></strong>
-            <kbd>Q</kbd>
-            <p>Um avanço rápido para fuga, exploração e situações de perigo.</p>
-          </div>
-        </article>
-
-        <article class="control-card planned">
-          <span class="control-icon">◌</span>
-          <div>
-            <strong>ESQUIVA / EMPURRÃO <em>PLANEJADO</em></strong>
-            <span class="control-key-muted">EM DESENVOLVIMENTO</span>
-            <p>Novas opções defensivas para sobreviver a encontros mais perigosos.</p>
+            <p>Pare o jogo e o relógio para organizar o próximo passo.</p>
           </div>
         </article>
       </div>
 
       <div class="help-future">
-        <span>AINDA VAI CRESCER</span>
-        <p>Inventário, lanterna, novas habilidades, escolhas com consequências,
-        mais interações com NPCs e novos eventos dentro e fora da casa.</p>
+        <span>INVESTIGAÇÃO</span>
+        <p>
+          Observe → registre → questione → compare → volte depois.
+          Pessoas podem lembrar versões diferentes; registros físicos e anotações ajudam a perceber contradições.
+        </p>
       </div>
 
       <blockquote class="info-quote">
@@ -4940,24 +4941,29 @@ function drawCharacterSprite(
     $("modalTitle").textContent = "CRÉDITOS";
 
     $("modalText").innerHTML = `
-      <div class="info-art-slot credits-art-slot" aria-hidden="true">
-        <span>ESPAÇO RESERVADO PARA ARTE / IMAGEM</span>
-      </div>
+      <div class="info-art-slot credits-art-slot" aria-hidden="true"></div>
 
       <div class="credits-mark" aria-hidden="true">
         <span></span><i>◇</i><span></span>
       </div>
 
       <div class="credit-entry">
-        <small>DESENVOLVIMENTO, DIREÇÃO E IDEIAS</small>
+        <small>DESENVOLVIMENTO · DIREÇÃO · IDEIAS</small>
         <strong>Pedro</strong>
       </div>
 
       <div class="credit-divider"></div>
 
       <div class="credit-entry">
-        <small>AUXÍLIO DE PROGRAMAÇÃO</small>
+        <small>AUXÍLIO DE PROGRAMAÇÃO E DESENVOLVIMENTO</small>
         <strong>ChatGPT</strong>
+      </div>
+
+      <div class="credit-divider"></div>
+
+      <div class="credit-entry">
+        <small>TECNOLOGIA</small>
+        <strong>HTML5 · CSS3 · JavaScript · Canvas 2D</strong>
       </div>
 
       <blockquote class="info-quote credits-quote">
@@ -6982,10 +6988,39 @@ if (!maps.shop) {
 
 let v06ToastText = "";
 let v06ToastUntil = 0;
+let v06ToastTimer = null;
 
 function v06Toast(text, seconds = 1.5) {
   v06ToastText = text;
   v06ToastUntil = elapsed + seconds;
+
+  const toast =
+    $("eventToast");
+
+  if (!toast) {
+    return;
+  }
+
+  toast.textContent = text;
+  toast.hidden = false;
+
+  if (v06ToastTimer) {
+    clearTimeout(v06ToastTimer);
+  }
+
+  const currentText = text;
+
+  v06ToastTimer = setTimeout(
+    () => {
+      if (
+        $("eventToast") &&
+        $("eventToast").textContent === currentText
+      ) {
+        $("eventToast").hidden = true;
+      }
+    },
+    Math.max(0.8, seconds) * 1000
+  );
 }
 
 function v06AbsoluteMinutes() {
@@ -7973,31 +8008,8 @@ drawWorld = function () {
     );
   }
 
-  if (
-    v06ToastText &&
-    elapsed < v06ToastUntil
-  ) {
-    const w = Math.max(
-      100,
-      v06ToastText.length * 7 + 18
-    );
-
-    rect(
-      W / 2 - w / 2,
-      16,
-      w,
-      24,
-      "#0b131beb"
-    );
-
-    txt(
-      v06ToastText,
-      W / 2 - w / 2 + 9,
-      32,
-      "#e3d3ac",
-      8
-    );
-  }
+  // 0.8.21: avisos rápidos agora são HTML (#eventToast),
+  // acima do Canvas e logo abaixo do objetivo do HUD.
 
   // A estática permanece pulsando durante toda a conversa
   // inicial com os filhos, sem bloquear controles ou diálogo.
@@ -27043,7 +27055,7 @@ updateHud = function() {
 };
 
 
-$("version").textContent = "PROTÓTIPO · 0.8.20";
+$("version").textContent = "PROTÓTIPO · 0.8.21";
   
   requestAnimationFrame(frame);
   showBootSplash();
