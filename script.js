@@ -19293,20 +19293,25 @@ function v076DrawSquareRoad() {
     200
   );
 
-  c.fillStyle = "#706b5f";
-  c.beginPath();
-  c.arc(1135, 367, 118, 0, Math.PI * 2);
-  c.fill();
+  // 0.8.24 — legado sem rotatória:
+  // mesmo em saves antigos, a Rua da Praça termina em ligação reta.
+  drawRoadTiledHorizontal(
+    "pavedHorizontal",
+    1080,
+    270,
+    320,
+    200
+  );
 
-  c.strokeStyle = "#8a867b";
-  c.lineWidth = 18;
-  c.beginPath();
-  c.arc(1135, 367, 126, -Math.PI * 0.58, Math.PI * 0.58);
-  c.stroke();
+  rect(
+    1080,
+    330,
+    320,
+    140,
+    "#716e66"
+  );
 
-  // Caminho de pedestres da rua sem saída até a praça.
-  rect(1210, 337, 190, 60, "#7b786f");
-  for (let x = 1220; x < 1390; x += 28) {
+  for (let x = 1090; x < 1390; x += 28) {
     rect(x, 347, 18, 10, "#8d897f");
     rect(x + 8, 370, 18, 10, "#817e75");
   }
@@ -27198,6 +27203,10 @@ window.addEventListener(
 const V0824_SQUARE_ROAD_START = 1080;
 const V0824_SQUARE_W = 2500;
 const V0824_SQUARE_H = 760;
+
+if (maps.squareRoad) {
+  maps.squareRoad.doors = [];
+}
 
 if (maps.square) {
   const plazaObjects =
