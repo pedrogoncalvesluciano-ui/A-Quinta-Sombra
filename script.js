@@ -8608,6 +8608,241 @@ update = function (dt) {
 };
 
 // =========================================================
+// 0.8.29 — TELA CHEIA MOBILE
+// =========================================================
+
+const mobileFullscreenButton =
+  $("mobileFullscreen");
+
+let mobilePseudoFullscreen = false;
+
+function mobileFullscreenElement() {
+  return (
+    document.fullscreenElement ||
+    document.webkitFullscreenElement ||
+    null
+  );
+}
+
+function mobileFullscreenSupported() {
+  const root =
+    document.documentElement;
+
+  return Boolean(
+    root?.requestFullscreen ||
+    root?.webkitRequestFullscreen
+  );
+}
+
+function mobileFullscreenAvailable() {
+  return Boolean(
+    mobileFullscreenButton &&
+    window.matchMedia &&
+    window.matchMedia(
+      "(hover: none) and (pointer: coarse)"
+    ).matches
+  );
+}
+
+function mobileFullscreenActive() {
+  return Boolean(
+    mobileFullscreenElement() ||
+    mobilePseudoFullscreen
+  );
+}
+
+function refreshMobileFullscreenButton() {
+  if (!mobileFullscreenButton) {
+    return;
+  }
+
+  const available =
+    mobileFullscreenAvailable();
+
+  mobileFullscreenButton.hidden =
+    !available;
+
+  mobileFullscreenButton.classList.toggle(
+    "mobile-fullscreen-ready",
+    available
+  );
+
+  const active =
+    mobileFullscreenActive();
+
+  mobileFullscreenButton.classList.toggle(
+    "is-active",
+    active
+  );
+
+  mobileFullscreenButton.setAttribute(
+    "aria-label",
+    active
+      ? "Sair da tela cheia"
+      : "Entrar em tela cheia"
+  );
+
+  mobileFullscreenButton.title =
+    active
+      ? "Sair da tela cheia"
+      : "Tela cheia";
+}
+
+async function mobileTryLockLandscape() {
+  if (
+    !screen.orientation ||
+    typeof screen.orientation.lock !==
+      "function"
+  ) {
+    return;
+  }
+
+  try {
+    await screen.orientation.lock(
+      "landscape"
+    );
+  } catch {
+    // Alguns navegadores móveis não permitem bloquear orientação.
+  }
+}
+
+function mobileUnlockOrientation() {
+  if (
+    !screen.orientation ||
+    typeof screen.orientation.unlock !==
+      "function"
+  ) {
+    return;
+  }
+
+  try {
+    screen.orientation.unlock();
+  } catch {}
+}
+
+function mobileEnterPseudoFullscreen() {
+  mobilePseudoFullscreen = true;
+  document.body.classList.add(
+    "mobile-pseudo-fullscreen"
+  );
+
+  try {
+    window.scrollTo(0, 1);
+  } catch {}
+
+  refreshMobileFullscreenButton();
+}
+
+function mobileExitPseudoFullscreen() {
+  mobilePseudoFullscreen = false;
+  document.body.classList.remove(
+    "mobile-pseudo-fullscreen"
+  );
+  mobileUnlockOrientation();
+  refreshMobileFullscreenButton();
+}
+
+async function toggleMobileFullscreen() {
+  if (!mobileFullscreenAvailable()) {
+    return;
+  }
+
+  if (mobileFullscreenElement()) {
+    try {
+      if (document.exitFullscreen) {
+        await document.exitFullscreen();
+      } else if (
+        document.webkitExitFullscreen
+      ) {
+        document.webkitExitFullscreen();
+      }
+    } catch {}
+
+    return;
+  }
+
+  if (mobilePseudoFullscreen) {
+    mobileExitPseudoFullscreen();
+    return;
+  }
+
+  const root =
+    document.documentElement;
+
+  if (mobileFullscreenSupported()) {
+    try {
+      if (root.requestFullscreen) {
+        await root.requestFullscreen({
+          navigationUI: "hide"
+        });
+      } else if (
+        root.webkitRequestFullscreen
+      ) {
+        root.webkitRequestFullscreen();
+      }
+
+      await mobileTryLockLandscape();
+      refreshMobileFullscreenButton();
+      return;
+    } catch {
+      // Se o navegador negar fullscreen real, usa o viewport inteiro.
+    }
+  }
+
+  mobileEnterPseudoFullscreen();
+}
+
+if (mobileFullscreenButton) {
+  mobileFullscreenButton.addEventListener(
+    "pointerdown",
+    event => {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  );
+
+  mobileFullscreenButton.addEventListener(
+    "click",
+    event => {
+      event.preventDefault();
+      event.stopPropagation();
+      void toggleMobileFullscreen();
+    }
+  );
+}
+
+for (const eventName of [
+  "fullscreenchange",
+  "webkitfullscreenchange"
+]) {
+  document.addEventListener(
+    eventName,
+    () => {
+      if (
+        !mobileFullscreenElement() &&
+        !mobilePseudoFullscreen
+      ) {
+        mobileUnlockOrientation();
+      }
+
+      refreshMobileFullscreenButton();
+    }
+  );
+}
+
+window.addEventListener(
+  "resize",
+  refreshMobileFullscreenButton
+);
+
+window.addEventListener(
+  "orientationchange",
+  refreshMobileFullscreenButton
+);
+
+refreshMobileFullscreenButton();
+
+// =========================================================
 // 0.6.28 — CONTROLES MOBILE DE TESTE
 // =========================================================
 
@@ -35243,7 +35478,7 @@ updateHud = function() {
   }
 };
 
-$("version").textContent = "PROTÓTIPO · 0.8.28";
+$("version").textContent = "PROTÓTIPO · 0.8.29";
   
   requestAnimationFrame(frame);
   showBootSplash();
