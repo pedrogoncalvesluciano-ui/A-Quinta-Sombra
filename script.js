@@ -35925,7 +35925,7 @@ function v0830OpenNorbertoThread() {
         v081PhoneElement(
           "p",
           "phone-small",
-          "CONTATO SALVO · RUA DO MERCADO"
+          "NÚMERO SALVO · RUA DO MERCADO"
         )
       );
 
@@ -36092,7 +36092,7 @@ v081OpenMessages = function() {
         ),
         makeContact(
           "NORBERTO",
-          "CONTATO SALVO",
+          "NÚMERO SALVO",
           v0830OpenNorbertoThread
         )
       );
@@ -36892,11 +36892,61 @@ const v0830PrepareBase =
   prepareSystems;
 
 prepareSystems = function() {
+  const wasLegacySquareRoad =
+    state?.room === "squareRoad";
+
+  const legacySquareRoadX =
+    Number.isFinite(state?.x)
+      ? state.x
+      : 70;
+
+  const legacySquareRoadY =
+    Number.isFinite(state?.y)
+      ? state.y
+      : 367;
+
   v0830PrepareBase();
 
   if (!state) return;
 
   v081EnsurePhone();
+
+  if (wasLegacySquareRoad) {
+    state.room =
+      V0830_PLAZA_ROAD_ROOM;
+
+    state.x =
+      Math.max(
+        72,
+        Math.min(
+          V0830_PLAZA_ROAD_W - 72,
+          legacySquareRoadX
+        )
+      );
+
+    state.y =
+      Math.max(
+        45,
+        Math.min(
+          V0830_PLAZA_ROAD_H - 45,
+          legacySquareRoadY
+        )
+      );
+
+    state.facing = "right";
+    state.walk = 0;
+
+    state.storyFlags =
+      state.storyFlags || {};
+
+    state.storyFlags
+      .v0830SquareRoadMigrated =
+      true;
+
+    keys.clear();
+    near = null;
+    save();
+  }
 
   const scene =
     v0830EnsureOsvaldoScene();
