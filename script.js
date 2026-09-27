@@ -8755,6 +8755,10 @@ async function toggleMobileFullscreen() {
         document.webkitExitFullscreen
       ) {
         document.webkitExitFullscreen();
+      } else if (
+        document.webkitCancelFullScreen
+      ) {
+        document.webkitCancelFullScreen();
       }
     } catch {}
 
@@ -8772,9 +8776,7 @@ async function toggleMobileFullscreen() {
   if (mobileFullscreenSupported()) {
     try {
       if (root.requestFullscreen) {
-        await root.requestFullscreen({
-          navigationUI: "hide"
-        });
+        await root.requestFullscreen();
       } else if (
         root.webkitRequestFullscreen
       ) {
@@ -8796,7 +8798,6 @@ if (mobileFullscreenButton) {
   mobileFullscreenButton.addEventListener(
     "pointerdown",
     event => {
-      event.preventDefault();
       event.stopPropagation();
     }
   );
