@@ -30235,6 +30235,21 @@ function v0828MeetFalseParents() {
       state.storyFlags
         .trueFatherHasTattoo = true;
 
+      if (state.randomEventState) {
+        state.randomEventState.pending = false;
+      }
+
+      if (state.smallEventState) {
+        state.smallEventState.pending = false;
+      }
+
+      if (state.danger) {
+        state.danger.phase = "safe";
+        state.danger.time = 0;
+        state.danger.enemy = null;
+        state.danger.cooldown = 9999;
+      }
+
       fade(
         "De volta para casa",
         "Por alguns minutos, parece que a busca terminou.",
@@ -31664,6 +31679,15 @@ getNear = function() {
     v0828GetNearBase();
 
   if (
+    [
+      "garciaStatement",
+      "westEvidence"
+    ].includes(target?.action)
+  ) {
+    return null;
+  }
+
+  if (
     state.room === "basement" &&
     [
       "basementNotebook",
@@ -32584,6 +32608,7 @@ const V0828_ENDINGS_META =
 let v0828TruthGame = {
   active: false,
   round: 0,
+  roundStartedAt: 0,
   progress: 0.5,
   time: 0,
   duration: 5.2,
@@ -33060,6 +33085,8 @@ function v0828StartTruthRound(
     v0828EnsureFinalArc();
 
   f.round = round;
+  v0828TruthGame.roundStartedAt =
+    elapsed;
 
   say(
     v0828TruthNarrative(round),
@@ -34640,12 +34667,152 @@ drawWorld = function() {
         "#050607"
       );
 
-      if (f.round === 6) {
+      const roundAge =
+        Math.max(
+          0,
+          elapsed -
+            v0828TruthGame.roundStartedAt
+        );
+
+      if (f.round === 3) {
+        const helpers = [
+          ["FLORINDA", "npcFemale"],
+          ["RAIMUNDO", "npcMale"],
+          ["ANÍSIO", "npcMale"],
+          ["HOMEM DA PRAÇA", "npcMale"]
+        ];
+
+        const index =
+          Math.min(
+            helpers.length - 1,
+            Math.floor(
+              roundAge / 1.25
+            )
+          );
+
+        const [name, kind] =
+          helpers[index];
+
+        const hx =
+          state.x - 70;
+        const hy =
+          state.y + 12;
+
+        for (let i = 0; i < 7; i++) {
+          const a =
+            0.10 +
+            (i % 3) * 0.04;
+          rect(
+            hx - 20 + i * 6,
+            hy - 44 -
+              (i % 2) * 7,
+            18,
+            26,
+            "rgba(3,4,5," +
+              a +
+              ")"
+          );
+        }
+
         person(
-          770,
+          hx,
+          hy,
+          kind,
+          0,
+          "right",
+          0.92
+        );
+
+        txt(
+          name,
+          hx - 28,
+          hy - 47,
+          "#b8b2a5",
+          7
+        );
+      }
+
+      if (f.round === 4) {
+        c.save();
+        c.translate(
+          state.x - 72,
+          state.y + 16
+        );
+        c.rotate(Math.PI / 2);
+        person(
+          0,
+          0,
+          "npcMale",
+          0,
+          "down",
+          0.92
+        );
+        c.restore();
+
+        rect(
+          state.x - 93,
+          state.y + 21,
+          47,
+          3,
+          "rgba(98,39,36,0.58)"
+        );
+      }
+
+      if (f.round === 5) {
+        const hx =
+          state.x - 105;
+        const hy =
+          state.y - 72;
+
+        rect(
+          hx,
+          hy,
+          150,
+          92,
+          "rgba(40,34,31,0.42)"
+        );
+        rect(
+          hx + 55,
+          hy + 48,
+          32,
+          44,
+          "rgba(8,8,9,0.70)"
+        );
+
+        for (let i = 0; i < 8; i++) {
+          rect(
+            hx +
+              ((i * 31 +
+                Math.floor(
+                  elapsed * 29
+                )) % 140),
+            hy +
+              ((i * 17) % 78),
+            20,
+            1,
+            "rgba(230,230,220,0.16)"
+          );
+        }
+      }
+
+      if (f.round === 6) {
+        const fatherProgress =
+          Math.min(
+            1,
+            roundAge / 4.5
+          );
+
+        const fatherX =
+          930 -
+          fatherProgress * 165;
+
+        person(
+          fatherX,
           405,
           "father",
-          0,
+          fatherProgress < 1
+            ? elapsed * 8
+            : 0,
           "left"
         );
       }
