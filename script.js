@@ -5752,7 +5752,10 @@ function drawCharacterSprite(
 
     // O soco agora usa a animação thrust.png do player.
 
-    if (!state.finished) return;
+    if (
+      !state.finished ||
+      state.finalArc?.cellarEntered
+    ) return;
 
     const styles = {
       safe: [
@@ -7963,7 +7966,10 @@ drawWorld = function () {
     c.restore();
   }
 
-  if (state.stage !== "prologue") {
+  if (
+    state.stage !== "prologue" &&
+    !state.finalArc?.cellarEntered
+  ) {
     // A barra de perigo foi removida. O jogador recebe somente
     // avisos diegéticos na tela quando a ameaça muda de estado.
 
@@ -34985,6 +34991,88 @@ updateHud = function() {
         / · LANTERNA(?: DO CELULAR)? \d+%/g,
         " · LANTERNA CELULAR"
       );
+  }
+};
+
+// ---------------------------------------------------------
+// 0.8.28 — GUARDAS FINAIS DE HUD / INVENTÁRIO
+// ---------------------------------------------------------
+
+const v0828FinalInventoryBase =
+  v0645OpenInventory;
+
+v0645OpenInventory = function() {
+  v0828FinalInventoryBase();
+
+  if (
+    !state?.finalArc?.cellarEntered
+  ) {
+    return;
+  }
+
+  const root =
+    $("modalText");
+
+  if (!root) {
+    return;
+  }
+
+  const status =
+    root.querySelector("p");
+
+  if (status) {
+    status.textContent =
+      state.finalArc.epilogueActive
+        ? "Epílogo · sem sistemas de sobrevivência."
+        : "Sequência final · fome e perigo desativados.";
+  }
+
+  for (
+    const node of
+      root.querySelectorAll("div")
+  ) {
+    if (
+      node.childElementCount === 0 &&
+      /Porção de comida|Lanterna do celular/.test(
+        node.textContent || ""
+      )
+    ) {
+      if (
+        node.textContent.includes(
+          "Porção de comida"
+        )
+      ) {
+        node.remove();
+      }
+    }
+  }
+};
+
+const v0828FinalHudBase =
+  updateHud;
+
+updateHud = function() {
+  v0828FinalHudBase();
+
+  if (!state?.finalArc) {
+    return;
+  }
+
+  if (
+    state.finalArc.epilogueActive
+  ) {
+    $("inventory").textContent = "";
+    $("day").textContent = "";
+    $("time").textContent = "DIA";
+    $("timeNote").textContent =
+      "UMA SEMANA DEPOIS";
+  } else if (
+    state.finalArc.cellarEntered
+  ) {
+    $("inventory").textContent =
+      state.finalArc.cellarKeyObtained
+        ? "CHAVE DO PORÃO · CELULAR"
+        : "CELULAR";
   }
 };
 
