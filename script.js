@@ -17882,16 +17882,38 @@ function v070DrawMineWorld() {
 
   // Mãe permanece fisicamente na mina; não existe pai real aqui.
   if (!state.ending?.complete) {
-    person(
-      V070_MOTHER_POS.x,
-      V070_MOTHER_POS.y,
-      "mother",
-      0,
-      state.x < V070_MOTHER_POS.x
-        ? "left"
-        : "right",
-      0.96
-    );
+    if (
+      typeof v0828CanonicalLateArc === "function" &&
+      v0828CanonicalLateArc() &&
+      !state.finalArc?.motherFound
+    ) {
+      c.save();
+      c.translate(
+        V070_MOTHER_POS.x,
+        V070_MOTHER_POS.y
+      );
+      c.rotate(Math.PI / 2);
+      person(
+        0,
+        0,
+        "mother",
+        0,
+        "down",
+        0.96
+      );
+      c.restore();
+    } else {
+      person(
+        V070_MOTHER_POS.x,
+        V070_MOTHER_POS.y,
+        "mother",
+        0,
+        state.x < V070_MOTHER_POS.x
+          ? "left"
+          : "right",
+        0.96
+      );
+    }
   }
 
   if (
@@ -32373,6 +32395,2252 @@ window.addEventListener(
   },
   true
 );
+
+// =========================================================
+// 0.8.28 — ARCO FINAL CANÔNICO · PARTE 2
+// Mina → REAL × MENTIRA → finais → epílogo → cena final
+// =========================================================
+
+const V0828_ENDINGS_META =
+  "a_quinta_sombra_endings_v1";
+
+let v0828TruthGame = {
+  active: false,
+  round: 0,
+  progress: 0.5,
+  time: 0,
+  duration: 5.2,
+  specialFather: false,
+  prompt: "",
+  lastOutcome: null
+};
+
+let v0828FinalScene = {
+  active: false,
+  time: 0,
+  creditsOpened: false
+};
+
+function v0828LoadEndingMeta() {
+  try {
+    const raw =
+      localStorage.getItem(
+        V0828_ENDINGS_META
+      );
+
+    if (!raw) {
+      return {
+        bad: false,
+        good: false
+      };
+    }
+
+    const data =
+      JSON.parse(raw);
+
+    return {
+      bad: Boolean(data.bad),
+      good: Boolean(data.good)
+    };
+  } catch {
+    return {
+      bad: false,
+      good: false
+    };
+  }
+}
+
+function v0828SaveEndingMeta() {
+  const f =
+    state
+      ? v0828EnsureFinalArc()
+      : null;
+
+  const current =
+    v0828LoadEndingMeta();
+
+  const data = {
+    bad:
+      current.bad ||
+      Boolean(
+        f?.badEndingUnlocked
+      ),
+    good:
+      current.good ||
+      Boolean(
+        f?.goodEndingUnlocked
+      )
+  };
+
+  try {
+    localStorage.setItem(
+      V0828_ENDINGS_META,
+      JSON.stringify(data)
+    );
+  } catch {}
+
+  return data;
+}
+
+function v0828RefreshEndingsButton() {
+  const button =
+    $("endings");
+
+  if (!button) return;
+
+  const meta =
+    v0828LoadEndingMeta();
+
+  button.hidden =
+    !(meta.bad || meta.good);
+}
+
+function v0828EnterMineDeep() {
+  const f =
+    v0828EnsureFinalArc();
+
+  f.phase = "mine";
+
+  state.chapter9 =
+    state.chapter9 || {};
+  state.chapter9.tunnelSeen = true;
+  state.chapter9.phase = "mine";
+  state.chapter9.motherMet = false;
+  state.chapter9.memoryStarted = false;
+
+  state.flashlight.on = true;
+
+  fade(
+    "Interior da mina",
+    "A construção doméstica termina. Restam madeira, metal, canos e trilhos.",
+    () => {
+      state.room = "mineDeep";
+      state.x = 105;
+      state.y = 390;
+      state.facing = "right";
+      state.walk = 0;
+
+      keys.clear();
+      near = null;
+      updateHud();
+      save();
+    }
+  );
+}
+
+function v0828MotherConversation() {
+  const f =
+    v0828EnsureFinalArc();
+
+  if (f.motherFound) {
+    say([
+      [
+        "Mãe",
+        "Eu estou aqui. Só ainda não sei explicar o que aconteceu depois do mercado."
+      ]
+    ]);
+    return;
+  }
+
+  say(
+    [
+      ["Mãe", "...Filhos?"],
+      ["Estevão", "MÃE!!"],
+      ["Irmão", "MÃÃE!!"],
+      [
+        "Estevão",
+        "Eu sabia que tinha algo de estranho..."
+      ],
+      [
+        "Mãe",
+        "Me perdoa, meus pequenos, por deixar vocês sozinhos."
+      ],
+      [
+        "Irmão",
+        "Tudo bem, mãe. Você não tinha como saber."
+      ],
+      [
+        "Estevão",
+        "Isso mesmo. O que importa é que você está bem. Mas e o pai?"
+      ],
+      [
+        "Mãe",
+        "Ah, seu pai...? Eu não sei, de verdade."
+      ],
+      [
+        "Mãe",
+        "Eu lembro do mercado... depois eu não sei."
+      ],
+      [
+        "Mãe",
+        "Quando eu consegui entender onde eu estava, eu já estava aqui. E ele não estava comigo."
+      ]
+    ],
+    () => {
+      f.motherFound = true;
+      f.worldDay = true;
+      f.phase = "mine";
+
+      state.chapter9.motherMet =
+        true;
+      state.chapter9.phase =
+        "motherFound";
+
+      state.storyFlags =
+        state.storyFlags || {};
+      state.storyFlags
+        .motherRescued = true;
+      state.storyFlags
+        .sys07hBlackout = false;
+      state.storyFlags
+        .sysHunger = false;
+      state.storyFlags
+        .sysDanger = false;
+
+      state.minutes = 12 * 60;
+      state.firstExit = false;
+
+      v0828RememberArcCheckpoint(
+        "mother"
+      );
+
+      v06Toast(
+        "A partir daqui, o mundo exterior está em período diurno.",
+        3.8
+      );
+
+      save();
+
+      setTimeout(
+        v0828StartObserverFinal,
+        450
+      );
+    }
+  );
+}
+
+function v0828DrawMineCompanions() {
+  const f =
+    v0828EnsureFinalArc();
+
+  if (
+    !f ||
+    !f.useCanonicalLateArc ||
+    ![
+      "tunnel",
+      "mine",
+      "observer"
+    ].includes(f.phase)
+  ) {
+    return;
+  }
+
+  if (
+    state.room ===
+      "undergroundPassage"
+  ) {
+    c.save();
+    c.translate(
+      -Math.floor(camera.x),
+      -Math.floor(camera.y)
+    );
+
+    const behind =
+      state.facing === "left"
+        ? 34
+        : state.facing === "right"
+          ? -34
+          : 0;
+
+    const behindY =
+      state.facing === "up"
+        ? 34
+        : state.facing === "down"
+          ? -34
+          : 22;
+
+    person(
+      state.x + behind,
+      state.y + behindY,
+      "brother",
+      state.walk * 0.8,
+      state.facing,
+      0.82
+    );
+
+    c.restore();
+  }
+
+  if (
+    state.room === "mineDeep" &&
+    f.motherFound
+  ) {
+    c.save();
+    c.translate(
+      -Math.floor(camera.x),
+      -Math.floor(camera.y)
+    );
+
+    const hideBrother =
+      f.observerFinalStarted &&
+      f.round >= 1;
+    const hideMother =
+      f.observerFinalStarted &&
+      f.round >= 2;
+
+    if (!hideBrother) {
+      person(
+        V070_MOTHER_POS.x - 38,
+        V070_MOTHER_POS.y + 26,
+        "brother",
+        0,
+        "right",
+        0.82
+      );
+    }
+
+    if (!hideMother) {
+      person(
+        V070_MOTHER_POS.x,
+        V070_MOTHER_POS.y,
+        "mother",
+        0,
+        "left",
+        0.96
+      );
+    }
+
+    c.restore();
+  }
+}
+
+function v0828StartObserverFinal() {
+  const f =
+    v0828EnsureFinalArc();
+
+  if (
+    f.observerFinalStarted
+  ) {
+    return;
+  }
+
+  f.observerFinalStarted = true;
+  f.phase = "observer";
+  f.realScore = 0;
+  f.lieScore = 0;
+  f.round = 0;
+
+  state.storyFlags.sys07hBlackout =
+    false;
+  state.storyFlags.sysHunger =
+    false;
+  state.storyFlags.sysDanger =
+    false;
+
+  v0828RememberArcCheckpoint(
+    "preObserver"
+  );
+
+  v0828StaticUntil =
+    elapsed + 1.4;
+
+  say(
+    [
+      "Vocês se viram para voltar pela passagem.",
+      "A saída parece escurecer antes de qualquer um conseguir dar o primeiro passo.",
+      "A forma preta ocupa o corredor. Não tem olhos definidos. Não tem boca. Só interferência nas bordas.",
+      [
+        "Mãe",
+        "Estevão... não escuta tudo o que ele disser."
+      ]
+    ],
+    () => {
+      v0828StartTruthRound(1);
+    }
+  );
+}
+
+function v0828TruthNarrative(round) {
+  const f =
+    v0828EnsureFinalArc();
+
+  f.round = round;
+
+  if (round === 1) {
+    return [
+      [
+        "Observador",
+        "Você é filho único."
+      ],
+      "A voz do seu irmão some da sua percepção. O espaço ao lado da sua mãe parece vazio."
+    ];
+  }
+
+  if (round === 2) {
+    return [
+      [
+        "Observador",
+        "Essa mulher não é sua mãe."
+      ],
+      "Agora a figura da sua mãe também desaparece da percepção. O corredor parece ter sempre estado vazio."
+    ];
+  }
+
+  if (round === 3) {
+    return [
+      "Sombras surgem uma por vez atrás de você.",
+      [
+        "Observador",
+        "A vizinha nunca protegeu você."
+      ],
+      [
+        "Observador",
+        "Aquele velho só alimentou sua paranoia."
+      ],
+      [
+        "Observador",
+        "Nem a polícia acreditou em você."
+      ],
+      [
+        "Observador",
+        "E aquele homem da Praça? Você sequer sabe quem ele era."
+      ]
+    ];
+  }
+
+  if (round === 4) {
+    return [
+      [
+        "Observador",
+        "Não havia corpo."
+      ],
+      [
+        "Observador",
+        "Não houve perseguição."
+      ],
+      [
+        "Observador",
+        "Você procurou por tanto tempo que começou a enxergar coisas."
+      ],
+      [
+        "Observador",
+        "Era só o efeito de procurar por nada."
+      ]
+    ];
+  }
+
+  if (round === 5) {
+    return [
+      [
+        "Observador",
+        "Quantas vezes você voltou para aquela casa?"
+      ],
+      [
+        "Observador",
+        "Quantas vezes acordou lá sem saber como chegou?"
+      ],
+      [
+        "Observador",
+        "Você chama aquilo de lar?"
+      ]
+    ];
+  }
+
+  return [
+    "Uma figura aparece no fundo do corredor e começa a caminhar na sua direção.",
+    "Visualmente, é seu pai.",
+    ["Observador", "E o seu pai?"],
+    [
+      "Observador",
+      "Vai querer ele de volta... ou vai deixar ele ir embora?"
+    ],
+    ["Estevão", "Eu ace—"],
+    "...",
+    "A voz do seu irmão atravessa a lembrança.",
+    [
+      "Irmão",
+      "Toma cuidado, por favor. Eu só tenho você."
+    ],
+    "Comida. O carrinho. A busca. A cozinha. A fuga. Sua mãe no chão da mina.",
+    ["Estevão", "Não..."],
+    [
+      "Estevão",
+      "ISSO NÃO É REAL!!!"
+    ]
+  ];
+}
+
+function v0828StartTruthRound(
+  round
+) {
+  const f =
+    v0828EnsureFinalArc();
+
+  f.round = round;
+
+  say(
+    v0828TruthNarrative(round),
+    () => {
+      v0828BeginTruthInput(round);
+    }
+  );
+}
+
+function v0828BeginTruthInput(
+  round
+) {
+  v0828TruthGame.active = true;
+  v0828TruthGame.round = round;
+  v0828TruthGame.time = 0;
+  v0828TruthGame.progress =
+    round === 6
+      ? 0.18
+      : 0.50;
+  v0828TruthGame.duration =
+    round === 6
+      ? 4.2
+      : 5.2;
+  v0828TruthGame.specialFather =
+    round === 6;
+  v0828TruthGame.prompt =
+    round === 6
+      ? "UM ÚNICO F"
+      : "APERTE F PARA RESISTIR";
+  v0828TruthGame.lastOutcome =
+    null;
+
+  transitionBusy = true;
+  keys.clear();
+  $("hud").hidden = true;
+  $("prompt").hidden = true;
+}
+
+function v0828TruthPress() {
+  if (!v0828TruthGame.active) {
+    return;
+  }
+
+  if (
+    v0828TruthGame.specialFather
+  ) {
+    v0828TruthGame.progress = 1;
+    v0828TruthResolve("lie");
+    return;
+  }
+
+  v0828TruthGame.progress =
+    Math.min(
+      1,
+      v0828TruthGame.progress + 0.13
+    );
+}
+
+function v0828TruthResolve(
+  forced
+) {
+  if (!v0828TruthGame.active) {
+    return;
+  }
+
+  const f =
+    v0828EnsureFinalArc();
+
+  const outcome =
+    forced ||
+    (
+      v0828TruthGame.progress >= 0.55
+        ? "lie"
+        : "real"
+    );
+
+  v0828TruthGame.active = false;
+  v0828TruthGame.lastOutcome =
+    outcome;
+
+  if (outcome === "lie") {
+    f.lieScore += 1;
+  } else {
+    f.realScore += 1;
+  }
+
+  transitionBusy = false;
+  $("hud").hidden = false;
+
+  v06Toast(
+    outcome === "lie"
+      ? "MENTIRA +1"
+      : "REAL +1",
+    1.8
+  );
+
+  save();
+
+  if (f.round < 6) {
+    setTimeout(
+      () =>
+        v0828StartTruthRound(
+          f.round + 1
+        ),
+      450
+    );
+    return;
+  }
+
+  setTimeout(
+    v0828ResolveTruthEnding,
+    550
+  );
+}
+
+function v0828ResolveTruthEnding() {
+  const f =
+    v0828EnsureFinalArc();
+
+  const tieBrokenByFather =
+    f.lieScore === f.realScore &&
+    v0828TruthGame.lastOutcome ===
+      "lie";
+
+  if (
+    f.lieScore > f.realScore ||
+    tieBrokenByFather
+  ) {
+    v0828GoodEnding();
+  } else {
+    v0828BadEnding();
+  }
+}
+
+function v0828BadEnding() {
+  const f =
+    v0828EnsureFinalArc();
+
+  f.badEndingUnlocked = true;
+  f.phase = "badEnding";
+
+  state.ending =
+    state.ending || {};
+  state.ending.id =
+    "observerDominated";
+  state.ending.complete = true;
+
+  v0828SaveEndingMeta();
+  v0828RefreshEndingsButton();
+  save();
+
+  modal(
+    "FINAL RUIM",
+    "Você acreditou nas ilusões e mentiras do Observador.\n\nO OBSERVADOR TE DOMINOU",
+    [
+      [
+        "Voltar ao menu",
+        () => {
+          closeModal();
+          mode = "menu";
+          $("menu").hidden = false;
+          $("hud").hidden = true;
+          $("prompt").hidden = true;
+          v0828RefreshEndingsButton();
+        }
+      ]
+    ]
+  );
+}
+
+function v0828GoodEnding() {
+  const f =
+    v0828EnsureFinalArc();
+
+  f.goodEndingUnlocked = true;
+  f.phase = "epilogue";
+
+  state.ending =
+    state.ending || {};
+  state.ending.id = "good";
+  state.ending.complete = true;
+
+  state.storyFlags =
+    state.storyFlags || {};
+  state.storyFlags.wheelchairGone =
+    true;
+  state.storyFlags.motherRescued =
+    true;
+
+  v0828SaveEndingMeta();
+  v0828RefreshEndingsButton();
+  save();
+
+  say(
+    [
+      "A pressão some da sua cabeça.",
+      "Sua mãe e seu irmão reaparecem na sua percepção exatamente onde sempre estiveram.",
+      "O Observador recua para a escuridão da mina. Não existe confirmação de que foi destruído."
+    ],
+    () => {
+      v0828StartEpilogue();
+    }
+  );
+}
+
+function v0828StartEpilogue() {
+  const f =
+    v0828EnsureFinalArc();
+
+  f.epilogueActive = true;
+  f.phase = "epilogue";
+  f.finalHomeUnlocked = false;
+
+  state.firstExit = false;
+  state.minutes = 12 * 60;
+  state.storyFlags.sys07hBlackout =
+    false;
+  state.storyFlags.sysHunger =
+    false;
+  state.storyFlags.sysDanger =
+    false;
+
+  if (state.danger) {
+    state.danger.phase = "safe";
+    state.danger.enemy = null;
+  }
+
+  if (state.randomEventState) {
+    state.randomEventState.pending =
+      false;
+  }
+
+  if (state.smallEventState) {
+    state.smallEventState.pending =
+      false;
+  }
+
+  v0828RememberArcCheckpoint(
+    "epilogue"
+  );
+
+  fade(
+    "UMA SEMANA DEPOIS",
+    "Forgotten · durante o dia",
+    () => {
+      v076SetOutdoorRoom(
+        "village",
+        650,
+        780,
+        "up"
+      );
+    }
+  );
+
+  updateHud();
+  save();
+}
+
+function v0828RegisterEpilogue(
+  id
+) {
+  const f =
+    v0828EnsureFinalArc();
+
+  if (
+    !f.epilogueTalkedNPCs.includes(
+      id
+    )
+  ) {
+    f.epilogueTalkedNPCs.push(id);
+  }
+
+  if (id === "raimundo") {
+    f.raimundoEpilogueDone = true;
+  }
+
+  save();
+}
+
+function v0828EpilogueDialogue(
+  id
+) {
+  const f =
+    v0828EnsureFinalArc();
+
+  if (id === "raimundo") {
+    say(
+      [
+        [
+          "Raimundo",
+          "Como você está, garoto? Fiquei sabendo que encontrou sua mãe. Fico feliz em saber."
+        ],
+        [
+          "Estevão",
+          "Obrigado, mas eu vim aqui pra tirar uma dúvida sobre o meu pai."
+        ],
+        [
+          "Raimundo",
+          "Ah, o seu pai, sim sim, pode falar."
+        ],
+        [
+          "Estevão",
+          "Gostaria de saber se você sabe onde ele foi parar."
+        ],
+        [
+          "Raimundo",
+          "Infelizmente eu não sei, garoto."
+        ],
+        [
+          "Estevão",
+          "E o senhor conhece alguém chamado Split? Ele tem o mesmo sobrenome que eu."
+        ],
+        [
+          "Raimundo",
+          "Esse nome, garoto, é do seu avô. Ele foi quem fundou e comandou aquela mina e, no dia do desabamento, acabou falecendo."
+        ],
+        [
+          "Estevão",
+          "Mas por que meu pai nunca falou isso?"
+        ],
+        [
+          "Raimundo",
+          "Pelo que eu me lembro, seu pai teve responsabilidade no desabamento. Ele era adolescente como você. Carregou essa culpa e nunca gostou de falar sobre isso."
+        ]
+      ],
+      () => {
+        v0828RegisterEpilogue(
+          "raimundo"
+        );
+      }
+    );
+    return;
+  }
+
+  if (id === "claudia") {
+    say(
+      [
+        [
+          "Estevão",
+          "Oi, Cláudia. Você lembra de mim?"
+        ],
+        [
+          "Cláudia",
+          "Sim, você que veio me perguntar do Garcia, né? E sobre seus pais, está tudo bem?"
+        ],
+        [
+          "Estevão",
+          "Achei mais ou menos. Eu consegui achar minha mãe, mas meu pai sumiu."
+        ],
+        [
+          "Cláudia",
+          "Nossa, espero que você e sua família fiquem bem então. Até breve."
+        ]
+      ],
+      () =>
+        v0828RegisterEpilogue(
+          "claudia"
+        )
+    );
+    return;
+  }
+
+  if (id === "norberto") {
+    say(
+      [
+        ["Estevão", "Oi, tio."],
+        [
+          "Norberto",
+          "Opa, Estevão. Fiquei sabendo que você achou sua mãe. Mas meu irmão sumiu..."
+        ],
+        [
+          "Estevão",
+          "Infelizmente ele não estava junto dela quando eu encontrei ela."
+        ],
+        [
+          "Norberto",
+          "Se eu descobrir alguma coisa, aviso vocês."
+        ],
+        [
+          "Estevão",
+          "Tá bom. Obrigado, tio."
+        ]
+      ],
+      () =>
+        v0828RegisterEpilogue(
+          "norberto"
+        )
+    );
+    return;
+  }
+
+  if (id === "florinda") {
+    say(
+      [
+        [
+          "Florinda",
+          "Estevão! Fiquei sabendo da sua mãe. Graças a Deus vocês encontraram ela."
+        ],
+        [
+          "Estevão",
+          "Ela ainda está se recuperando."
+        ],
+        [
+          "Florinda",
+          "Cuida dela. E do seu irmão também."
+        ],
+        ["Estevão", "Pode deixar."],
+        [
+          "Florinda",
+          "E de você, viu?"
+        ],
+        ["Estevão", "...Pode deixar."]
+      ],
+      () =>
+        v0828RegisterEpilogue(
+          "florinda"
+        )
+    );
+    return;
+  }
+
+  if (id === "anisio") {
+    say(
+      [
+        [
+          "Anísio",
+          "Soube que encontrou sua mãe."
+        ],
+        ["Estevão", "Encontrei."],
+        [
+          "Anísio",
+          "Fico feliz. E... sobre algumas coisas que você me contou... talvez eu devesse ter escutado melhor."
+        ],
+        ["Estevão", "Tudo bem."],
+        [
+          "Anísio",
+          "Não. Não está. Mas fico feliz que vocês estejam seguros."
+        ]
+      ],
+      () =>
+        v0828RegisterEpilogue(
+          "anisio"
+        )
+    );
+    return;
+  }
+
+  if (id === "garcia") {
+    say(
+      [
+        ["Garcia", "Garoto..."],
+        ["Estevão", "Oi."],
+        [
+          "Garcia",
+          "Soube da sua mãe."
+        ],
+        [
+          "Estevão",
+          "Ela está bem."
+        ],
+        [
+          "Garcia",
+          "Que bom. E sobre aquele dia..."
+        ],
+        [
+          "Estevão",
+          "Eu sei que não foi você."
+        ],
+        ["Garcia", "...Obrigado."]
+      ],
+      () =>
+        v0828RegisterEpilogue(
+          "garcia"
+        )
+    );
+    return;
+  }
+
+  if (id === "market") {
+    say(
+      [
+        [
+          "Funcionário",
+          "Você é o garoto que estava procurando os pais, não é?"
+        ],
+        ["Estevão", "Sou."],
+        ["Funcionário", "Encontrou?"],
+        [
+          "Estevão",
+          "Minha mãe voltou pra casa."
+        ],
+        [
+          "Funcionário",
+          "Que bom. Espero que seu pai apareça também."
+        ],
+        ["Estevão", "Eu também."]
+      ],
+      () =>
+        v0828RegisterEpilogue(
+          "market"
+        )
+    );
+    return;
+  }
+
+  if (id === "osmar") {
+    say(
+      [
+        [
+          "Osmar",
+          "E aí, garoto. Encontrou eles?"
+        ],
+        [
+          "Estevão",
+          "Minha mãe. Meu pai ainda não."
+        ],
+        [
+          "Osmar",
+          "Poxa... espero que encontrem ele também."
+        ],
+        ["Estevão", "Obrigado."]
+      ],
+      () =>
+        v0828RegisterEpilogue(
+          "osmar"
+        )
+    );
+  }
+}
+
+function v0828CanEnterFinalHome() {
+  const f =
+    v0828EnsureFinalArc();
+
+  if (
+    f.epilogueTalkedNPCs.length < 5
+  ) {
+    say([
+      "Eu preciso falar com aqueles que me ajudaram, não posso entrar."
+    ]);
+    return false;
+  }
+
+  if (!f.raimundoEpilogueDone) {
+    say([
+      "Ainda não... preciso falar com o Raimundo antes de voltar."
+    ]);
+    return false;
+  }
+
+  return true;
+}
+
+function v0828EnterFinalHome() {
+  const f =
+    v0828EnsureFinalArc();
+
+  if (!v0828CanEnterFinalHome()) {
+    return;
+  }
+
+  f.finalHomeUnlocked = true;
+  f.phase = "finalHome";
+  f.brotherWithPlayer = false;
+
+  go(
+    "living",
+    500,
+    215
+  );
+
+  updateHud();
+  save();
+}
+
+function v0828FinalBrotherConversation() {
+  const f =
+    v0828EnsureFinalArc();
+
+  if (f.homeBrotherDone) {
+    say([
+      [
+        "Irmão",
+        "Vamos falar com a mãe."
+      ]
+    ]);
+    return;
+  }
+
+  say(
+    [
+      [
+        "Estevão",
+        "Oi, irmão. Loucura o que veio acontecendo, né?"
+      ],
+      [
+        "Irmão",
+        "Sim. Eu achei que nós não íamos sair dessa, mas graças a você conseguimos."
+      ],
+      [
+        "Estevão",
+        "Que nada. Graças a você e a todo mundo que me ajudou. A Florinda, Raimundo, polícia, mercado... graças a eles nossa mãe está aqui."
+      ],
+      [
+        "Irmão",
+        "Verdade... mas eu ainda sinto falta do pai."
+      ],
+      [
+        "Estevão",
+        "Sim. Eu também. Eu falei com o Raimundo. Ele falou que o Split, aquele nome que estava no porão, era nosso avô. E que o pai teve alguma coisa a ver com a tragédia."
+      ],
+      [
+        "Irmão",
+        "Será que ele se lembrou e a culpa voltou? Mas por que ele iria sumir assim do nada?"
+      ],
+      [
+        "Estevão",
+        "Eu não sei, irmão. Eu não sei. Mas não vamos pensar muito nisso agora. Vamos aproveitar que nossa mãe está em casa."
+      ],
+      [
+        "Irmão",
+        "Tá... vamos falar com ela."
+      ]
+    ],
+    () => {
+      f.homeBrotherDone = true;
+      f.brotherWithPlayer = true;
+      updateHud();
+      save();
+    }
+  );
+}
+
+function v0828FinalMotherConversation() {
+  const f =
+    v0828EnsureFinalArc();
+
+  if (!f.homeBrotherDone) {
+    say([
+      "Preciso falar com meu irmão primeiro."
+    ]);
+    return;
+  }
+
+  if (f.homeMotherDone) {
+    say([
+      [
+        "Mãe",
+        "Eu amo vocês. Vão descansar um pouco."
+      ]
+    ]);
+    return;
+  }
+
+  say(
+    [
+      [
+        "Irmão",
+        "Mãe, o Estevão me falou que o Split é nosso avô?"
+      ],
+      [
+        "Mãe",
+        "Oi, meus amores. E como vocês descobriram isso? Seu pai nunca falou sobre isso."
+      ],
+      [
+        "Estevão",
+        "A gente achou o nome lá no porão. Aí hoje eu perguntei pro Raimundo e ele falou a história."
+      ],
+      [
+        "Mãe",
+        "Ah, o Raimundo... ele é uma pessoa incrível. Ele e seu pai eram grandes amigos, mesmo com a diferença de idade."
+      ],
+      [
+        "Estevão",
+        "É? Quantos anos o Raimundo tem?"
+      ],
+      [
+        "Mãe",
+        "Pelo que eu me lembro, há cinco anos ele tinha feito 58. Então atualmente deve estar com 63. Vocês não lembram? Foram até no aniversário dele. Seu pai comprou bolo, comprou tudo."
+      ],
+      ["Os dois", "Não."],
+      [
+        "Irmão",
+        "Ele parece ser um cara muito legal mesmo."
+      ],
+      [
+        "Mãe",
+        "Enfim... vocês sabem que eu amo vocês, né? Vocês são tudo o que eu tenho. Não quero perder vocês nunca nessa vida."
+      ],
+      [
+        "Os dois",
+        "Nós também te amamos, mãe!"
+      ],
+      [
+        "Mãe",
+        "Vão lá pra sala que eu vou preparar alguma coisa aqui pra vocês."
+      ],
+      ["Os dois", "Tá bom."]
+    ],
+    () => {
+      f.homeMotherDone = true;
+      f.brotherWithPlayer = false;
+
+      fade(
+        "",
+        "",
+        () => {
+          go(
+            "living",
+            470,
+            215
+          );
+        }
+      );
+
+      updateHud();
+      save();
+    }
+  );
+}
+
+function v0828ThanksAndFinalFigure() {
+  const f =
+    v0828EnsureFinalArc();
+
+  if (
+    !f.homeMotherDone ||
+    f.finalFigureStarted
+  ) {
+    return;
+  }
+
+  f.finalFigureStarted = true;
+  f.phase = "finalFigure";
+
+  say(
+    [
+      ["Estevão", "Irmão."],
+      ["Irmão", "Oi?"]
+    ],
+    () => {
+      $("hud").hidden = true;
+      $("prompt").hidden = true;
+      keys.clear();
+
+      transitionBusy = true;
+
+      v0828FinalScene.active = true;
+      v0828FinalScene.time = 0;
+      v0828FinalScene.creditsOpened =
+        false;
+
+      save();
+    }
+  );
+}
+
+function v0828DrawTruthGame() {
+  if (!v0828TruthGame.active) {
+    return;
+  }
+
+  rect(
+    0,
+    0,
+    W,
+    H,
+    "rgba(3,4,6,0.78)"
+  );
+
+  txt(
+    "REAL × MENTIRA",
+    174,
+    58,
+    "#eee9dc",
+    12
+  );
+
+  txt(
+    "REAL",
+    74,
+    132,
+    "#c7b39a",
+    9
+  );
+
+  txt(
+    "MENTIRA",
+    W - 126,
+    132,
+    "#c6c9b7",
+    9
+  );
+
+  rect(
+    90,
+    146,
+    W - 180,
+    12,
+    "#252526"
+  );
+
+  const px =
+    90 +
+    (W - 180) *
+      v0828TruthGame.progress;
+
+  rect(
+    px - 4,
+    141,
+    8,
+    22,
+    "#e3ded0"
+  );
+
+  txt(
+    v0828TruthGame.prompt,
+    165,
+    193,
+    "#ded8c9",
+    8
+  );
+
+  const f =
+    v0828EnsureFinalArc();
+
+  txt(
+    "REAL " +
+      f.realScore +
+      "  ·  MENTIRA " +
+      f.lieScore,
+    158,
+    226,
+    "#a8a394",
+    8
+  );
+}
+
+function v0828DrawFinalFigureScene() {
+  const t =
+    v0828FinalScene.time;
+
+  rect(
+    0,
+    0,
+    W,
+    H,
+    "#030405"
+  );
+
+  if (t < 2.5) {
+    txt(
+      "Obrigado por tudo.",
+      173,
+      139,
+      "#e5dfd2",
+      12
+    );
+    return;
+  }
+
+  if (t >= 8.8) {
+    txt(
+      "A QUINTA SOMBRA",
+      151,
+      138,
+      "#e7e0d2",
+      14
+    );
+    return;
+  }
+
+  rect(
+    0,
+    0,
+    W,
+    H,
+    "#718069"
+  );
+
+  rect(
+    206,
+    64,
+    170,
+    115,
+    "#665746"
+  );
+  rect(
+    220,
+    78,
+    142,
+    87,
+    "#85705a"
+  );
+  rect(
+    278,
+    126,
+    34,
+    53,
+    "#312a25"
+  );
+
+  rect(
+    0,
+    192,
+    W,
+    78,
+    "#5d5b54"
+  );
+
+  const progress =
+    Math.max(
+      0,
+      Math.min(
+        1,
+        (t - 2.5) / 5.6
+      )
+    );
+
+  const x =
+    75 +
+    (295 - 75) *
+      progress;
+  const y =
+    235 -
+    70 *
+      progress;
+
+  person(
+    x,
+    y,
+    "father",
+    t * 8,
+    "up",
+    0.95
+  );
+}
+
+function v0828FinishFinalScene() {
+  if (
+    v0828FinalScene.creditsOpened
+  ) {
+    return;
+  }
+
+  v0828FinalScene.creditsOpened =
+    true;
+  v0828FinalScene.active = false;
+  transitionBusy = false;
+
+  const f =
+    v0828EnsureFinalArc();
+
+  f.completed = true;
+  f.phase = "complete";
+
+  state.ending =
+    state.ending || {};
+  state.ending.id = "good";
+  state.ending.complete = true;
+  state.ending.epilogueSeen = true;
+
+  save();
+
+  mode = "menu";
+  $("menu").hidden = false;
+  $("hud").hidden = true;
+  $("prompt").hidden = true;
+
+  v0828RefreshEndingsButton();
+  openCreditsScreen();
+}
+
+function v0828OpenEndingsMenu() {
+  const meta =
+    v0828LoadEndingMeta();
+
+  let sourceState =
+    state;
+
+  if (!sourceState) {
+    try {
+      const raw =
+        localStorage.getItem(SAVE);
+      sourceState =
+        raw
+          ? JSON.parse(raw)
+          : null;
+    } catch {}
+  }
+
+  const canReturn =
+    Boolean(
+      sourceState
+        ?.finalArcPreObserverCheckpoint
+    );
+
+  const buttons = [];
+
+  if (canReturn) {
+    buttons.push([
+      "VOLTAR PARA ANTES DO FINAL",
+      () => {
+        const unlocked =
+          v0828LoadEndingMeta();
+
+        state =
+          JSON.parse(
+            JSON.stringify(
+              sourceState
+                .finalArcPreObserverCheckpoint
+            )
+          );
+
+        v0828EnsureFinalArc();
+
+        state.finalArc
+          .badEndingUnlocked =
+          unlocked.bad;
+        state.finalArc
+          .goodEndingUnlocked =
+          unlocked.good;
+
+        state.gameOver = false;
+
+        closeModal();
+        enterGame();
+        updateHud();
+        save();
+      }
+    ]);
+  }
+
+  buttons.push([
+    "Voltar",
+    closeModal
+  ]);
+
+  modal(
+    "FINAIS",
+    "O OBSERVADOR TE DOMINOU      " +
+      (
+        meta.bad
+          ? "✓"
+          : "INCOMPLETO"
+      ) +
+      "\n" +
+      "A QUINTA SOMBRA             " +
+      (
+        meta.good
+          ? "✓"
+          : "INCOMPLETO"
+      ),
+    buttons
+  );
+}
+
+const v0828Part2PrepareBase =
+  prepareSystems;
+
+prepareSystems = function() {
+  v0828Part2PrepareBase();
+
+  if (!state) {
+    v0828RefreshEndingsButton();
+    return;
+  }
+
+  const f =
+    v0828EnsureFinalArc();
+  const meta =
+    v0828LoadEndingMeta();
+
+  f.badEndingUnlocked =
+    f.badEndingUnlocked ||
+    meta.bad;
+  f.goodEndingUnlocked =
+    f.goodEndingUnlocked ||
+    meta.good;
+
+  if (
+    typeof f.footprintsSeen !==
+      "boolean"
+  ) {
+    f.footprintsSeen = false;
+  }
+
+  v0828RefreshEndingsButton();
+};
+
+const v0828Part2GetNearBase =
+  getNear;
+
+getNear = function() {
+  const f =
+    v0828EnsureFinalArc();
+
+  if (
+    !f ||
+    !f.useCanonicalLateArc
+  ) {
+    return v0828Part2GetNearBase();
+  }
+
+  if (
+    state.room ===
+      "undergroundPassage"
+  ) {
+    if (state.x < 105) {
+      return {
+        label: "Voltar ao porão",
+        action:
+          "undergroundBack"
+      };
+    }
+
+    if (state.x > 2335) {
+      return {
+        label: "Seguir para a mina",
+        action:
+          "v0828MineDeep"
+      };
+    }
+  }
+
+  if (
+    state.room === "mineDeep" &&
+    !f.motherFound &&
+    Math.hypot(
+      state.x - V070_MOTHER_POS.x,
+      state.y - V070_MOTHER_POS.y
+    ) < 60
+  ) {
+    return {
+      label:
+        "Ajudar sua mãe",
+      action:
+        "v0828Mother"
+    };
+  }
+
+  if (f.epilogueActive) {
+    if (
+      state.room === "northRoad"
+    ) {
+      if (
+        Math.hypot(
+          state.x - 730,
+          state.y - 520
+        ) < 62
+      ) {
+        return {
+          label:
+            "Falar com tio Norberto",
+          action:
+            "v0828EpiNorberto"
+        };
+      }
+
+      if (
+        Math.hypot(
+          state.x - 170,
+          state.y - 520
+        ) < 62
+      ) {
+        return {
+          label:
+            "Falar com Osmar",
+          action:
+            "v0828EpiOsmar"
+        };
+      }
+    }
+
+    if (
+      state.room === "westRoad" &&
+      Math.hypot(
+        state.x - 350,
+        state.y - 360
+      ) < 54
+    ) {
+      return {
+        label:
+          "Falar com Garcia",
+        action:
+          "v0828EpiGarcia"
+      };
+    }
+  }
+
+  if (
+    f.phase === "finalHome" &&
+    state.room === "living"
+  ) {
+    const x =
+      housePoint(160);
+    const y =
+      housePoint(215);
+
+    if (
+      Math.hypot(
+        state.x - x,
+        state.y - y
+      ) < 62
+    ) {
+      return {
+        label:
+          f.homeMotherDone
+            ? "Falar com seu irmão"
+            : "Falar com seu irmão",
+        action:
+          f.homeMotherDone
+            ? "v0828Thanks"
+            : "v0828FinalBrother"
+      };
+    }
+  }
+
+  if (
+    f.phase === "finalHome" &&
+    state.room === "kitchen"
+  ) {
+    const x =
+      housePoint(430);
+    const y =
+      housePoint(210);
+
+    if (
+      Math.hypot(
+        state.x - x,
+        state.y - y
+      ) < 62
+    ) {
+      return {
+        label:
+          "Falar com sua mãe",
+        action:
+          "v0828FinalMother"
+      };
+    }
+  }
+
+  return v0828Part2GetNearBase();
+};
+
+const v0828Part2InteractBase =
+  interact;
+
+interact = function(action) {
+  const f =
+    v0828EnsureFinalArc();
+
+  if (
+    !f ||
+    !f.useCanonicalLateArc
+  ) {
+    v0828Part2InteractBase(
+      action
+    );
+    return;
+  }
+
+  if (
+    action ===
+      "v0828MineDeep"
+  ) {
+    v0828EnterMineDeep();
+    return;
+  }
+
+  if (
+    action ===
+      "v0828Mother"
+  ) {
+    v0828MotherConversation();
+    return;
+  }
+
+  if (f.epilogueActive) {
+    if (
+      [
+        "shopDoor",
+        "neighborDoor",
+        "vendor"
+      ].includes(action)
+    ) {
+      v0828EpilogueDialogue(
+        "florinda"
+      );
+      return;
+    }
+
+    if (
+      [
+        "policeDoor",
+        "policeOfficer"
+      ].includes(action)
+    ) {
+      v0828EpilogueDialogue(
+        "anisio"
+      );
+      return;
+    }
+
+    if (
+      action === "oldManTalk"
+    ) {
+      v0828EpilogueDialogue(
+        "raimundo"
+      );
+      return;
+    }
+
+    if (
+      action ===
+        "v0828ClaudiaDoor"
+    ) {
+      v0828EpilogueDialogue(
+        "claudia"
+      );
+      return;
+    }
+
+    if (
+      action === "marketClerk"
+    ) {
+      v0828EpilogueDialogue(
+        "market"
+      );
+      return;
+    }
+
+    if (
+      action ===
+        "v0828EpiNorberto"
+    ) {
+      v0828EpilogueDialogue(
+        "norberto"
+      );
+      return;
+    }
+
+    if (
+      action ===
+        "v0828EpiOsmar"
+    ) {
+      v0828EpilogueDialogue(
+        "osmar"
+      );
+      return;
+    }
+
+    if (
+      action ===
+        "v0828EpiGarcia"
+    ) {
+      v0828EpilogueDialogue(
+        "garcia"
+      );
+      return;
+    }
+
+    if (action === "home") {
+      v0828EnterFinalHome();
+      return;
+    }
+  }
+
+  if (
+    action ===
+      "v0828FinalBrother"
+  ) {
+    v0828FinalBrotherConversation();
+    return;
+  }
+
+  if (
+    action ===
+      "v0828FinalMother"
+  ) {
+    v0828FinalMotherConversation();
+    return;
+  }
+
+  if (
+    action === "v0828Thanks"
+  ) {
+    v0828ThanksAndFinalFigure();
+    return;
+  }
+
+  v0828Part2InteractBase(
+    action
+  );
+};
+
+const v0828Part2DrawBase =
+  drawWorld;
+
+drawWorld = function() {
+  if (v0828FinalScene.active) {
+    v0828DrawFinalFigureScene();
+    return;
+  }
+
+  v0828Part2DrawBase();
+
+  if (!state) return;
+
+  const f =
+    v0828EnsureFinalArc();
+
+  if (
+    f?.useCanonicalLateArc
+  ) {
+    v0828DrawMineCompanions();
+
+    if (f.epilogueActive) {
+      c.save();
+      c.translate(
+        -Math.floor(camera.x),
+        -Math.floor(camera.y)
+      );
+
+      if (
+        state.room === "northRoad"
+      ) {
+        person(
+          730,
+          520,
+          "npcMale",
+          0,
+          "down"
+        );
+        person(
+          170,
+          520,
+          "npcMale",
+          0,
+          "down"
+        );
+      }
+
+      if (
+        state.room === "westRoad"
+      ) {
+        person(
+          350,
+          360,
+          "npcMale",
+          0,
+          "down"
+        );
+      }
+
+      if (
+        f.phase === "finalHome" &&
+        state.room === "living"
+      ) {
+        person(
+          housePoint(160),
+          housePoint(215),
+          "brother",
+          0,
+          "right",
+          0.82
+        );
+      }
+
+      if (
+        f.phase === "finalHome" &&
+        state.room === "kitchen"
+      ) {
+        person(
+          housePoint(430),
+          housePoint(210),
+          "mother",
+          0,
+          "left",
+          0.96
+        );
+      }
+
+      c.restore();
+    }
+
+    if (
+      state.room === "mineDeep" &&
+      f.observerFinalStarted &&
+      f.phase === "observer"
+    ) {
+      c.save();
+      c.translate(
+        -Math.floor(camera.x),
+        -Math.floor(camera.y)
+      );
+
+      rect(
+        875,
+        300,
+        52,
+        76,
+        "#050607"
+      );
+      rect(
+        862,
+        326,
+        80,
+        16,
+        "#050607"
+      );
+
+      if (f.round === 6) {
+        person(
+          770,
+          405,
+          "father",
+          0,
+          "left"
+        );
+      }
+
+      c.restore();
+    }
+  }
+
+  v0828DrawTruthGame();
+};
+
+const v0828Part2UpdateBase =
+  update;
+
+update = function(dt) {
+  if (v0828FinalScene.active) {
+    elapsed += dt;
+    v0828FinalScene.time += dt;
+
+    if (
+      v0828FinalScene.time >=
+        10.8
+    ) {
+      v0828FinishFinalScene();
+    }
+
+    return;
+  }
+
+  if (v0828TruthGame.active) {
+    elapsed += dt;
+
+    const f =
+      v0828EnsureFinalArc();
+
+    v0828TruthGame.time += dt;
+
+    if (
+      !v0828TruthGame
+        .specialFather
+    ) {
+      const force =
+        0.055 +
+        f.realScore * 0.012;
+
+      v0828TruthGame.progress =
+        Math.max(
+          0,
+          v0828TruthGame.progress -
+            dt * force
+        );
+    }
+
+    if (
+      v0828TruthGame.time >=
+        v0828TruthGame.duration
+    ) {
+      v0828TruthResolve();
+    }
+
+    return;
+  }
+
+  v0828Part2UpdateBase(dt);
+
+  if (!state) return;
+
+  const f =
+    v0828EnsureFinalArc();
+
+  if (
+    !f?.useCanonicalLateArc
+  ) {
+    return;
+  }
+
+  if (
+    f.phase === "tunnel" &&
+    state.room ===
+      "undergroundPassage" &&
+    !f.footprintsSeen &&
+    state.x > 780
+  ) {
+    f.footprintsSeen = true;
+
+    say(
+      [
+        "Oxe, pegadas... por que tem pegadas aqui?"
+      ],
+      save
+    );
+  }
+
+  if (f.epilogueActive) {
+    state.firstExit = false;
+    state.minutes = 12 * 60;
+
+    if (state.danger) {
+      state.danger.phase = "safe";
+      state.danger.enemy = null;
+    }
+
+    if (state.randomEventState) {
+      state.randomEventState.pending =
+        false;
+    }
+
+    if (state.smallEventState) {
+      state.smallEventState.pending =
+        false;
+    }
+  }
+};
+
+const v0828Part2HudBase =
+  updateHud;
+
+updateHud = function() {
+  v0828Part2HudBase();
+
+  if (!state) return;
+
+  const f =
+    v0828EnsureFinalArc();
+
+  if (
+    !f ||
+    !f.useCanonicalLateArc
+  ) {
+    return;
+  }
+
+  if (
+    f.cellarEntered ||
+    f.epilogueActive
+  ) {
+    const inv =
+      $("inventory");
+
+    if (inv) {
+      inv.textContent =
+        inv.textContent
+          .replace(
+            / · FOME \d+%/g,
+            ""
+          )
+          .replace(
+            /FOME \d+% ·? ?/g,
+            ""
+          );
+    }
+  }
+
+  if (
+    f.worldDay ||
+    f.epilogueActive
+  ) {
+    $("day").textContent = "";
+    $("time").textContent =
+      f.epilogueActive
+        ? "DIA"
+        : "12:00";
+    $("timeNote").textContent =
+      f.epilogueActive
+        ? "UMA SEMANA DEPOIS"
+        : "DESFECHO · DIA";
+  }
+
+  if (
+    f.phase === "tunnel"
+  ) {
+    $("objective").textContent =
+      "Siga as pegadas pela passagem até a mina.";
+    return;
+  }
+
+  if (
+    f.phase === "mine" &&
+    !f.motherFound
+  ) {
+    $("objective").textContent =
+      "Aproxime-se da pessoa caída na galeria.";
+    return;
+  }
+
+  if (
+    f.phase === "observer"
+  ) {
+    $("objective").textContent =
+      "REAL " +
+      f.realScore +
+      " · MENTIRA " +
+      f.lieScore;
+    return;
+  }
+
+  if (f.epilogueActive) {
+    $("objective").textContent =
+      "Converse com quem te ajudou · " +
+      f.epilogueTalkedNPCs.length +
+      "/5" +
+      (
+        f.raimundoEpilogueDone
+          ? " · RAIMUNDO ✓"
+          : " · FALE COM RAIMUNDO"
+      );
+    return;
+  }
+
+  if (
+    f.phase === "finalHome"
+  ) {
+    $("objective").textContent =
+      !f.homeBrotherDone
+        ? "Fale com seu irmão."
+        : !f.homeMotherDone
+          ? "Vá com seu irmão falar com sua mãe."
+          : "Volte para a sala.";
+  }
+};
+
+window.addEventListener(
+  "keydown",
+  event => {
+    if (
+      event.key.toLowerCase() !== "f" ||
+      event.repeat ||
+      !v0828TruthGame.active
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    keys.delete("f");
+    v0828TruthPress();
+  },
+  true
+);
+
+if ($("endings")) {
+  $("endings").onclick =
+    v0828OpenEndingsMenu;
+}
+
+v0828RefreshEndingsButton();
 
 // =========================================================
 // 0.8.27 — ALINHAMENTO COM BÍBLIA MESTRE v3.1
