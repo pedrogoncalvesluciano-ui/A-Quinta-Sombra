@@ -29644,6 +29644,62 @@ function v0828DrawOsvaldoAndEpilogueNPCs() {
   }
 }
 
+function v0828DrawBrotherCompanion() {
+  const f = v0828EnsureFinalArc();
+
+  if (
+    !f ||
+    !f.useCanonicalLateArc ||
+    !f.brotherWithPlayer ||
+    ![
+      "escapeHouse",
+      "florindaUrgent",
+      "secondChase",
+      "cellarExplore",
+      "cellarPush",
+      "finalHome"
+    ].includes(f.phase) ||
+    [
+      "brother",
+      "undergroundPassage",
+      "mineDeep"
+    ].includes(state.room)
+  ) {
+    return;
+  }
+
+  const offsetX =
+    state.facing === "left"
+      ? 28
+      : state.facing === "right"
+        ? -28
+        : -18;
+
+  const offsetY =
+    state.facing === "up"
+      ? 28
+      : state.facing === "down"
+        ? -28
+        : 18;
+
+  c.save();
+  c.translate(
+    -Math.floor(camera.x),
+    -Math.floor(camera.y)
+  );
+
+  person(
+    state.x + offsetX,
+    state.y + offsetY,
+    "brother",
+    state.walk * 0.82,
+    state.facing,
+    0.82
+  );
+
+  c.restore();
+}
+
 function v0828DrawFamilyInFoyer() {
   const f = v0828EnsureFinalArc();
 
@@ -31008,6 +31064,7 @@ function v0828FlorindaUrgent() {
     ],
     () => {
       f.florindaFinalTalkDone = true;
+      f.brotherWithPlayer = true;
       f.phase = "secondChase";
       f.secondChaseActive = true;
       f.secondChaseTimer = 20;
@@ -31062,6 +31119,7 @@ function v0828EnterCellar() {
 
   f.secondChaseActive = false;
   f.cellarEntered = true;
+  f.brotherWithPlayer = true;
   f.phase = "cellarExplore";
   f.pursuersActive = false;
 
@@ -31998,6 +32056,7 @@ drawWorld = function() {
 
   v0828DrawOsvaldoAndEpilogueNPCs();
   v0828DrawFamilyInFoyer();
+  v0828DrawBrotherCompanion();
   v0828DrawPursuers();
 
   const f =
@@ -34823,7 +34882,7 @@ updateHud = function() {
   }
 };
 
-$("version").textContent = "PROTÓTIPO · 0.8.27";
+$("version").textContent = "PROTÓTIPO · 0.8.28";
   
   requestAnimationFrame(frame);
   showBootSplash();
