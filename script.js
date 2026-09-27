@@ -13357,6 +13357,15 @@ update = function(dt) {
     e.phase === "chase" &&
     !e.caught
   ) {
+    e.grace = Math.max(
+      0,
+      (Number(e.grace) || 0) - dt
+    );
+
+    if (e.grace > 0) {
+      return;
+    }
+
     const dx = state.x - e.x;
     const dy = state.y - e.y;
     const distance = Math.hypot(dx, dy) || 1;
@@ -28243,7 +28252,7 @@ function v0825UnlockWestFromOsmar() {
 
   if (firstPhoneLight) {
     v06Toast(
-      "Lanterna do celular liberada · pressione L.",
+      "Lanterna do celular liberada. Ela liga automaticamente ao entrar na Rua Oeste.",
       4.4
     );
   }
@@ -28732,7 +28741,7 @@ v0649DrawFlashlightDarkness = function() {
 
   if (state.flashlight?.owned) {
     txt(
-      "CELULAR · L",
+      "CELULAR · LUZ ATIVA",
       14,
       H - 14,
       "#c9c2ad",
@@ -28972,7 +28981,7 @@ updateHud = function() {
     state.room !== "westRoad"
   ) {
     $("objective").textContent =
-      "O caminho oeste está liberado. Use a lanterna do celular (L) e siga para a Rua Oeste.";
+      "O caminho oeste está liberado. A lanterna do celular liga automaticamente ao entrar na Rua Oeste.";
   }
 
   if (
@@ -35479,7 +35488,1526 @@ updateHud = function() {
   }
 };
 
-$("version").textContent = "PROTÓTIPO · 0.8.29";
+// =========================================================
+// 0.8.30 — CORREÇÕES DO PLAYTEST MOBILE
+// Conversas, Rua da Praça, Norberto, Osvaldo, Oeste e transição inicial
+// =========================================================
+
+// ---------------------------------------------------------
+// RUA DA PRAÇA: rua própria, entrada pelo começo e praça no fim.
+// O composite invertido da 0.8.24 fica desativado para o fluxo atual.
+// ---------------------------------------------------------
+
+const V0830_PLAZA_ROAD_ROOM = "plazaRoad";
+const V0830_PLAZA_ROAD_W = 1480;
+const V0830_PLAZA_ROAD_H = 760;
+
+maps[V0830_PLAZA_ROAD_ROOM] = {
+  w: V0830_PLAZA_ROAD_W,
+  h: V0830_PLAZA_ROAD_H,
+  objects: [
+    obj(120, 70, 225, 165, "building"),
+    obj(470, 72, 225, 165, "building"),
+    obj(820, 68, 235, 170, "building"),
+    obj(1130, 72, 225, 165, "building"),
+
+    obj(145, 515, 225, 165, "building"),
+    obj(500, 520, 225, 160, "building"),
+    obj(850, 510, 235, 170, "building"),
+    obj(1160, 515, 225, 165, "building")
+  ],
+  doors: []
+};
+
+roomNames[V0830_PLAZA_ROAD_ROOM] =
+  "Rua da praça · leste de Forgotten";
+
+if (maps.square) {
+  maps.square.w = 1080;
+  maps.square.h = 760;
+  maps.square.objects =
+    maps.square.objects.filter(
+      o => o.x < 1080
+    );
+  maps.square.doors = [];
+}
+
+if (
+  typeof V084_OUTDOOR_ROOMS !==
+    "undefined"
+) {
+  V084_OUTDOOR_ROOMS.add(
+    V0830_PLAZA_ROAD_ROOM
+  );
+}
+
+function v0830DrawPlazaRoad() {
+  const m =
+    maps[V0830_PLAZA_ROAD_ROOM];
+
+  camera.x = Math.max(
+    0,
+    Math.min(
+      m.w - W,
+      state.x - W / 2
+    )
+  );
+  camera.y = Math.max(
+    0,
+    Math.min(
+      m.h - H,
+      state.y - H / 2
+    )
+  );
+
+  c.save();
+  c.translate(
+    -Math.floor(camera.x),
+    -Math.floor(camera.y)
+  );
+
+  drawGrassGround(
+    0,
+    0,
+    m.w,
+    m.h
+  );
+
+  drawRoadTiledHorizontal(
+    "pavedHorizontal",
+    0,
+    270,
+    m.w,
+    200
+  );
+
+  for (const o of m.objects) {
+    building(o);
+  }
+
+  for (const [lx, ly] of [
+    [255, 285],
+    [610, 285],
+    [965, 285],
+    [1290, 285],
+    [255, 455],
+    [610, 455],
+    [965, 455],
+    [1290, 455]
+  ]) {
+    rect(lx, ly, 4, 34, "#343a39");
+    rect(lx - 4, ly - 3, 12, 5, "#4d5350");
+    rect(lx - 2, ly - 1, 8, 3, "#d2b777");
+  }
+
+  txt(
+    "BAIRRO",
+    54,
+    255,
+    "#a99d82",
+    7
+  );
+
+  txt(
+    "PRAÇA →",
+    m.w - 150,
+    255,
+    "#d4c49c",
+    8
+  );
+
+  person(
+    state.x,
+    state.y,
+    "player",
+    state.walk,
+    state.facing
+  );
+
+  c.restore();
+  v0646ApplyOutdoorLight();
+}
+
+v0648GoSquare = function() {
+  if (
+    !state ||
+    transitionBusy ||
+    dialog ||
+    !v0648Chapter2Unlocked() ||
+    !state.storyFlags
+      ?.marketParentsConfirmed
+  ) {
+    return;
+  }
+
+  fade(
+    "Rua da praça",
+    "Entre pela rua e siga para a direita até a Praça Central.",
+    () => {
+      v076SetOutdoorRoom(
+        V0830_PLAZA_ROAD_ROOM,
+        72,
+        367,
+        "right"
+      );
+    }
+  );
+};
+
+v0648ReturnFromSquare = function() {
+  if (
+    !state ||
+    transitionBusy ||
+    dialog
+  ) {
+    return;
+  }
+
+  fade(
+    "Rua da praça",
+    "",
+    () => {
+      v076SetOutdoorRoom(
+        V0830_PLAZA_ROAD_ROOM,
+        V0830_PLAZA_ROAD_W - 74,
+        367,
+        "left"
+      );
+    }
+  );
+};
+
+// ---------------------------------------------------------
+// RUA ABAIXO DO OESTE: mapa próprio e visual inequivocamente diferente.
+// ---------------------------------------------------------
+
+maps.culdesacWest = {
+  w: 860,
+  h: 1080,
+  objects: [
+    obj(
+      70,
+      180,
+      225,
+      170,
+      "building",
+      "Bater na casa de Cláudia",
+      "v0828ClaudiaDoor"
+    ),
+    obj(565, 180, 225, 170, "building"),
+    obj(65, 440, 225, 165, "building"),
+    obj(570, 445, 220, 165, "building"),
+    obj(70, 710, 220, 165, "building"),
+    obj(565, 705, 225, 170, "building")
+  ],
+  doors: [
+    door(
+      430,
+      1035,
+      null,
+      0,
+      0,
+      "Voltar para a Rua Oeste",
+      "v0828LeaveCuldesac"
+    )
+  ]
+};
+
+roomNames.culdesacWest =
+  "Rua sem saída · abaixo do Oeste";
+
+v0828DrawCuldesac = function() {
+  const m =
+    maps.culdesacWest;
+
+  camera.x = Math.max(
+    0,
+    Math.min(
+      m.w - W,
+      state.x - W / 2
+    )
+  );
+  camera.y = Math.max(
+    0,
+    Math.min(
+      m.h - H,
+      state.y - H / 2
+    )
+  );
+
+  c.save();
+  c.translate(
+    -Math.floor(camera.x),
+    -Math.floor(camera.y)
+  );
+
+  drawGrassGround(
+    0,
+    0,
+    m.w,
+    m.h
+  );
+
+  // Rua estreita vertical com um bolsão de retorno no fim.
+  drawRoadTiledVertical(
+    "pavedVertical",
+    315,
+    250,
+    230,
+    m.h - 250
+  );
+
+  rect(
+    270,
+    120,
+    320,
+    250,
+    "#696861"
+  );
+
+  rect(
+    315,
+    300,
+    230,
+    90,
+    "#696861"
+  );
+
+  for (let x = 300; x < 565; x += 28) {
+    rect(
+      x,
+      178,
+      18,
+      9,
+      "#858177"
+    );
+  }
+
+  for (const o of m.objects) {
+    building(o);
+  }
+
+  txt(
+    "SEM SAÍDA",
+    392,
+    150,
+    "#c7bca0",
+    8
+  );
+
+  txt(
+    "CLÁUDIA",
+    145,
+    372,
+    "#a99d82",
+    7
+  );
+
+  person(
+    state.x,
+    state.y,
+    "player",
+    state.walk,
+    state.facing
+  );
+
+  c.restore();
+  v0646ApplyOutdoorLight();
+};
+
+// ---------------------------------------------------------
+// CONTATO DE NORBERTO E PAIS SEPARADOS NO M-91.
+// ---------------------------------------------------------
+
+const v0830EnsurePhoneBase =
+  v081EnsurePhone;
+
+v081EnsurePhone = function() {
+  v0830EnsurePhoneBase();
+
+  if (!state?.phone) return;
+
+  if (
+    !Array.isArray(
+      state.phone.norbertoLog
+    )
+  ) {
+    state.phone.norbertoLog = [];
+  }
+
+  if (
+    typeof state.phone
+      .norbertoAskedParents !==
+      "boolean"
+  ) {
+    state.phone.norbertoAskedParents =
+      false;
+  }
+};
+
+function v0830OpenMotherThread() {
+  v081PhoneModal(
+    "MÃE",
+    screen => {
+      screen.append(
+        v081PhoneElement(
+          "div",
+          "phone-no-signal",
+          "SEM SINAL\n\nNão foi possível estabelecer conexão com este contato."
+        )
+      );
+    },
+    {
+      back: v081OpenMessages
+    }
+  );
+}
+
+function v0830OpenFatherThread() {
+  v081PhoneModal(
+    "PAI",
+    screen => {
+      screen.append(
+        v081PhoneElement(
+          "div",
+          "phone-no-signal",
+          "FORA DE ÁREA\n\nO telefone não está alcançável."
+        )
+      );
+    },
+    {
+      back: v081OpenMessages
+    }
+  );
+}
+
+function v0830SendNorbertoParents() {
+  prepareSystems();
+
+  if (!v081HasInternet()) {
+    v06Toast(
+      "Sem rede para enviar a mensagem.",
+      2
+    );
+    return;
+  }
+
+  if (
+    !state.phone.norbertoAskedParents
+  ) {
+    state.phone.norbertoAskedParents =
+      true;
+
+    state.phone.norbertoLog.push({
+      from: "you",
+      text:
+        "Tio, você sabe onde meus pais estão?"
+    });
+
+    state.storyFlags =
+      state.storyFlags || {};
+    state.storyFlags.norbertoMessaged =
+      true;
+
+    save();
+  }
+
+  v0830OpenNorbertoThread();
+}
+
+function v0830OpenNorbertoThread() {
+  prepareSystems();
+
+  v081PhoneModal(
+    "NORBERTO",
+    screen => {
+      screen.append(
+        v081PhoneElement(
+          "p",
+          "phone-small",
+          "NÚMERO SALVO · RUA DO MERCADO"
+        )
+      );
+
+      const thread =
+        v081PhoneElement(
+          "div",
+          "phone-thread"
+        );
+
+      for (
+        const message of
+          state.phone.norbertoLog
+      ) {
+        v081RenderMessageBubble(
+          thread,
+          message
+        );
+      }
+
+      if (
+        !state.phone.norbertoLog.length
+      ) {
+        thread.append(
+          v081PhoneElement(
+            "p",
+            "phone-empty",
+            "Nenhuma mensagem."
+          )
+        );
+      }
+
+      screen.append(thread);
+
+      if (
+        !state.phone
+          .norbertoAskedParents
+      ) {
+        const actions =
+          v081PhoneElement(
+            "div",
+            "phone-reply-list"
+          );
+
+        const ask =
+          document.createElement(
+            "button"
+          );
+
+        ask.className =
+          "phone-reply";
+        ask.textContent =
+          "Perguntar pelos meus pais";
+        ask.onclick =
+          v0830SendNorbertoParents;
+
+        actions.append(ask);
+        screen.append(actions);
+      } else {
+        screen.append(
+          v081PhoneElement(
+            "p",
+            "phone-small",
+            "MENSAGEM ENVIADA · aguardando resposta."
+          )
+        );
+      }
+    },
+    {
+      back: v081OpenMessages
+    }
+  );
+}
+
+v081OpenMessages = function() {
+  prepareSystems();
+
+  if (
+    v081HasInternet() &&
+    !state.phone.activeBrotherScene
+  ) {
+    v081DeliverBrotherScene();
+  }
+
+  v081PhoneModal(
+    "MENSAGENS",
+    screen => {
+      const info =
+        v081PhoneElement(
+          "p",
+          v081HasInternet()
+            ? "phone-online-text"
+            : "phone-offline-text",
+          v081HasInternet()
+            ? "Rede disponível nesta residência."
+            : "Sem conexão. Mensagens novas chegam quando você entra em uma residência."
+        );
+
+      const list =
+        v081PhoneElement(
+          "div",
+          "phone-contact-list"
+        );
+
+      const makeContact = (
+        name,
+        status,
+        action,
+        offline = false
+      ) => {
+        const button =
+          document.createElement(
+            "button"
+          );
+
+        button.className =
+          "phone-contact" +
+          (
+            offline
+              ? " phone-contact-offline"
+              : ""
+          );
+
+        const strong =
+          document.createElement(
+            "strong"
+          );
+        strong.textContent = name;
+
+        const span =
+          document.createElement(
+            "span"
+          );
+        span.textContent = status;
+
+        button.append(
+          strong,
+          span
+        );
+
+        button.onclick = action;
+        return button;
+      };
+
+      list.append(
+        makeContact(
+          "IRMÃO",
+          state.phone.unreadBrother > 0
+            ? state.phone.unreadBrother +
+              " nova"
+            : "conversa",
+          v081OpenBrotherThread
+        ),
+        makeContact(
+          "MÃE",
+          "SEM SINAL",
+          v0830OpenMotherThread,
+          true
+        ),
+        makeContact(
+          "PAI",
+          "FORA DE ÁREA",
+          v0830OpenFatherThread,
+          true
+        ),
+        makeContact(
+          "NORBERTO",
+          "NÚMERO SALVO",
+          v0830OpenNorbertoThread
+        )
+      );
+
+      screen.append(
+        info,
+        list
+      );
+    },
+    {
+      back: v081OpenPhoneHome
+    }
+  );
+};
+
+// ---------------------------------------------------------
+// MENUS DE CONVERSA: policial e irmão.
+// ---------------------------------------------------------
+
+function v0830OpenBrotherTopics() {
+  const topics = [
+    {
+      id: "parents",
+      label:
+        "Falar sobre nossos pais",
+      tone: "FAMÍLIA",
+      run: () => {
+        say([
+          [
+            "Estevão",
+            "Eu ainda estou procurando. Se eu descobrir alguma coisa, você vai ser o primeiro a saber."
+          ],
+          [
+            "Irmão",
+            "Tá. Só não some sem me avisar."
+          ]
+        ]);
+      }
+    },
+    {
+      id: "how-are-you",
+      label:
+        "Perguntar se ele está bem",
+      tone: "CUIDAR",
+      run: () => {
+        say([
+          [
+            "Estevão",
+            "Você está bem?"
+          ],
+          [
+            "Irmão",
+            "Tô... só queria que eles voltassem logo."
+          ]
+        ]);
+      }
+    },
+    {
+      id: "heard-anything",
+      label:
+        "Perguntar se ouviu alguma coisa",
+      tone: "INVESTIGAR",
+      run: () => {
+        say([
+          [
+            "Estevão",
+            "Você ouviu alguma coisa diferente desde a última vez?"
+          ],
+          [
+            "Irmão",
+            "Nada novo. Se eu ouvir, eu te chamo."
+          ]
+        ]);
+      }
+    }
+  ];
+
+  v0825OpenTopicMenu({
+    id: "brother-topics",
+    speaker: "Irmão",
+    text:
+      "O que você quer conversar comigo?",
+    topics
+  });
+}
+
+function v0830BrotherHasPriorityScene() {
+  if (
+    state.pendingBrotherRemark
+  ) {
+    return true;
+  }
+
+  if (
+    state.day === 1 &&
+    state.day1Progress?.completed &&
+    !state.day1Extra?.brotherBedtime
+  ) {
+    return true;
+  }
+
+  if (
+    state.dawnCollapseCount >
+      state.brotherDawnTalkCount
+  ) {
+    return true;
+  }
+
+  if (
+    typeof v0820PostWestActive ===
+      "function" &&
+    v0820PostWestActive()
+  ) {
+    return true;
+  }
+
+  if (
+    state.storyFlags?.raimundoMet &&
+    !state.forgottenAlive
+      ?.westPresenceSeen
+  ) {
+    return true;
+  }
+
+  const phase =
+    state.finalArc?.phase || "";
+
+  return [
+    "returnBrother",
+    "finalHome"
+  ].includes(phase);
+}
+
+// ---------------------------------------------------------
+// OSVALDO: cena automática após Osmar, com jogador/câmera congelados.
+// ---------------------------------------------------------
+
+v0828DrawOsvaldoAndEpilogueNPCs =
+  function() {
+    // A presença antiga parada na Praça foi removida.
+    // Osvaldo entra pela cena automática da Rua do Mercado.
+  };
+
+v0828TriggerOsvaldoWestScene =
+  function() {
+    // Substituído pela cinematográfica 0.8.30.
+  };
+
+function v0830EnsureOsvaldoScene() {
+  const f =
+    v0828EnsureFinalArc();
+
+  if (
+    !f.osvaldoStreetScene ||
+    typeof f.osvaldoStreetScene !==
+      "object"
+  ) {
+    f.osvaldoStreetScene = {
+      active: false,
+      phase: "waiting",
+      time: 0,
+      x: 450,
+      y: 1050,
+      startY: 1050,
+      targetY: 900
+    };
+  }
+
+  return f.osvaldoStreetScene;
+}
+
+function v0830StartOsvaldoStreetScene() {
+  const f =
+    v0828EnsureFinalArc();
+  const scene =
+    v0830EnsureOsvaldoScene();
+
+  if (
+    scene.active ||
+    scene.phase !== "waiting" ||
+    f.osvaldoWestSeen
+  ) {
+    return;
+  }
+
+  scene.active = true;
+  scene.phase = "approach";
+  scene.time = 0;
+  scene.x = Math.max(
+    385,
+    Math.min(
+      515,
+      state.x
+    )
+  );
+  scene.startY =
+    Math.min(
+      maps.northRoad.h - 120,
+      state.y + 235
+    );
+  scene.targetY =
+    state.y + 72;
+  scene.y =
+    scene.startY;
+
+  transitionBusy = true;
+  keys.clear();
+  state.walk = 0;
+
+  save();
+}
+
+function v0830UpdateOsvaldoScene(
+  dt
+) {
+  const f =
+    v0828EnsureFinalArc();
+  const scene =
+    v0830EnsureOsvaldoScene();
+
+  if (!scene.active) {
+    return false;
+  }
+
+  if (scene.phase === "dialog") {
+    return true;
+  }
+
+  scene.time += dt;
+
+  if (scene.phase === "approach") {
+    const p =
+      Math.min(
+        1,
+        scene.time / 1.9
+      );
+
+    scene.y =
+      scene.startY +
+      (
+        scene.targetY -
+        scene.startY
+      ) * p;
+
+    if (p >= 1) {
+      scene.phase = "dialog";
+      scene.time = 0;
+      transitionBusy = false;
+
+      say(
+        [
+          [
+            "Osvaldo",
+            "Você não devia estar sozinho na rua essas horas."
+          ],
+          [
+            "Estevão",
+            "Eu já estou voltando."
+          ]
+        ],
+        () => {
+          scene.phase = "leave";
+          scene.time = 0;
+          scene.startX =
+            scene.x;
+          scene.startY =
+            scene.y;
+
+          transitionBusy = true;
+          keys.clear();
+        }
+      );
+    }
+
+    return true;
+  }
+
+  if (scene.phase === "leave") {
+    const p =
+      Math.min(
+        1,
+        scene.time / 1.7
+      );
+
+    scene.x =
+      scene.startX +
+      (245 - scene.startX) * p;
+
+    scene.y =
+      scene.startY +
+      45 * p;
+
+    if (p >= 1) {
+      scene.active = false;
+      scene.phase = "done";
+
+      f.osvaldoKnown = true;
+      f.osvaldoWestSeen = true;
+
+      transitionBusy = false;
+      keys.clear();
+
+      v06Toast(
+        "Osvaldo seguiu em direção ao Oeste.",
+        2.8
+      );
+
+      updateHud();
+      save();
+    }
+
+    return true;
+  }
+
+  return false;
+}
+
+function v0830DrawOsvaldoScene() {
+  const scene =
+    state?.finalArc
+      ?.osvaldoStreetScene;
+
+  if (
+    !scene?.active ||
+    state.room !== "northRoad"
+  ) {
+    return;
+  }
+
+  c.save();
+  c.translate(
+    -Math.floor(camera.x),
+    -Math.floor(camera.y)
+  );
+
+  person(
+    scene.x,
+    scene.y,
+    "npcMale",
+    elapsed * 8,
+    scene.phase === "leave"
+      ? "left"
+      : "up"
+  );
+
+  c.restore();
+}
+
+// ---------------------------------------------------------
+// GARCIA: não captura durante a saída do diálogo e retry refaz a rua.
+// ---------------------------------------------------------
+
+v0649StartGarciaChase = function() {
+  const e =
+    state.garciaEvent;
+
+  e.phase = "chase";
+  e.caught = false;
+  e.x = 350;
+  e.y = 360;
+  e.grace = 1.5;
+
+  keys.clear();
+  state.walk = 0;
+
+  v06Toast(
+    "CORRA · volte para o bairro.",
+    2.6
+  );
+
+  updateHud();
+  save();
+};
+
+v0649GarciaCaught = function() {
+  const e =
+    state.garciaEvent;
+
+  if (e.caught) return;
+
+  e.caught = true;
+  keys.clear();
+  state.walk = 0;
+
+  modal(
+    "Garcia te alcançou",
+    "Ele te segura antes que você consiga voltar para a rua principal. Ao tentar de novo, você refaz a travessia da Rua Oeste.",
+    [
+      [
+        "Tentar novamente",
+        () => {
+          closeModal();
+
+          // Refaz a sequência desde a entrada da Rua Oeste.
+          state.chapter4.bodySeen =
+            false;
+
+          e.phase = "waiting";
+          e.caught = false;
+          e.grace = 0;
+          e.x = 330;
+          e.y = 350;
+
+          state.room = "westRoad";
+          state.x =
+            maps.westRoad.w - 65;
+          state.y = 390;
+          state.facing = "left";
+          state.walk = 0;
+
+          state.flashlight.on = true;
+          state.flashlight.emptyWarned =
+            false;
+
+          keys.clear();
+          near = null;
+
+          v06Toast(
+            "Atravesse a Rua Oeste novamente.",
+            2.5
+          );
+
+          updateHud();
+          save();
+        }
+      ]
+    ]
+  );
+};
+
+// ---------------------------------------------------------
+// TRANSIÇÃO DA ABERTURA: mais lenta e com tempo decorrido explícito.
+// ---------------------------------------------------------
+
+v0826ParentsLeaveTransition =
+  async function() {
+    transitionBusy = true;
+    keys.clear();
+    near = null;
+    $("prompt").hidden = true;
+
+    const transition =
+      $("transition");
+    const titleEl =
+      $("transitionTitle");
+    const hintEl =
+      $("transitionHint");
+
+    transition.classList.add(
+      "active"
+    );
+
+    await v0826Pause(1300);
+
+    const timeline = [
+      {
+        title:
+          "14:05 · +00h05",
+        text:
+          "Eles saíram a pé.",
+        hold: 2600
+      },
+      {
+        title:
+          "14:20 · +00h20",
+        text:
+          "O mercado não ficava longe.",
+        hold: 2600
+      },
+      {
+        title:
+          "18:13 · +04h13",
+        text:
+          "Liguei para minha mãe. Sem sinal.",
+        hold: 3100
+      },
+      {
+        title:
+          "18:14 · +04h14",
+        text:
+          "Meu pai estava fora de área.",
+        hold: 3000
+      },
+      {
+        title:
+          "19:41 · +05h41",
+        text:
+          "Meu irmão perguntou onde eles estavam. Eu disse que provavelmente estavam voltando.",
+        hold: 3900
+      },
+      {
+        title:
+          "22:17 · +08h17",
+        text:
+          "Nenhuma mensagem. Nenhuma ligação.",
+        hold: 3300
+      },
+      {
+        title:
+          "23:00 · 9 HORAS DEPOIS",
+        text:
+          "Meus pais não voltaram.",
+        hold: 4300
+      }
+    ];
+
+    for (
+      const item of timeline
+    ) {
+      titleEl.textContent =
+        item.title;
+      hintEl.textContent =
+        item.text;
+
+      await v0826Pause(
+        item.hold
+      );
+    }
+
+    // O corte para o quarto acontece ainda no preto.
+    titleEl.textContent =
+      "23:00 · 9 HORAS DEPOIS";
+    hintEl.textContent =
+      "A casa está silenciosa.";
+
+    await v0826Pause(1700);
+
+    state.minutes = 1380;
+    state.stage = "parents";
+    state.room = "bedroom";
+    state.x = housePoint(180);
+    state.y = housePoint(235);
+    state.facing = "down";
+    state.walk = 0;
+
+    keys.clear();
+    near = null;
+
+    updateHud();
+    save();
+
+    await v0826Pause(850);
+
+    transition.classList.remove(
+      "active"
+    );
+
+    await v0826Pause(1100);
+
+    transitionBusy = false;
+    keys.clear();
+
+    v06Toast(
+      "Verifique o quarto dos seus pais.",
+      4.2
+    );
+  };
+
+// ---------------------------------------------------------
+// WRAPPERS FINAIS DA 0.8.30
+// ---------------------------------------------------------
+
+const v0830GetNearBase =
+  getNear;
+
+getNear = function() {
+  const target =
+    v0830GetNearBase();
+
+  // Remove a antiga "venda" fantasma acima da casa da Florinda.
+  if (
+    target?.action === "shopDoor"
+  ) {
+    return null;
+  }
+
+  // Osvaldo não fica mais parado na Praça.
+  if (
+    target?.action ===
+      "v0828Osvaldo"
+  ) {
+    return null;
+  }
+
+  return target;
+};
+
+const v0830InteractBase =
+  interact;
+
+interact = function(action) {
+  prepareSystems();
+
+  const f =
+    state
+      ? v0828EnsureFinalArc()
+      : null;
+
+  if (
+    action === "policeOfficer" &&
+    !f?.epilogueActive &&
+    f?.phase !==
+      "florindaUrgent"
+  ) {
+    v0825PoliceTopics();
+    return;
+  }
+
+  if (
+    action === "brother" &&
+    state.stage === "free" &&
+    !state.gameOver &&
+    !dangerActive() &&
+    !v0830BrotherHasPriorityScene()
+  ) {
+    v0830OpenBrotherTopics();
+    return;
+  }
+
+  if (
+    action ===
+      "v0828CuldesacEntrance"
+  ) {
+    if (!f?.culdesacUnlocked) {
+      say([
+        "Ainda não tenho motivo para entrar nessa rua."
+      ]);
+      return;
+    }
+
+    fade(
+      "Rua sem saída",
+      "Uma rua curta abaixo da região Oeste.",
+      () => {
+        v076SetOutdoorRoom(
+          "culdesacWest",
+          430,
+          maps.culdesacWest.h - 70,
+          "up"
+        );
+      }
+    );
+    return;
+  }
+
+  v0830InteractBase(action);
+};
+
+const v0830DrawWorldBase =
+  drawWorld;
+
+drawWorld = function() {
+  if (
+    state?.room ===
+      V0830_PLAZA_ROAD_ROOM
+  ) {
+    v0830DrawPlazaRoad();
+  } else {
+    v0830DrawWorldBase();
+  }
+
+  if (!state) return;
+
+  v0830DrawOsvaldoScene();
+};
+
+const v0830UpdateBase =
+  update;
+
+update = function(dt) {
+  if (
+    state?.finalArc
+      ?.osvaldoStreetScene?.active
+  ) {
+    elapsed += dt;
+    v0830UpdateOsvaldoScene(dt);
+    return;
+  }
+
+  v0830UpdateBase(dt);
+
+  if (
+    !state ||
+    mode !== "game" ||
+    dialog ||
+    transitionBusy ||
+    !$("overlay").hidden ||
+    state.gameOver
+  ) {
+    return;
+  }
+
+  if (
+    state.room ===
+      V0830_PLAZA_ROAD_ROOM
+  ) {
+    const right =
+      keys.has("d") ||
+      keys.has("arrowright");
+    const left =
+      keys.has("a") ||
+      keys.has("arrowleft");
+
+    if (
+      state.x >=
+        maps[
+          V0830_PLAZA_ROAD_ROOM
+        ].w - 42 &&
+      right
+    ) {
+      state.x =
+        maps[
+          V0830_PLAZA_ROAD_ROOM
+        ].w - 44;
+
+      fade(
+        "Praça central",
+        "Fim da Rua da Praça.",
+        () => {
+          v076SetOutdoorRoom(
+            "square",
+            1000,
+            430,
+            "left"
+          );
+        }
+      );
+
+      return;
+    }
+
+    if (
+      state.x <= 42 &&
+      left
+    ) {
+      state.x = 44;
+
+      fade(
+        "",
+        "",
+        () => {
+          v076SetOutdoorRoom(
+            "village",
+            maps.village.w - 58,
+            424,
+            "left"
+          );
+        }
+      );
+
+      return;
+    }
+  }
+
+  const finalArc =
+    v0828EnsureFinalArc();
+
+  if (
+    state.room === "northRoad" &&
+    (
+      state.forgottenAlive
+        ?.completed?.osmar ||
+      state.forgottenAlive
+        ?.osmarStage >= 3
+    ) &&
+    !finalArc.osvaldoWestSeen &&
+    state.y >= 850
+  ) {
+    v0830StartOsvaldoStreetScene();
+  }
+};
+
+const v0830HudBase =
+  updateHud;
+
+updateHud = function() {
+  v0830HudBase();
+
+  if (!state) return;
+
+  if (
+    state.room ===
+      V0830_PLAZA_ROAD_ROOM
+  ) {
+    $("location").textContent =
+      "Rua da praça · leste de Forgotten";
+
+    $("objective").textContent =
+      !state.squareManFirstSpeechDone
+        ? "Siga para a direita até a Praça Central."
+        : "Volte pela Rua da Praça quando terminar aqui.";
+  }
+};
+
+// Migração de saves que ficaram presos na antiga rua composta.
+const v0830PrepareBase =
+  prepareSystems;
+
+prepareSystems = function() {
+  const wasLegacySquareRoad =
+    state?.room === "squareRoad";
+
+  const legacySquareRoadX =
+    Number.isFinite(state?.x)
+      ? state.x
+      : 70;
+
+  const legacySquareRoadY =
+    Number.isFinite(state?.y)
+      ? state.y
+      : 367;
+
+  v0830PrepareBase();
+
+  if (!state) return;
+
+  v081EnsurePhone();
+
+  if (wasLegacySquareRoad) {
+    state.room =
+      V0830_PLAZA_ROAD_ROOM;
+
+    state.x =
+      Math.max(
+        72,
+        Math.min(
+          V0830_PLAZA_ROAD_W - 72,
+          legacySquareRoadX
+        )
+      );
+
+    state.y =
+      Math.max(
+        45,
+        Math.min(
+          V0830_PLAZA_ROAD_H - 45,
+          legacySquareRoadY
+        )
+      );
+
+    state.facing = "right";
+    state.walk = 0;
+
+    state.storyFlags =
+      state.storyFlags || {};
+
+    state.storyFlags
+      .v0830SquareRoadMigrated =
+      true;
+
+    keys.clear();
+    near = null;
+    save();
+  }
+
+  const scene =
+    v0830EnsureOsvaldoScene();
+
+  if (
+    scene.phase === "done"
+  ) {
+    state.finalArc.osvaldoKnown =
+      true;
+    state.finalArc.osvaldoWestSeen =
+      true;
+  }
+
+  // Save antigo parado na metade direita da praça composta:
+  // move uma única vez para a nova Rua da Praça.
+  state.storyFlags =
+    state.storyFlags || {};
+
+  if (
+    state.room === "square" &&
+    state.x > 1080 &&
+    !state.storyFlags
+      .v0830SquareRoadMigrated
+  ) {
+    const oldX =
+      state.x;
+
+    state.room =
+      V0830_PLAZA_ROAD_ROOM;
+
+    state.x =
+      Math.max(
+        72,
+        Math.min(
+          V0830_PLAZA_ROAD_W - 72,
+          oldX - 1080 + 72
+        )
+      );
+
+    state.y =
+      Math.max(
+        45,
+        Math.min(
+          V0830_PLAZA_ROAD_H - 45,
+          state.y
+        )
+      );
+
+    state.facing = "right";
+    state.walk = 0;
+    state.storyFlags
+      .v0830SquareRoadMigrated =
+      true;
+
+    keys.clear();
+    near = null;
+    save();
+  }
+};
+
+$("version").textContent = "PROTÓTIPO · 0.8.30";
   
   requestAnimationFrame(frame);
   showBootSplash();
