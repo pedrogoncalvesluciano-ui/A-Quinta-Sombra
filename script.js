@@ -29096,6 +29096,3285 @@ prepareSystems = function() {
 
 
 // =========================================================
+// 0.8.28 — ARCO FINAL CANÔNICO · PARTE 1
+// Oeste → Cláudia → Raimundo → casal → falsos pais → porão
+// =========================================================
+
+const V0828_CLAUDIA_POS = { x: 450, y: 210 };
+const V0828_CULDESAC_EXIT = { x: 450, y: 850 };
+const V0828_COUPLE_PARENT_POS = {
+  father: { x: 625, y: 365 },
+  mother: { x: 660, y: 365 }
+};
+const V0828_OSVALDO_POS = { x: 720, y: 500 };
+let v0828StaticUntil = 0;
+let v0828CameraScene = {
+  active: false,
+  text: "",
+  phase: 0
+};
+
+function v0828LegacyLateArcDetected() {
+  return Boolean(
+    state?.chapter6?.basementUnlocked ||
+    state?.chapter7?.started ||
+    state?.chapter8?.complete ||
+    state?.chapter9?.entered ||
+    state?.ending?.complete ||
+    (
+      state?.copyFather?.phase &&
+      state.copyFather.phase !== "waiting"
+    )
+  );
+}
+
+function v0828EnsureFinalArc() {
+  if (!state) return null;
+
+  if (
+    !state.finalArc ||
+    typeof state.finalArc !== "object"
+  ) {
+    state.finalArc = {
+      version: 1,
+      useCanonicalLateArc: !v0828LegacyLateArcDetected(),
+      phase: "locked"
+    };
+  }
+
+  const f = state.finalArc;
+  const defaults = {
+    version: 1,
+    useCanonicalLateArc: true,
+    phase: "locked",
+    culdesacUnlocked: false,
+    claudiaTestimonyDone: false,
+    garciaCleared: false,
+    osvaldoKnown: false,
+    osvaldoWestSeen: false,
+    westCaseResolved: false,
+    raimundoCoupleRumorDone: false,
+    plazaLinkUnlocked: false,
+    coupleEntry: "village",
+    residentA: false,
+    residentB: false,
+    falseParentsFound: false,
+    falseParentsHome: false,
+    cameraRevealDone: false,
+    kitchenHideDone: false,
+    kitchenTimer: 0,
+    platesObtained: false,
+    plateSceneDone: false,
+    platesDownTimer: 0,
+    cellarKeyObtained: false,
+    brotherWithPlayer: false,
+    houseEscaped: false,
+    florindaFinalTalkDone: false,
+    secondChaseActive: false,
+    secondChaseTimer: 0,
+    cellarEntered: false,
+    cellarToolsSeen: false,
+    cellarSplitSeen: false,
+    cellarMiningSeen: false,
+    pushActive: false,
+    pushProgress: 0,
+    secretPassageOpened: false,
+    motherFound: false,
+    worldDay: false,
+    observerFinalStarted: false,
+    realScore: 0,
+    lieScore: 0,
+    round: 0,
+    badEndingUnlocked: false,
+    goodEndingUnlocked: false,
+    epilogueActive: false,
+    epilogueTalkedNPCs: [],
+    raimundoEpilogueDone: false,
+    finalHomeUnlocked: false,
+    homeBrotherDone: false,
+    homeMotherDone: false,
+    finalFigureStarted: false,
+    completed: false,
+    pursuersActive: false,
+    pursuers: []
+  };
+
+  for (const [key, value] of Object.entries(defaults)) {
+    if (typeof f[key] === "undefined") {
+      f[key] =
+        Array.isArray(value)
+          ? value.slice()
+          : value;
+    }
+  }
+
+  if (!Array.isArray(f.epilogueTalkedNPCs)) {
+    f.epilogueTalkedNPCs = [];
+  }
+
+  if (!Array.isArray(f.pursuers)) {
+    f.pursuers = [];
+  }
+
+  if (
+    f.useCanonicalLateArc &&
+    state.chapter4?.bodySeen
+  ) {
+    f.culdesacUnlocked = true;
+
+    if (f.phase === "locked") {
+      f.phase = "postWest";
+    }
+  }
+
+  if (f.claudiaTestimonyDone) {
+    f.culdesacUnlocked = true;
+  }
+
+  if (f.raimundoCoupleRumorDone) {
+    f.plazaLinkUnlocked = true;
+  }
+
+  if (
+    [
+      "familyPhoto",
+      "kitchenHide",
+      "plates",
+      "plateThrow",
+      "findExit",
+      "returnBrother",
+      "escapeHouse",
+      "florindaUrgent",
+      "secondChase",
+      "cellarExplore",
+      "cellarPush",
+      "tunnel",
+      "mine",
+      "observer",
+      "epilogue",
+      "finalHome",
+      "finalFigure"
+    ].includes(f.phase)
+  ) {
+    state.storyFlags =
+      state.storyFlags || {};
+    state.storyFlags.sys07hBlackout = false;
+  }
+
+  if (f.cellarEntered) {
+    state.storyFlags =
+      state.storyFlags || {};
+    state.storyFlags.sysHunger = false;
+    state.storyFlags.sysDanger = false;
+
+    if (state.danger) {
+      state.danger.phase = "safe";
+      state.danger.time = 0;
+      state.danger.enemy = null;
+    }
+
+    if (state.randomEventState) {
+      state.randomEventState.pending = false;
+    }
+
+    if (state.smallEventState) {
+      state.smallEventState.pending = false;
+    }
+  }
+
+  return f;
+}
+
+function v0828CanonicalLateArc() {
+  return Boolean(
+    state &&
+    v0828EnsureFinalArc()?.useCanonicalLateArc
+  );
+}
+
+if (!maps.culdesacWest) {
+  maps.culdesacWest = {
+    w: 900,
+    h: 900,
+    objects: [
+      obj(60, 70, 220, 165, "building"),
+      obj(620, 70, 220, 165, "building"),
+      obj(
+        330,
+        75,
+        240,
+        170,
+        "building",
+        "Bater na casa de Cláudia",
+        "v0828ClaudiaDoor"
+      ),
+      obj(55, 560, 225, 165, "building"),
+      obj(620, 565, 220, 160, "building"),
+      obj(330, 575, 240, 165, "building")
+    ],
+    doors: [
+      door(
+        450,
+        850,
+        null,
+        0,
+        0,
+        "Voltar para a Rua Oeste",
+        "v0828LeaveCuldesac"
+      )
+    ]
+  };
+}
+roomNames.culdesacWest =
+  "Rua sem saída · Oeste de Forgotten";
+
+if (!maps.coupleRoad) {
+  maps.coupleRoad = {
+    w: 1280,
+    h: 760,
+    objects: [
+      obj(
+        120,
+        70,
+        225,
+        165,
+        "building",
+        "Falar com morador",
+        "v0828CoupleResidentA"
+      ),
+      obj(485, 72, 225, 165, "building"),
+      obj(
+        845,
+        70,
+        225,
+        165,
+        "building",
+        "Falar com morador",
+        "v0828CoupleResidentB"
+      ),
+      obj(150, 515, 225, 165, "building"),
+      obj(525, 520, 225, 160, "building"),
+      obj(900, 510, 225, 170, "building")
+    ],
+    doors: [
+      door(
+        45,
+        365,
+        null,
+        0,
+        0,
+        "Voltar para a Rua do Player",
+        "v0828CoupleToVillage"
+      ),
+      door(
+        1235,
+        365,
+        null,
+        0,
+        0,
+        "Seguir para a Praça",
+        "v0828CoupleToSquare"
+      )
+    ]
+  };
+}
+roomNames.coupleRoad =
+  "Rua de ligação · Forgotten";
+
+if (V084_OUTDOOR_ROOMS) {
+  V084_OUTDOOR_ROOMS.add("culdesacWest");
+  V084_OUTDOOR_ROOMS.add("coupleRoad");
+}
+
+if (
+  maps.westRoad &&
+  !maps.westRoad.doors.some(
+    d => d.action === "v0828CuldesacEntrance"
+  )
+) {
+  maps.westRoad.doors.push(
+    door(
+      250,
+      maps.westRoad.h - 45,
+      null,
+      0,
+      0,
+      "Rua lateral",
+      "v0828CuldesacEntrance"
+    )
+  );
+}
+
+if (
+  maps.village &&
+  !maps.village.doors.some(
+    d => d.action === "v0828CoupleRoadVillage"
+  )
+) {
+  maps.village.doors.push(
+    door(
+      maps.village.w - 38,
+      794,
+      null,
+      0,
+      0,
+      "Rua residencial",
+      "v0828CoupleRoadVillage"
+    )
+  );
+}
+
+if (
+  maps.square &&
+  !maps.square.doors.some(
+    d => d.action === "v0828CoupleRoadSquare"
+  )
+) {
+  maps.square.doors.push(
+    door(
+      maps.square.w - 45,
+      367,
+      null,
+      0,
+      0,
+      "Rua residencial",
+      "v0828CoupleRoadSquare"
+    )
+  );
+}
+
+function v0828DrawCuldesac() {
+  const m = maps.culdesacWest;
+
+  camera.x = Math.max(
+    0,
+    Math.min(m.w - W, state.x - W / 2)
+  );
+  camera.y = Math.max(
+    0,
+    Math.min(m.h - H, state.y - H / 2)
+  );
+
+  c.save();
+  c.translate(
+    -Math.floor(camera.x),
+    -Math.floor(camera.y)
+  );
+
+  drawGrassGround(0, 0, m.w, m.h);
+
+  drawRoadTiledVertical(
+    "pavedVertical",
+    330,
+    0,
+    240,
+    m.h
+  );
+
+  rect(
+    330,
+    0,
+    240,
+    48,
+    "#4d4b47"
+  );
+
+  txt(
+    "SEM SAÍDA",
+    405,
+    42,
+    "#c7bca0",
+    8
+  );
+
+  for (const o of m.objects) {
+    building(o);
+  }
+
+  txt(
+    "CASA DE CLÁUDIA",
+    372,
+    265,
+    "#a99d82",
+    7
+  );
+
+  person(
+    state.x,
+    state.y,
+    "player",
+    state.walk,
+    state.facing
+  );
+
+  c.restore();
+  v0646ApplyOutdoorLight();
+}
+
+function v0828DrawCoupleRoad() {
+  const m = maps.coupleRoad;
+  const f = v0828EnsureFinalArc();
+
+  camera.x = Math.max(
+    0,
+    Math.min(m.w - W, state.x - W / 2)
+  );
+  camera.y = Math.max(
+    0,
+    Math.min(m.h - H, state.y - H / 2)
+  );
+
+  c.save();
+  c.translate(
+    -Math.floor(camera.x),
+    -Math.floor(camera.y)
+  );
+
+  drawGrassGround(0, 0, m.w, m.h);
+
+  drawRoadTiledHorizontal(
+    "pavedHorizontal",
+    0,
+    270,
+    m.w,
+    200
+  );
+
+  for (const o of m.objects) {
+    building(o);
+  }
+
+  for (const [x, y] of [
+    [340, 285],
+    [650, 285],
+    [970, 285],
+    [340, 455],
+    [650, 455],
+    [970, 455]
+  ]) {
+    rect(x, y, 4, 34, "#343a39");
+    rect(x - 4, y - 3, 12, 5, "#4d5350");
+    rect(x - 2, y - 1, 8, 3, "#d2b777");
+  }
+
+  if (
+    f.falseParentsFound &&
+    !f.falseParentsHome
+  ) {
+    person(
+      V0828_COUPLE_PARENT_POS.father.x,
+      V0828_COUPLE_PARENT_POS.father.y,
+      "father",
+      0,
+      "left"
+    );
+
+    person(
+      V0828_COUPLE_PARENT_POS.mother.x,
+      V0828_COUPLE_PARENT_POS.mother.y,
+      "mother",
+      0,
+      "right"
+    );
+  }
+
+  person(
+    state.x,
+    state.y,
+    "player",
+    state.walk,
+    state.facing
+  );
+
+  c.restore();
+  v0646ApplyOutdoorLight();
+}
+
+function v0828DrawOsvaldoAndEpilogueNPCs() {
+  const f = v0828EnsureFinalArc();
+  if (!f || !v0828CanonicalLateArc()) return;
+
+  if (
+    state.room === "square" &&
+    !f.epilogueActive &&
+    !f.osvaldoWestSeen
+  ) {
+    c.save();
+    c.translate(
+      -Math.floor(camera.x),
+      -Math.floor(camera.y)
+    );
+
+    person(
+      V0828_OSVALDO_POS.x,
+      V0828_OSVALDO_POS.y,
+      "npcMale",
+      0,
+      "left"
+    );
+
+    c.restore();
+  }
+}
+
+function v0828DrawFamilyInFoyer() {
+  const f = v0828EnsureFinalArc();
+
+  if (
+    !f ||
+    state.room !== "foyer" ||
+    ![
+      "familyPhoto",
+      "cameraReveal"
+    ].includes(f.phase)
+  ) {
+    return;
+  }
+
+  c.save();
+  c.translate(
+    -Math.floor(camera.x),
+    -Math.floor(camera.y)
+  );
+
+  person(
+    housePoint(410),
+    housePoint(235),
+    "father",
+    0,
+    "left"
+  );
+  person(
+    housePoint(455),
+    housePoint(245),
+    "mother",
+    0,
+    "left"
+  );
+  person(
+    housePoint(350),
+    housePoint(252),
+    "brother",
+    0,
+    "right",
+    0.82
+  );
+
+  c.restore();
+}
+
+function v0828DrawCameraOverlay() {
+  if (!v0828CameraScene.active) {
+    return;
+  }
+
+  c.save();
+
+  rect(
+    12,
+    12,
+    W - 24,
+    H - 24,
+    "rgba(8,11,12,0.20)"
+  );
+
+  c.strokeStyle = "#b7bea9";
+  c.lineWidth = 2;
+  c.strokeRect(
+    18,
+    18,
+    W - 36,
+    H - 36
+  );
+
+  txt(
+    "CÂMERA · LANCASTER M-91",
+    28,
+    38,
+    "#c8ccb9",
+    8
+  );
+
+  txt(
+    "REC",
+    W - 62,
+    38,
+    "#b8897f",
+    8
+  );
+
+  if (v0828CameraScene.phase >= 2) {
+    rect(
+      W - 145,
+      62,
+      105,
+      72,
+      "rgba(9,11,12,0.78)"
+    );
+    txt(
+      "BRAÇO",
+      W - 126,
+      79,
+      "#bdb8a8",
+      7
+    );
+    rect(
+      W - 116,
+      94,
+      52,
+      11,
+      "#b98e72"
+    );
+    txt(
+      "sem a marca",
+      W - 130,
+      123,
+      "#d0c5ae",
+      7
+    );
+  }
+
+  if (v0828CameraScene.text) {
+    rect(
+      55,
+      H - 67,
+      W - 110,
+      34,
+      "rgba(0,0,0,0.75)"
+    );
+    txt(
+      v0828CameraScene.text,
+      75,
+      H - 46,
+      "#eee9dc",
+      10
+    );
+  }
+
+  c.restore();
+}
+
+function v0828DirectionLine() {
+  const f = v0828EnsureFinalArc();
+
+  return f.coupleEntry === "square"
+    ? "Vi um casal descendo por essa rua."
+    : "Vi um casal subindo por essa rua.";
+}
+
+function v0828MaybeFindFalseParents() {
+  const f = v0828EnsureFinalArc();
+
+  if (
+    f.residentA &&
+    f.residentB &&
+    !f.falseParentsFound
+  ) {
+    f.falseParentsFound = true;
+    f.phase = "falseParentsRoad";
+
+    v06Toast(
+      "Um casal está mais adiante na rua.",
+      3
+    );
+
+    save();
+  }
+}
+
+function v0828TalkClaudia() {
+  const f = v0828EnsureFinalArc();
+
+  if (f.claudiaTestimonyDone) {
+    say([
+      [
+        "Cláudia",
+        "Eu tenho certeza. Quando o Garcia chegou, o corpo já estava lá."
+      ]
+    ]);
+    return;
+  }
+
+  say(
+    [
+      ["Estevão", "O Garcia matou aquela pessoa?"],
+      [
+        "Cláudia",
+        "Não. Eu vi ele chegar depois. O corpo já estava lá."
+      ],
+      [
+        "Estevão",
+        "Então ele mexeu na cena, mas não matou."
+      ],
+      [
+        "Cláudia",
+        "Foi o que eu vi. Não vou dizer mais do que isso."
+      ]
+    ],
+    () => {
+      f.claudiaTestimonyDone = true;
+      f.garciaCleared = true;
+      f.phase = "westWitness";
+
+      if (
+        state.sideQuests?.westCase
+      ) {
+        state.sideQuests.westCase
+          .garciaStatement = true;
+      }
+
+      v06Toast(
+        "Cláudia confirma: Garcia chegou depois.",
+        3
+      );
+
+      updateHud();
+      save();
+    }
+  );
+}
+
+function v0828TalkOsvaldo() {
+  const f = v0828EnsureFinalArc();
+
+  if (f.osvaldoKnown) {
+    say([
+      [
+        "Osvaldo",
+        "Vai pra casa, garoto. A cidade já está estranha o bastante."
+      ]
+    ]);
+    return;
+  }
+
+  say(
+    [
+      ["Osvaldo", "Você é o filho dos Lancaster, não é?"],
+      ["Estevão", "Sou."],
+      [
+        "Osvaldo",
+        "Sinto pelo que aconteceu. Só não fica andando sozinho por aí."
+      ]
+    ],
+    () => {
+      f.osvaldoKnown = true;
+      save();
+    }
+  );
+}
+
+function v0828TriggerOsvaldoWestScene() {
+  const f = v0828EnsureFinalArc();
+
+  if (
+    !f.osvaldoKnown ||
+    f.osvaldoWestSeen ||
+    !(
+      state.forgottenAlive?.completed?.osmar ||
+      state.forgottenAlive?.osmarStage >= 3
+    ) ||
+    state.room !== "northRoad"
+  ) {
+    return;
+  }
+
+  f.osvaldoWestSeen = true;
+
+  say(
+    [
+      [
+        "Osvaldo",
+        "Ei, garoto. Não é seguro ficar andando essas horas por aí."
+      ],
+      [
+        "Estevão",
+        "Eu sei, já estou indo pra casa. Obrigado."
+      ]
+    ],
+    () => {
+      v06Toast(
+        "Osvaldo seguiu em direção ao Oeste.",
+        2.8
+      );
+      save();
+    }
+  );
+}
+
+const v0828WestCaseBase =
+  v070ResolveWestCase;
+
+v070ResolveWestCase = function() {
+  const f = v0828EnsureFinalArc();
+
+  if (
+    !v0828CanonicalLateArc()
+  ) {
+    v0828WestCaseBase();
+    return;
+  }
+
+  if (!f.claudiaTestimonyDone) {
+    say([
+      [
+        "Anísio",
+        "Garcia parece suspeito, mas ainda falta uma testemunha que coloque a chegada dele depois da morte."
+      ]
+    ]);
+    return;
+  }
+
+  if (!f.osvaldoWestSeen) {
+    say([
+      [
+        "Anísio",
+        "A fala da Cláudia tira o Garcia da hora da morte. Ainda preciso fechar quem estava indo para o Oeste."
+      ]
+    ]);
+    return;
+  }
+
+  if (f.westCaseResolved) {
+    say([
+      [
+        "Anísio",
+        "O caso do corpo está fechado para mim. Foi violência humana. Não misture isso com o desaparecimento dos seus pais."
+      ]
+    ]);
+    return;
+  }
+
+  say(
+    [
+      [
+        "Estevão",
+        "A Cláudia viu o Garcia chegar depois. E eu vi o Osvaldo indo para o Oeste."
+      ],
+      [
+        "Anísio",
+        "Isso fecha a linha que faltava. A vítima devia dinheiro ao Osvaldo."
+      ],
+      [
+        "Anísio",
+        "A cobrança virou briga. Garcia encontrou o corpo depois, entrou em pânico e mexeu na cena."
+      ],
+      [
+        "Estevão",
+        "Então isso não tem relação com o que está acontecendo com meus pais."
+      ],
+      [
+        "Anísio",
+        "Não. Isso aqui foi humano."
+      ]
+    ],
+    () => {
+      f.westCaseResolved = true;
+
+      if (
+        state.sideQuests?.westCase
+      ) {
+        state.sideQuests.westCase.resolved = true;
+        state.sideQuests.westCase.osvaldoNamed = true;
+      }
+
+      updateHud();
+      save();
+    }
+  );
+};
+
+function v0828TalkRaimundoCoupleRumor() {
+  const f = v0828EnsureFinalArc();
+
+  if (f.raimundoCoupleRumorDone) {
+    say([
+      [
+        "Raimundo",
+        "Vai falar com o pessoal daquela rua. Se viram um casal, é melhor ouvir exatamente o que eles dizem."
+      ]
+    ]);
+    return;
+  }
+
+  say(
+    [
+      [
+        "Raimundo",
+        "Olá, garoto. Já houve algum resultado na sua busca?"
+      ],
+      [
+        "Estevão",
+        "Ainda não, mas eu sinto que estou perto."
+      ],
+      [
+        "Raimundo",
+        "Ouvi dizer que algumas pessoas viram um casal. Quem sabe não são seus pais."
+      ],
+      [
+        "Estevão",
+        "Já ouvi essa história algumas vezes, mas parece que nada acontece."
+      ],
+      [
+        "Raimundo",
+        "Mas tenta falar com elas, garoto. Não custa nada..."
+      ]
+    ],
+    () => {
+      f.raimundoCoupleRumorDone = true;
+      f.plazaLinkUnlocked = true;
+      f.phase = "coupleSearch";
+
+      v06Toast(
+        "Nova rota · rua de ligação à Praça",
+        3
+      );
+
+      updateHud();
+      save();
+    }
+  );
+}
+
+function v0828EnterCoupleRoad(from) {
+  const f = v0828EnsureFinalArc();
+
+  if (!f.plazaLinkUnlocked) {
+    say([
+      "Ainda não tenho motivo para procurar por essa rua."
+    ]);
+    return;
+  }
+
+  f.coupleEntry = from;
+
+  fade(
+    "Rua de ligação",
+    "Uma rua residencial conecta o bairro à Praça.",
+    () => {
+      if (from === "square") {
+        v076SetOutdoorRoom(
+          "coupleRoad",
+          maps.coupleRoad.w - 80,
+          365,
+          "left"
+        );
+      } else {
+        v076SetOutdoorRoom(
+          "coupleRoad",
+          80,
+          365,
+          "right"
+        );
+      }
+    }
+  );
+}
+
+function v0828TalkCoupleResident(id) {
+  const f = v0828EnsureFinalArc();
+  const key =
+    id === "a"
+      ? "residentA"
+      : "residentB";
+
+  if (f[key]) {
+    say([
+      [
+        "Morador",
+        v0828DirectionLine()
+      ]
+    ]);
+    return;
+  }
+
+  say(
+    [
+      ["Estevão", "Você viu um homem e uma mulher passando por aqui?"],
+      [
+        "Morador",
+        v0828DirectionLine()
+      ],
+      [
+        "Morador",
+        "Não prestei muita atenção. Só lembro que estavam juntos."
+      ]
+    ],
+    () => {
+      f[key] = true;
+      v0828MaybeFindFalseParents();
+      updateHud();
+      save();
+    }
+  );
+}
+
+function v0828MeetFalseParents() {
+  const f = v0828EnsureFinalArc();
+
+  if (
+    !f.falseParentsFound ||
+    f.falseParentsHome
+  ) {
+    return;
+  }
+
+  say(
+    [
+      ["Estevão", "Mãe...? Pai...?"],
+      ["Mãe", "Estevão! Meu filho."],
+      ["Pai", "O que você está fazendo tão longe de casa?"],
+      [
+        "Estevão",
+        "Eu procurei vocês por toda parte."
+      ],
+      [
+        "Mãe",
+        "A gente está aqui agora. Vamos voltar."
+      ]
+    ],
+    () => {
+      f.falseParentsHome = true;
+      f.phase = "familyPhoto";
+
+      fade(
+        "De volta para casa",
+        "Por alguns minutos, parece que a busca terminou.",
+        () => {
+          go(
+            "foyer",
+            540,
+            300
+          );
+        }
+      );
+
+      setTimeout(
+        v0828FamilyPhotoRequest,
+        900
+      );
+    }
+  );
+}
+
+function v0828FamilyPhotoRequest() {
+  const f = v0828EnsureFinalArc();
+
+  if (
+    !f ||
+    f.phase !== "familyPhoto" ||
+    dialog
+  ) {
+    return;
+  }
+
+  say(
+    [
+      ["Irmão", "Vamos tirar uma foto?"],
+      ["Pai", "Não."],
+      ["Irmão", "Ah, vamos... por favor."],
+      ["Pai", "Pra quê isso agora?"],
+      ["Irmão", "Porque vocês voltaram."],
+      ["Pai", "...Tá bom."]
+    ],
+    () => {
+      v0828StartCameraReveal();
+    }
+  );
+}
+
+function v0828StartCameraReveal() {
+  const f = v0828EnsureFinalArc();
+
+  if (
+    f.cameraRevealDone ||
+    v0828CameraScene.active
+  ) {
+    return;
+  }
+
+  f.phase = "cameraReveal";
+  transitionBusy = true;
+  keys.clear();
+  $("hud").hidden = true;
+  $("prompt").hidden = true;
+
+  v0828CameraScene.active = true;
+  v0828CameraScene.phase = 1;
+  v0828CameraScene.text = "";
+
+  setTimeout(() => {
+    v0828CameraScene.phase = 2;
+    v0828CameraScene.text = "Espera...";
+  }, 950);
+
+  setTimeout(() => {
+    v0828CameraScene.phase = 3;
+    v0828CameraScene.text =
+      "Tem algo de errado.";
+  }, 2300);
+
+  setTimeout(() => {
+    v0828CameraScene.phase = 4;
+    v0828CameraScene.text =
+      "A tatuagem...?";
+  }, 3800);
+
+  setTimeout(() => {
+    v0828CameraScene.active = false;
+    transitionBusy = false;
+    $("hud").hidden = false;
+
+    f.cameraRevealDone = true;
+
+    say(
+      [
+        [
+          "Pai",
+          "Eu falei que não era pra tirar foto."
+        ],
+        [
+          "Estevão",
+          "Eu nem tirei ainda."
+        ],
+        [
+          "Estevão",
+          "Cadê sua tatuagem?"
+        ],
+        ["Pai", "..."],
+        [
+          "Estevão",
+          "Você não é meu pai."
+        ]
+      ],
+      () => {
+        v0828StartKitchenHide();
+      }
+    );
+  }, 5350);
+}
+
+function v0828StartKitchenHide() {
+  const f = v0828EnsureFinalArc();
+
+  f.phase = "kitchenHide";
+  f.kitchenTimer = 20;
+  f.kitchenHideDone = false;
+  f.pursuersActive = false;
+
+  go(
+    "kitchen",
+    310,
+    320
+  );
+
+  v06Toast(
+    "ESCONDA-SE · 20 s",
+    3
+  );
+
+  updateHud();
+  save();
+}
+
+function v0828KitchenHide() {
+  const f = v0828EnsureFinalArc();
+
+  if (
+    f.phase !== "kitchenHide"
+  ) {
+    return;
+  }
+
+  f.kitchenHideDone = true;
+  f.kitchenTimer = 0;
+  f.phase = "plates";
+
+  say(
+    [
+      "Você puxa seu irmão para trás do móvel.",
+      "Passos entram na cozinha.",
+      "Os dois procuram por alguns segundos.",
+      "Depois, os passos se afastam."
+    ],
+    () => {
+      v06Toast(
+        "PEGUE ALGO PARA SE PROTEGER",
+        3
+      );
+      updateHud();
+      save();
+    }
+  );
+}
+
+function v0828TakePlates() {
+  const f = v0828EnsureFinalArc();
+
+  if (
+    f.phase !== "plates" ||
+    f.platesObtained
+  ) {
+    return;
+  }
+
+  f.platesObtained = true;
+
+  say(
+    [
+      [
+        "Irmão",
+        "Você tá de brincadeira, né?"
+      ],
+      [
+        "Irmão",
+        "Você passou dias procurando eles. Você sabe tudo de errado que pode acontecer aqui."
+      ],
+      [
+        "Irmão",
+        "Se você não soubesse dessas coisas, tudo bem. Mas você sabe."
+      ],
+      [
+        "Estevão",
+        "Vamos encontrar nossos pais de verdade. Eu prometo."
+      ],
+      ["Estevão", "Fica aí. Eu já volto."],
+      ["Irmão", "Irmão."],
+      ["Estevão", "Oi?"],
+      [
+        "Irmão",
+        "Toma cuidado, por favor. Eu só tenho você."
+      ]
+    ],
+    () => {
+      f.phase = "plateThrow";
+      f.platesDownTimer = 0;
+      state.atticUnlocked = true;
+
+      v0828RememberArcCheckpoint(
+        "plates"
+      );
+
+      fade(
+        "Andar superior",
+        "Eles saem do quarto do seu irmão.",
+        () => {
+          go(
+            "hall",
+            330,
+            285
+          );
+        }
+      );
+
+      v06Toast(
+        "F — ARREMESSAR",
+        3
+      );
+
+      updateHud();
+      save();
+    }
+  );
+}
+
+function v0828CleanSnapshot(source) {
+  const snapshot =
+    JSON.parse(
+      JSON.stringify(source)
+    );
+
+  delete snapshot.finalArcCheckpoint;
+  delete snapshot.finalArcPreObserverCheckpoint;
+  delete snapshot.rescueCheckpoint;
+
+  return snapshot;
+}
+
+function v0828RememberArcCheckpoint(kind) {
+  if (!state) return;
+
+  const snapshot =
+    v0828CleanSnapshot(state);
+
+  snapshot.finalArcCheckpointKind =
+    kind;
+
+  if (kind === "preObserver") {
+    state.finalArcPreObserverCheckpoint =
+      snapshot;
+  } else {
+    state.finalArcCheckpoint =
+      snapshot;
+  }
+
+  save();
+}
+
+function v0828RestoreArcCheckpoint() {
+  if (!state?.finalArcCheckpoint) {
+    return;
+  }
+
+  const meta = {
+    bad:
+      state.finalArc?.badEndingUnlocked,
+    good:
+      state.finalArc?.goodEndingUnlocked
+  };
+
+  state =
+    JSON.parse(
+      JSON.stringify(
+        state.finalArcCheckpoint
+      )
+    );
+
+  v0828EnsureFinalArc();
+
+  state.finalArc.badEndingUnlocked =
+    Boolean(meta.bad);
+  state.finalArc.goodEndingUnlocked =
+    Boolean(meta.good);
+  state.gameOver = false;
+
+  closeModal();
+  enterGame();
+  updateHud();
+  save();
+}
+
+function v0828FinalDefeat(text) {
+  if (!state || state.gameOver) {
+    return;
+  }
+
+  state.gameOver = true;
+  keys.clear();
+
+  modal(
+    "Eles te alcançaram",
+    text +
+      "\n\nO checkpoint da sequência final continua disponível.",
+    [
+      [
+        "Voltar ao checkpoint",
+        v0828RestoreArcCheckpoint
+      ],
+      [
+        "Menu principal",
+        () => {
+          save();
+          closeModal();
+          mode = "menu";
+          $("menu").hidden = false;
+          $("hud").hidden = true;
+          $("prompt").hidden = true;
+        }
+      ]
+    ]
+  );
+}
+
+function v0828ThrowPlates() {
+  const f = v0828EnsureFinalArc();
+
+  if (f.phase !== "plateThrow") {
+    return;
+  }
+
+  f.plateSceneDone = true;
+  f.platesDownTimer = 30;
+  f.phase = "findExit";
+  f.pursuersActive = false;
+
+  f.pursuers = [
+    {
+      id: "norberto",
+      kind: "father",
+      room: "hall",
+      x: housePoint(205),
+      y: housePoint(150),
+      facing: "right",
+      cooldown: 0
+    },
+    {
+      id: "claudia",
+      kind: "mother",
+      room: "hall",
+      x: housePoint(265),
+      y: housePoint(150),
+      facing: "right",
+      cooldown: 0
+    }
+  ];
+
+  v06Toast(
+    "ENCONTRE UMA SAÍDA · eles estão caídos por 30 s",
+    4
+  );
+
+  updateHud();
+  save();
+}
+
+const V0828_HOUSE_LINKS = {
+  foyer: [
+    {
+      to: "kitchen",
+      x: housePoint(260),
+      y: housePoint(46),
+      sx: housePoint(310),
+      sy: housePoint(320)
+    },
+    {
+      to: "living",
+      x: housePoint(45),
+      y: housePoint(215),
+      sx: housePoint(530),
+      sy: housePoint(210)
+    },
+    {
+      to: "parents",
+      x: housePoint(175),
+      y: housePoint(374),
+      sx: housePoint(485),
+      sy: housePoint(90)
+    },
+    {
+      to: "hall",
+      x: housePoint(472),
+      y: housePoint(155),
+      sx: housePoint(450),
+      sy: housePoint(200)
+    }
+  ],
+  kitchen: [
+    {
+      to: "foyer",
+      x: housePoint(310),
+      y: housePoint(374),
+      sx: housePoint(260),
+      sy: housePoint(90)
+    }
+  ],
+  living: [
+    {
+      to: "foyer",
+      x: housePoint(595),
+      y: housePoint(210),
+      sx: housePoint(90),
+      sy: housePoint(215)
+    }
+  ],
+  parents: [
+    {
+      to: "foyer",
+      x: housePoint(485),
+      y: housePoint(46),
+      sx: housePoint(175),
+      sy: housePoint(325)
+    }
+  ],
+  hall: [
+    {
+      to: "brother",
+      x: housePoint(160),
+      y: housePoint(374),
+      sx: housePoint(490),
+      sy: housePoint(85)
+    },
+    {
+      to: "bedroom",
+      x: housePoint(490),
+      y: housePoint(374),
+      sx: housePoint(131),
+      sy: housePoint(132)
+    },
+    {
+      to: "attic",
+      x: housePoint(240),
+      y: housePoint(46),
+      sx: housePoint(310),
+      sy: housePoint(315)
+    },
+    {
+      to: "foyer",
+      x: housePoint(435),
+      y: housePoint(105),
+      sx: housePoint(370),
+      sy: housePoint(255)
+    }
+  ],
+  brother: [
+    {
+      to: "hall",
+      x: housePoint(490),
+      y: housePoint(46),
+      sx: housePoint(160),
+      sy: housePoint(325)
+    }
+  ],
+  bedroom: [
+    {
+      to: "hall",
+      x: housePoint(131),
+      y: housePoint(46),
+      sx: housePoint(490),
+      sy: housePoint(325)
+    }
+  ],
+  attic: [
+    {
+      to: "hall",
+      x: housePoint(310),
+      y: housePoint(374),
+      sx: housePoint(240),
+      sy: housePoint(90)
+    }
+  ]
+};
+
+function v0828NextHouseRoom(
+  start,
+  target
+) {
+  if (start === target) {
+    return null;
+  }
+
+  const queue = [
+    {
+      room: start,
+      first: null
+    }
+  ];
+  const seen =
+    new Set([start]);
+
+  while (queue.length) {
+    const current =
+      queue.shift();
+
+    for (
+      const edge of
+        V0828_HOUSE_LINKS[current.room] ||
+        []
+    ) {
+      if (seen.has(edge.to)) {
+        continue;
+      }
+
+      const first =
+        current.first || edge;
+
+      if (edge.to === target) {
+        return first;
+      }
+
+      seen.add(edge.to);
+      queue.push({
+        room: edge.to,
+        first
+      });
+    }
+  }
+
+  return null;
+}
+
+function v0828UpdatePursuer(
+  pursuer,
+  dt
+) {
+  if (
+    !pursuer ||
+    !state ||
+    !v0828EnsureFinalArc()
+      .pursuersActive
+  ) {
+    return;
+  }
+
+  pursuer.cooldown =
+    Math.max(
+      0,
+      (pursuer.cooldown || 0) - dt
+    );
+
+  let tx;
+  let ty;
+  let edge = null;
+
+  if (pursuer.room === state.room) {
+    tx = state.x;
+    ty = state.y;
+  } else {
+    edge =
+      v0828NextHouseRoom(
+        pursuer.room,
+        state.room
+      );
+
+    if (!edge) {
+      return;
+    }
+
+    tx = edge.x;
+    ty = edge.y;
+  }
+
+  const dx = tx - pursuer.x;
+  const dy = ty - pursuer.y;
+  const distance =
+    Math.hypot(dx, dy) || 1;
+  const speed = 78;
+  const step =
+    Math.min(
+      distance,
+      speed * dt
+    );
+
+  pursuer.x +=
+    dx / distance * step;
+  pursuer.y +=
+    dy / distance * step;
+
+  pursuer.facing =
+    Math.abs(dx) > Math.abs(dy)
+      ? (
+          dx > 0
+            ? "right"
+            : "left"
+        )
+      : (
+          dy > 0
+            ? "down"
+            : "up"
+        );
+
+  if (
+    pursuer.room === state.room &&
+    distance < 18
+  ) {
+    v0828FinalDefeat(
+      "Um dos falsos pais te alcançou antes da fuga."
+    );
+    return;
+  }
+
+  if (
+    edge &&
+    distance < 9 &&
+    pursuer.cooldown <= 0
+  ) {
+    pursuer.room = edge.to;
+    pursuer.x = edge.sx;
+    pursuer.y = edge.sy;
+    pursuer.cooldown = 0.7;
+  }
+}
+
+function v0828DrawPursuers() {
+  const f = v0828EnsureFinalArc();
+
+  if (
+    !f ||
+    ![
+      "findExit",
+      "returnBrother",
+      "escapeHouse"
+    ].includes(f.phase)
+  ) {
+    return;
+  }
+
+  c.save();
+  c.translate(
+    -Math.floor(camera.x),
+    -Math.floor(camera.y)
+  );
+
+  for (const p of f.pursuers) {
+    if (p.room !== state.room) {
+      continue;
+    }
+
+    person(
+      p.x,
+      p.y,
+      p.kind,
+      0,
+      p.facing
+    );
+  }
+
+  c.restore();
+}
+
+function v0828TakeCellarKey() {
+  const f = v0828EnsureFinalArc();
+
+  if (
+    ![
+      "findExit",
+      "returnBrother"
+    ].includes(f.phase)
+  ) {
+    return;
+  }
+
+  if (f.cellarKeyObtained) {
+    say([
+      "A chave do porão já está comigo."
+    ]);
+    return;
+  }
+
+  f.cellarKeyObtained = true;
+  f.phase = "returnBrother";
+
+  say(
+    [
+      "Entre as coisas guardadas no sótão, uma chave pesada.",
+      "Eu conheço essa fechadura. É a do porão.",
+      "Preciso voltar para o meu irmão."
+    ],
+    () => {
+      updateHud();
+      save();
+    }
+  );
+}
+
+function v0828CollectBrotherForEscape() {
+  const f = v0828EnsureFinalArc();
+
+  if (
+    f.phase !== "returnBrother" ||
+    !f.cellarKeyObtained
+  ) {
+    return;
+  }
+
+  f.brotherWithPlayer = true;
+  f.phase = "escapeHouse";
+
+  say(
+    [
+      ["Estevão", "Vamos fugir, corre."],
+      ["Irmão", "Tá. Eu tô com você."]
+    ],
+    () => {
+      updateHud();
+      save();
+    }
+  );
+}
+
+function v0828EscapeHouse() {
+  const f = v0828EnsureFinalArc();
+
+  if (
+    f.phase !== "escapeHouse" ||
+    !f.brotherWithPlayer
+  ) {
+    return;
+  }
+
+  f.houseEscaped = true;
+  f.pursuersActive = false;
+  f.phase = "florindaUrgent";
+
+  if (state.day1Extra) {
+    state.day1Extra.doorLocked = true;
+  }
+
+  fade(
+    "Do lado de fora",
+    "Vocês trancam a porta e se afastam da casa.",
+    () => {
+      v076SetOutdoorRoom(
+        "village",
+        442,
+        760,
+        "left"
+      );
+    }
+  );
+
+  v06Toast(
+    "FALE COM FLORINDA",
+    4
+  );
+
+  updateHud();
+  save();
+}
+
+function v0828FlorindaUrgent() {
+  const f = v0828EnsureFinalArc();
+
+  if (f.florindaFinalTalkDone) {
+    return;
+  }
+
+  say(
+    [
+      [
+        "Estevão",
+        "Meus pais voltaram, mas eles não são meus pais. Eles perseguiram a gente."
+      ],
+      [
+        "Florinda",
+        "Eu conheço seus pais há anos. Por que eles fariam isso?"
+      ],
+      [
+        "Estevão",
+        "Eles não fariam. Esse é o problema."
+      ],
+      [
+        "Florinda",
+        "Está bem. Eu não entendo o que você está dizendo, mas sei quando duas crianças estão apavoradas."
+      ],
+      [
+        "Estevão",
+        "E por que eu sempre acordo em casa depois das sete?"
+      ],
+      [
+        "Florinda",
+        "Porque eu encontro você. Seus pais pediram que eu cuidasse de vocês se alguma coisa acontecesse."
+      ],
+      [
+        "Florinda",
+        "Quando você apaga na rua, eu te levo de volta. Eu não sei por que você desmaia. Só não vou deixar você jogado lá."
+      ]
+    ],
+    () => {
+      f.florindaFinalTalkDone = true;
+      f.phase = "secondChase";
+      f.secondChaseActive = true;
+      f.secondChaseTimer = 20;
+
+      state.storyFlags.sys07hBlackout =
+        false;
+
+      v0828StaticUntil =
+        elapsed + 1.4;
+
+      f.pursuers = [
+        {
+          id: "norberto",
+          kind: "father",
+          room: "village",
+          x: 450,
+          y: 700,
+          facing: "down",
+          cooldown: 0
+        },
+        {
+          id: "claudia",
+          kind: "mother",
+          room: "village",
+          x: 480,
+          y: 700,
+          facing: "down",
+          cooldown: 0
+        }
+      ];
+
+      v06Toast(
+        "ESTÁTICA · PROCURE UM LUGAR PARA SE ESCONDER · 20 s",
+        4
+      );
+
+      updateHud();
+      save();
+    }
+  );
+}
+
+function v0828EnterCellar() {
+  const f = v0828EnsureFinalArc();
+
+  if (
+    f.phase !== "secondChase" ||
+    !f.cellarKeyObtained
+  ) {
+    return;
+  }
+
+  f.secondChaseActive = false;
+  f.cellarEntered = true;
+  f.phase = "cellarExplore";
+  f.pursuersActive = false;
+
+  state.storyFlags.sys07hBlackout =
+    false;
+  state.storyFlags.sysHunger =
+    false;
+  state.storyFlags.sysDanger =
+    false;
+  state.firstExit = false;
+
+  if (state.danger) {
+    state.danger.phase = "safe";
+    state.danger.enemy = null;
+  }
+
+  fade(
+    "Porão dos Lancaster",
+    "As duas portas inclinadas fecham sobre vocês.",
+    () => {
+      go(
+        "basement",
+        310,
+        330
+      );
+    }
+  );
+
+  say(
+    [
+      ["Irmão", "Nossa... será que aqui estamos realmente seguros? Eu tô com medo."],
+      ["Estevão", "Eu espero que sim. Vamos esperar um pouco antes de sair daqui."]
+    ],
+    () => {
+      updateHud();
+      save();
+    }
+  );
+}
+
+function v0828CellarClue(kind) {
+  const f = v0828EnsureFinalArc();
+
+  if (kind === "tools") {
+    if (f.cellarToolsSeen) {
+      say([
+        "As ferramentas do meu pai continuam aqui."
+      ]);
+      return;
+    }
+
+    f.cellarToolsSeen = true;
+    say([
+      "As ferramentas do meu pai..."
+    ]);
+  }
+
+  if (kind === "split") {
+    if (f.cellarSplitSeen) {
+      say([
+        "O nome continua legível: Split Lancaster."
+      ]);
+      return;
+    }
+
+    f.cellarSplitSeen = true;
+    say([
+      "Um documento antigo de mineração.",
+      "Split Lancaster.",
+      "Isso é o nome do meu avô, se eu não me engano?"
+    ]);
+  }
+
+  if (kind === "mining") {
+    if (f.cellarMiningSeen) {
+      say([
+        "Um equipamento antigo de mineração."
+      ]);
+      return;
+    }
+
+    f.cellarMiningSeen = true;
+    say([
+      "Um equipamento antigo de mineração.",
+      "Por que meu pai guardava isso aqui?"
+    ]);
+  }
+
+  save();
+}
+
+function v0828CellarReadyForCabinet() {
+  const f = v0828EnsureFinalArc();
+
+  return Boolean(
+    f.cellarToolsSeen &&
+    f.cellarSplitSeen &&
+    f.cellarMiningSeen
+  );
+}
+
+function v0828StartCabinetPush() {
+  const f = v0828EnsureFinalArc();
+
+  if (!v0828CellarReadyForCabinet()) {
+    say([
+      "Ainda quero olhar o resto do porão primeiro."
+    ]);
+    return;
+  }
+
+  if (f.secretPassageOpened) {
+    say([
+      "O armário já está tombado. A passagem está aberta."
+    ]);
+    return;
+  }
+
+  f.phase = "cellarPush";
+  f.pushActive = true;
+  f.pushProgress = 0;
+  keys.clear();
+
+  say(
+    [
+      ["Irmão", "Irmão... vem ver isso. Eu tô ficando maluco ou tem um buraco aqui?"],
+      ["Estevão", "Sai um pouquinho."],
+      ["Estevão", "Eu vou tombar ele."]
+    ],
+    () => {
+      transitionBusy = true;
+      v06Toast(
+        "F — EMPURRAR",
+        3
+      );
+    }
+  );
+}
+
+function v0828PushCabinet() {
+  const f = v0828EnsureFinalArc();
+
+  if (!f.pushActive) {
+    return;
+  }
+
+  f.pushProgress =
+    Math.min(
+      1,
+      f.pushProgress + 0.17
+    );
+
+  if (f.pushProgress >= 1) {
+    f.pushActive = false;
+    f.secretPassageOpened = true;
+    f.phase = "cellarExplore";
+    transitionBusy = false;
+
+    v06Toast(
+      "O armário tombou. Há uma passagem atrás dele.",
+      4
+    );
+
+    updateHud();
+    save();
+  }
+}
+
+function v0828EnterTunnel() {
+  const f = v0828EnsureFinalArc();
+
+  if (!f.secretPassageOpened) {
+    return;
+  }
+
+  f.phase = "tunnel";
+
+  state.flashlight =
+    state.flashlight || {};
+  state.flashlight.owned = true;
+  state.flashlight.source = "phone";
+  state.flashlight.on = true;
+  state.flashlight.battery = 100;
+
+  fade(
+    "Passagem subterrânea",
+    "A parede da casa gradualmente vira estrutura de mina.",
+    () => {
+      state.room =
+        "undergroundPassage";
+      state.x = 85;
+      state.y = 230;
+      state.facing = "right";
+      state.walk = 0;
+      keys.clear();
+      near = null;
+      updateHud();
+      save();
+    }
+  );
+}
+
+const v0828PrepareBase =
+  prepareSystems;
+
+prepareSystems = function() {
+  v0828PrepareBase();
+
+  if (!state) return;
+
+  const f =
+    v0828EnsureFinalArc();
+
+  if (
+    f.useCanonicalLateArc &&
+    f.phase === "postWest" &&
+    f.claudiaTestimonyDone
+  ) {
+    f.phase = "westWitness";
+  }
+
+  if (
+    f.useCanonicalLateArc &&
+    f.platesDownTimer > 0
+  ) {
+    f.pursuersActive = false;
+  }
+};
+
+const v0828Chapter5Base =
+  v0650Chapter5Unlocked;
+const v0828Chapter6Base =
+  v0650Chapter6Unlocked;
+const v0828Chapter7Base =
+  v0650Chapter7Unlocked;
+const v0828Chapter8Base =
+  v0650Chapter8Unlocked;
+const v0828Chapter9Base =
+  v070Chapter9Unlocked;
+
+v0650Chapter5Unlocked = function() {
+  if (v0828CanonicalLateArc()) {
+    return false;
+  }
+  return v0828Chapter5Base();
+};
+
+v0650Chapter6Unlocked = function() {
+  if (v0828CanonicalLateArc()) {
+    return false;
+  }
+  return v0828Chapter6Base();
+};
+
+v0650Chapter7Unlocked = function() {
+  if (v0828CanonicalLateArc()) {
+    return false;
+  }
+  return v0828Chapter7Base();
+};
+
+v0650Chapter8Unlocked = function() {
+  if (v0828CanonicalLateArc()) {
+    return false;
+  }
+  return v0828Chapter8Base();
+};
+
+v070Chapter9Unlocked = function() {
+  if (v0828CanonicalLateArc()) {
+    return false;
+  }
+  return v0828Chapter9Base();
+};
+
+const v0828GoBase = go;
+
+go = function(
+  nextRoom,
+  x,
+  y
+) {
+  const f =
+    v0828EnsureFinalArc();
+
+  if (
+    f?.useCanonicalLateArc &&
+    nextRoom === "attic" &&
+    [
+      "findExit",
+      "returnBrother",
+      "escapeHouse"
+    ].includes(f.phase)
+  ) {
+    state.atticUnlocked = true;
+  }
+
+  v0828GoBase(
+    nextRoom,
+    x,
+    y
+  );
+};
+
+const v0828GetNearBase =
+  getNear;
+
+getNear = function() {
+  const f =
+    v0828EnsureFinalArc();
+
+  if (
+    !f ||
+    !f.useCanonicalLateArc
+  ) {
+    return v0828GetNearBase();
+  }
+
+  if (
+    state.room === "square" &&
+    !f.epilogueActive &&
+    !f.osvaldoWestSeen &&
+    Math.hypot(
+      state.x - V0828_OSVALDO_POS.x,
+      state.y - V0828_OSVALDO_POS.y
+    ) < 44
+  ) {
+    return {
+      label: "Falar com Osvaldo",
+      action: "v0828Osvaldo"
+    };
+  }
+
+  if (
+    state.room === "coupleRoad" &&
+    f.falseParentsFound &&
+    !f.falseParentsHome
+  ) {
+    const centerX =
+      (
+        V0828_COUPLE_PARENT_POS.father.x +
+        V0828_COUPLE_PARENT_POS.mother.x
+      ) / 2;
+
+    if (
+      Math.hypot(
+        state.x - centerX,
+        state.y -
+          V0828_COUPLE_PARENT_POS.father.y
+      ) < 62
+    ) {
+      return {
+        label: "Falar com seus pais",
+        action: "v0828FalseParents"
+      };
+    }
+  }
+
+  if (
+    state.room === "kitchen" &&
+    f.phase === "kitchenHide"
+  ) {
+    const x = housePoint(100);
+    const y = housePoint(272);
+
+    if (
+      Math.hypot(
+        state.x - x,
+        state.y - y
+      ) < 54
+    ) {
+      return {
+        label: "Esconder atrás do móvel",
+        action: "v0828KitchenHide"
+      };
+    }
+  }
+
+  if (
+    state.room === "kitchen" &&
+    f.phase === "plates"
+  ) {
+    const x = housePoint(285);
+    const y = housePoint(235);
+
+    if (
+      Math.hypot(
+        state.x - x,
+        state.y - y
+      ) < 60
+    ) {
+      return {
+        label: "Pegar dois pratos",
+        action: "v0828TakePlates"
+      };
+    }
+  }
+
+  if (
+    state.room === "attic" &&
+    [
+      "findExit",
+      "returnBrother"
+    ].includes(f.phase)
+  ) {
+    const x = housePoint(157);
+    const y = housePoint(128);
+
+    if (
+      Math.hypot(
+        state.x - x,
+        state.y - y
+      ) < 58
+    ) {
+      return {
+        label:
+          f.cellarKeyObtained
+            ? "Chave do porão"
+            : "Pegar a chave do porão",
+        action:
+          "v0828CellarKey"
+      };
+    }
+  }
+
+  if (
+    state.room === "brother" &&
+    f.phase === "returnBrother"
+  ) {
+    return {
+      label: "Chamar seu irmão",
+      action:
+        "v0828BrotherEscape"
+    };
+  }
+
+  if (
+    state.room === "basement" &&
+    f.phase === "cellarExplore"
+  ) {
+    const points = [
+      {
+        x: housePoint(130),
+        y: housePoint(135),
+        label:
+          "Examinar ferramentas",
+        action:
+          "v0828CellarTools"
+      },
+      {
+        x: housePoint(325),
+        y: housePoint(130),
+        label:
+          "Examinar documento",
+        action:
+          "v0828CellarSplit"
+      },
+      {
+        x: housePoint(500),
+        y: housePoint(210),
+        label:
+          "Examinar equipamento",
+        action:
+          "v0828CellarMining"
+      }
+    ];
+
+    for (const p of points) {
+      if (
+        Math.hypot(
+          state.x - p.x,
+          state.y - p.y
+        ) < 52
+      ) {
+        return p;
+      }
+    }
+
+    if (
+      v0828CellarReadyForCabinet()
+    ) {
+      const x = housePoint(505);
+      const y = housePoint(135);
+
+      if (
+        Math.hypot(
+          state.x - x,
+          state.y - y
+        ) < 60
+      ) {
+        return {
+          label:
+            f.secretPassageOpened
+              ? "Entrar na passagem"
+              : "Examinar o armário",
+          action:
+            f.secretPassageOpened
+              ? "v0828Tunnel"
+              : "v0828Cabinet"
+        };
+      }
+    }
+  }
+
+  const target =
+    v0828GetNearBase();
+
+  if (
+    target?.action === "yardBasement" &&
+    ![
+      "secondChase",
+      "cellarExplore",
+      "cellarPush",
+      "tunnel",
+      "mine",
+      "observer",
+      "epilogue"
+    ].includes(f.phase)
+  ) {
+    return {
+      ...target,
+      label:
+        "Examinar entrada do porão",
+      action:
+        "v0828BasementLocked"
+    };
+  }
+
+  return target;
+};
+
+const v0828InteractBase =
+  interact;
+
+interact = function(action) {
+  const f =
+    v0828EnsureFinalArc();
+
+  if (
+    !f ||
+    !f.useCanonicalLateArc
+  ) {
+    v0828InteractBase(action);
+    return;
+  }
+
+  if (
+    action ===
+      "v0828CuldesacEntrance"
+  ) {
+    if (!f.culdesacUnlocked) {
+      say([
+        "Ainda não tenho motivo para entrar nessa rua."
+      ]);
+      return;
+    }
+
+    fade(
+      "Rua sem saída",
+      "Uma rua curta abaixo do Oeste.",
+      () => {
+        v076SetOutdoorRoom(
+          "culdesacWest",
+          450,
+          800,
+          "up"
+        );
+      }
+    );
+    return;
+  }
+
+  if (
+    action ===
+      "v0828LeaveCuldesac"
+  ) {
+    fade(
+      "",
+      "",
+      () => {
+        v076SetOutdoorRoom(
+          "westRoad",
+          250,
+          maps.westRoad.h - 85,
+          "up"
+        );
+      }
+    );
+    return;
+  }
+
+  if (
+    action ===
+      "v0828ClaudiaDoor"
+  ) {
+    v0828TalkClaudia();
+    return;
+  }
+
+  if (
+    action === "v0828Osvaldo"
+  ) {
+    v0828TalkOsvaldo();
+    return;
+  }
+
+  if (
+    action ===
+      "v0828CoupleRoadVillage"
+  ) {
+    v0828EnterCoupleRoad(
+      "village"
+    );
+    return;
+  }
+
+  if (
+    action ===
+      "v0828CoupleRoadSquare"
+  ) {
+    v0828EnterCoupleRoad(
+      "square"
+    );
+    return;
+  }
+
+  if (
+    action ===
+      "v0828CoupleToVillage"
+  ) {
+    fade(
+      "",
+      "",
+      () => {
+        v076SetOutdoorRoom(
+          "village",
+          maps.village.w - 80,
+          794,
+          "left"
+        );
+      }
+    );
+    return;
+  }
+
+  if (
+    action ===
+      "v0828CoupleToSquare"
+  ) {
+    fade(
+      "",
+      "",
+      () => {
+        v076SetOutdoorRoom(
+          "square",
+          maps.square.w - 85,
+          367,
+          "left"
+        );
+      }
+    );
+    return;
+  }
+
+  if (
+    action ===
+      "v0828CoupleResidentA"
+  ) {
+    v0828TalkCoupleResident("a");
+    return;
+  }
+
+  if (
+    action ===
+      "v0828CoupleResidentB"
+  ) {
+    v0828TalkCoupleResident("b");
+    return;
+  }
+
+  if (
+    action ===
+      "v0828FalseParents"
+  ) {
+    v0828MeetFalseParents();
+    return;
+  }
+
+  if (
+    action ===
+      "v0828KitchenHide"
+  ) {
+    v0828KitchenHide();
+    return;
+  }
+
+  if (
+    action ===
+      "v0828TakePlates"
+  ) {
+    v0828TakePlates();
+    return;
+  }
+
+  if (
+    action === "v0828CellarKey"
+  ) {
+    v0828TakeCellarKey();
+    return;
+  }
+
+  if (
+    action ===
+      "v0828BrotherEscape"
+  ) {
+    v0828CollectBrotherForEscape();
+    return;
+  }
+
+  if (
+    action === "outside" &&
+    f.phase === "escapeHouse"
+  ) {
+    v0828EscapeHouse();
+    return;
+  }
+
+  if (
+    ["policeDoor", "policeOfficer"].includes(action) &&
+    f.phase === "florindaUrgent"
+  ) {
+    say([
+      "Não... ele não vai acreditar em mim."
+    ]);
+    return;
+  }
+
+  if (
+    ["shopDoor", "neighborDoor", "vendor"].includes(action) &&
+    f.phase === "florindaUrgent"
+  ) {
+    v0828FlorindaUrgent();
+    return;
+  }
+
+  if (
+    action === "yardBasement" &&
+    f.phase === "secondChase"
+  ) {
+    if (!f.cellarKeyObtained) {
+      say([
+        "Está trancado. A chave estava no sótão."
+      ]);
+      return;
+    }
+
+    v0828EnterCellar();
+    return;
+  }
+
+  if (
+    action ===
+      "v0828BasementLocked"
+  ) {
+    say([
+      "Trancado. A chave do porão fica com meus pais."
+    ]);
+    return;
+  }
+
+  if (
+    action ===
+      "v0828CellarTools"
+  ) {
+    v0828CellarClue("tools");
+    return;
+  }
+
+  if (
+    action ===
+      "v0828CellarSplit"
+  ) {
+    v0828CellarClue("split");
+    return;
+  }
+
+  if (
+    action ===
+      "v0828CellarMining"
+  ) {
+    v0828CellarClue("mining");
+    return;
+  }
+
+  if (
+    action === "v0828Cabinet"
+  ) {
+    v0828StartCabinetPush();
+    return;
+  }
+
+  if (
+    action === "v0828Tunnel"
+  ) {
+    v0828EnterTunnel();
+    return;
+  }
+
+  if (
+    action === "oldManTalk" &&
+    f.claudiaTestimonyDone &&
+    !f.raimundoCoupleRumorDone
+  ) {
+    v0828TalkRaimundoCoupleRumor();
+    return;
+  }
+
+  v0828InteractBase(action);
+};
+
+const v0828SolidBase = solid;
+
+solid = function(x, y) {
+  const f =
+    v0828EnsureFinalArc();
+
+  if (
+    f?.useCanonicalLateArc
+  ) {
+    if (
+      f.phase === "florindaUrgent" &&
+      state.room === "village" &&
+      (
+        x < 35 ||
+        x > maps.village.w - 35 ||
+        y < 430 ||
+        y > 900
+      )
+    ) {
+      return true;
+    }
+
+    if (
+      f.phase === "secondChase" &&
+      state.room === "village" &&
+      (
+        x < 300 ||
+        x > 650 ||
+        y < 470 ||
+        y > 860
+      )
+    ) {
+      return true;
+    }
+
+    if (
+      f.pursuersActive
+    ) {
+      for (const p of f.pursuers) {
+        if (
+          p.room === state.room &&
+          Math.hypot(
+            x - p.x,
+            y - p.y
+          ) < 18
+        ) {
+          return true;
+        }
+      }
+    }
+  }
+
+  return v0828SolidBase(x, y);
+};
+
+const v0828DrawWorldBase =
+  drawWorld;
+
+drawWorld = function() {
+  if (
+    state?.room === "culdesacWest"
+  ) {
+    v0828DrawCuldesac();
+  } else if (
+    state?.room === "coupleRoad"
+  ) {
+    v0828DrawCoupleRoad();
+  } else {
+    v0828DrawWorldBase();
+  }
+
+  if (!state) return;
+
+  v0828DrawOsvaldoAndEpilogueNPCs();
+  v0828DrawFamilyInFoyer();
+  v0828DrawPursuers();
+
+  const f =
+    v0828EnsureFinalArc();
+
+  if (
+    f?.secondChaseActive &&
+    state.room === "village"
+  ) {
+    c.save();
+    c.translate(
+      -Math.floor(camera.x),
+      -Math.floor(camera.y)
+    );
+
+    const t =
+      Math.max(
+        0,
+        Math.min(
+          1,
+          1 -
+            f.secondChaseTimer /
+            20
+        )
+      );
+
+    person(
+      455 + (state.x - 455) * t * 0.28,
+      720 + (state.y - 720) * t * 0.28,
+      "father",
+      elapsed * 8,
+      "down"
+    );
+    person(
+      490 + (state.x - 490) * t * 0.24,
+      720 + (state.y - 720) * t * 0.24,
+      "mother",
+      elapsed * 8,
+      "down"
+    );
+
+    c.restore();
+  }
+
+  if (
+    state.room === "village" &&
+    f?.phase === "secondChase"
+  ) {
+    c.save();
+    c.translate(
+      -Math.floor(camera.x),
+      -Math.floor(camera.y)
+    );
+
+    c.fillStyle = "#4b4034";
+    c.beginPath();
+    c.moveTo(346, 505);
+    c.lineTo(422, 505);
+    c.lineTo(414, 548);
+    c.lineTo(354, 548);
+    c.closePath();
+    c.fill();
+
+    c.strokeStyle = "#211e1a";
+    c.lineWidth = 3;
+    c.stroke();
+
+    c.restore();
+  }
+
+  if (
+    elapsed < v0828StaticUntil
+  ) {
+    for (let i = 0; i < 34; i++) {
+      const y =
+        (
+          i * 11 +
+          Math.floor(
+            elapsed * 870
+          )
+        ) % H;
+
+      rect(
+        0,
+        y,
+        W,
+        1 + (i % 5 === 0 ? 1 : 0),
+        "rgba(235,236,230,0.13)"
+      );
+    }
+  }
+
+  v0828DrawCameraOverlay();
+
+  if (
+    f?.pushActive
+  ) {
+    rect(
+      70,
+      H - 52,
+      W - 140,
+      24,
+      "rgba(0,0,0,0.74)"
+    );
+    rect(
+      80,
+      H - 43,
+      W - 160,
+      8,
+      "#302d29"
+    );
+    rect(
+      80,
+      H - 43,
+      (W - 160) *
+        f.pushProgress,
+      8,
+      "#c7baa0"
+    );
+    txt(
+      "F — EMPURRAR",
+      184,
+      H - 58,
+      "#e6e0d2",
+      8
+    );
+  }
+};
+
+const v0828UpdateBase =
+  update;
+
+update = function(dt) {
+  const f =
+    state
+      ? v0828EnsureFinalArc()
+      : null;
+
+  if (
+    f?.pushActive
+  ) {
+    elapsed += dt;
+    f.pushProgress =
+      Math.max(
+        0,
+        f.pushProgress -
+          dt * 0.075
+      );
+    return;
+  }
+
+  let restoreRun = null;
+
+  if (
+    f?.useCanonicalLateArc &&
+    state.room ===
+      "undergroundPassage" &&
+    state.oldManEvent
+  ) {
+    restoreRun =
+      state.oldManEvent.runUnlocked;
+    state.oldManEvent.runUnlocked =
+      false;
+  }
+
+  v0828UpdateBase(dt);
+
+  if (
+    restoreRun !== null &&
+    state?.oldManEvent
+  ) {
+    state.oldManEvent.runUnlocked =
+      restoreRun;
+  }
+
+  if (
+    !state ||
+    !f ||
+    !f.useCanonicalLateArc ||
+    mode !== "game" ||
+    dialog ||
+    transitionBusy ||
+    state.gameOver
+  ) {
+    return;
+  }
+
+  if (
+    state.room === "northRoad"
+  ) {
+    v0828TriggerOsvaldoWestScene();
+  }
+
+  if (
+    f.phase === "kitchenHide"
+  ) {
+    f.kitchenTimer =
+      Math.max(
+        0,
+        f.kitchenTimer - dt
+      );
+
+    if (
+      f.kitchenTimer <= 0 &&
+      !f.kitchenHideDone
+    ) {
+      v0828FinalDefeat(
+        "Os falsos pais encontraram vocês antes de conseguirem se esconder."
+      );
+      return;
+    }
+  }
+
+  if (
+    [
+      "findExit",
+      "returnBrother",
+      "escapeHouse"
+    ].includes(f.phase)
+  ) {
+    if (f.platesDownTimer > 0) {
+      f.platesDownTimer =
+        Math.max(
+          0,
+          f.platesDownTimer - dt
+        );
+
+      if (
+        f.platesDownTimer <= 0
+      ) {
+        f.pursuersActive = true;
+        v06Toast(
+          "Eles se levantaram.",
+          2.2
+        );
+      }
+    }
+
+    if (f.pursuersActive) {
+      for (const p of f.pursuers) {
+        v0828UpdatePursuer(
+          p,
+          dt
+        );
+      }
+    }
+  }
+
+  if (
+    f.secondChaseActive &&
+    f.phase === "secondChase"
+  ) {
+    f.secondChaseTimer =
+      Math.max(
+        0,
+        f.secondChaseTimer - dt
+      );
+
+    if (
+      f.secondChaseTimer <= 0
+    ) {
+      v0828FinalDefeat(
+        "Os falsos pais alcançaram vocês antes de encontrarem um esconderijo."
+      );
+      return;
+    }
+  }
+
+  updateHud();
+};
+
+const v0828HudBase =
+  updateHud;
+
+updateHud = function() {
+  v0828HudBase();
+
+  if (!state) return;
+
+  const f =
+    v0828EnsureFinalArc();
+
+  if (
+    !f ||
+    !f.useCanonicalLateArc
+  ) {
+    return;
+  }
+
+  if (
+    f.phase === "postWest" ||
+    f.phase === "westWitness"
+  ) {
+    $("objective").textContent =
+      !f.claudiaTestimonyDone
+        ? "Procure testemunhas perto da Rua Oeste."
+        : !f.westCaseResolved
+          ? "Leve a nova informação para Anísio e continue investigando o Oeste."
+          : "Volte a falar com Raimundo.";
+    return;
+  }
+
+  if (
+    f.phase === "coupleSearch"
+  ) {
+    $("objective").textContent =
+      "Converse com moradores da nova rua de ligação à Praça.";
+    return;
+  }
+
+  if (
+    f.phase === "falseParentsRoad"
+  ) {
+    $("objective").textContent =
+      "Encontre o casal visto pelos moradores.";
+    return;
+  }
+
+  if (
+    f.phase === "familyPhoto" ||
+    f.phase === "cameraReveal"
+  ) {
+    $("objective").textContent =
+      "Fique com sua família.";
+    return;
+  }
+
+  if (
+    f.phase === "kitchenHide"
+  ) {
+    $("objective").textContent =
+      "ESCONDA-SE · " +
+      Math.ceil(
+        f.kitchenTimer
+      ) +
+      " s";
+    return;
+  }
+
+  if (
+    f.phase === "plates"
+  ) {
+    $("objective").textContent =
+      "PEGUE ALGO PARA SE PROTEGER";
+    return;
+  }
+
+  if (
+    f.phase === "plateThrow"
+  ) {
+    $("objective").textContent =
+      "F — ARREMESSAR";
+    return;
+  }
+
+  if (
+    f.phase === "findExit"
+  ) {
+    $("objective").textContent =
+      "ENCONTRE UMA SAÍDA" +
+      (
+        f.platesDownTimer > 0
+          ? " · " +
+            Math.ceil(
+              f.platesDownTimer
+            ) +
+            " s"
+          : ""
+      );
+    return;
+  }
+
+  if (
+    f.phase === "returnBrother"
+  ) {
+    $("objective").textContent =
+      "Volte até seu irmão.";
+    return;
+  }
+
+  if (
+    f.phase === "escapeHouse"
+  ) {
+    $("objective").textContent =
+      "SAIAM DA CASA";
+    return;
+  }
+
+  if (
+    f.phase === "florindaUrgent"
+  ) {
+    $("objective").textContent =
+      "FALE COM FLORINDA";
+    return;
+  }
+
+  if (
+    f.phase === "secondChase"
+  ) {
+    $("objective").textContent =
+      "PROCURE UM LUGAR PARA SE ESCONDER · " +
+      Math.ceil(
+        f.secondChaseTimer
+      ) +
+      " s";
+    return;
+  }
+
+  if (
+    f.phase === "cellarExplore"
+  ) {
+    $("objective").textContent =
+      f.secretPassageOpened
+        ? "Entre na passagem atrás do armário."
+        : v0828CellarReadyForCabinet()
+          ? "Veja o que seu irmão encontrou atrás do armário."
+          : "Explore o porão.";
+    return;
+  }
+
+  if (
+    f.phase === "cellarPush"
+  ) {
+    $("objective").textContent =
+      "F — EMPURRAR O ARMÁRIO";
+    return;
+  }
+
+  if (
+    f.phase === "tunnel"
+  ) {
+    $("objective").textContent =
+      "Siga as pegadas pela passagem.";
+    return;
+  }
+};
+
+window.addEventListener(
+  "keydown",
+  event => {
+    const f =
+      state
+        ? v0828EnsureFinalArc()
+        : null;
+
+    if (
+      !f ||
+      !f.useCanonicalLateArc ||
+      event.key.toLowerCase() !== "f" ||
+      event.repeat
+    ) {
+      return;
+    }
+
+    if (
+      f.phase === "plateThrow"
+    ) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      keys.delete("f");
+      v0828ThrowPlates();
+      return;
+    }
+
+    if (f.pushActive) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      keys.delete("f");
+      v0828PushCabinet();
+    }
+  },
+  true
+);
+
+// =========================================================
 // 0.8.27 — ALINHAMENTO COM BÍBLIA MESTRE v3.1
 // Progressão por descoberta + 07h final + lanterna do celular
 // =========================================================
