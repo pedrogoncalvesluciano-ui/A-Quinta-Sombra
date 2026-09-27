@@ -17882,9 +17882,12 @@ function v070DrawMineWorld() {
 
   // Mãe permanece fisicamente na mina; não existe pai real aqui.
   if (!state.ending?.complete) {
-    if (
+    const canonicalLateArc =
       typeof v0828CanonicalLateArc === "function" &&
-      v0828CanonicalLateArc() &&
+      v0828CanonicalLateArc();
+
+    if (
+      canonicalLateArc &&
       !state.finalArc?.motherFound
     ) {
       c.save();
@@ -17902,7 +17905,7 @@ function v070DrawMineWorld() {
         0.96
       );
       c.restore();
-    } else {
+    } else if (!canonicalLateArc) {
       person(
         V070_MOTHER_POS.x,
         V070_MOTHER_POS.y,
@@ -18004,14 +18007,16 @@ function v070DrawDeepDarkness() {
   c.fillRect(0, 0, W, H);
 
   txt(
-    "LANTERNA " +
-    Math.ceil(state.flashlight?.battery || 0) +
-    "% · L",
+    state.flashlight?.source === "phone"
+      ? "CELULAR · L"
+      : "LANTERNA " +
+        Math.ceil(
+          state.flashlight?.battery || 0
+        ) +
+        "% · L",
     14,
     H - 14,
-    (state.flashlight?.battery || 0) < 20
-      ? "#c49a83"
-      : "#c9c2ad",
+    "#c9c2ad",
     7
   );
 
@@ -30158,6 +30163,15 @@ function v0828MeetFalseParents() {
       f.falseParentsHome = true;
       f.phase = "familyPhoto";
 
+      state.storyFlags =
+        state.storyFlags || {};
+      state.storyFlags
+        .falseFatherBodyNorberto = true;
+      state.storyFlags
+        .falseMotherBodyClaudia = true;
+      state.storyFlags
+        .trueFatherHasTattoo = true;
+
       fade(
         "De volta para casa",
         "Por alguns minutos, parece que a busca terminou.",
@@ -30277,6 +30291,10 @@ function v0828StartCameraReveal() {
 
 function v0828StartKitchenHide() {
   const f = v0828EnsureFinalArc();
+
+  v0828RememberArcCheckpoint(
+    "prePlates"
+  );
 
   f.phase = "kitchenHide";
   f.kitchenTimer = 20;
@@ -30821,13 +30839,30 @@ function v0828DrawPursuers() {
       continue;
     }
 
-    person(
-      p.x,
-      p.y,
-      p.kind,
-      0,
-      p.facing
-    );
+    if (f.platesDownTimer > 0) {
+      c.save();
+      c.translate(
+        p.x,
+        p.y
+      );
+      c.rotate(Math.PI / 2);
+      person(
+        0,
+        0,
+        p.kind,
+        0,
+        "down"
+      );
+      c.restore();
+    } else {
+      person(
+        p.x,
+        p.y,
+        p.kind,
+        0,
+        p.facing
+      );
+    }
   }
 
   c.restore();
@@ -31052,17 +31087,29 @@ function v0828EnterCellar() {
         310,
         330
       );
-    }
-  );
 
-  say(
-    [
-      ["Irmão", "Nossa... será que aqui estamos realmente seguros? Eu tô com medo."],
-      ["Estevão", "Eu espero que sim. Vamos esperar um pouco antes de sair daqui."]
-    ],
-    () => {
-      updateHud();
-      save();
+      setTimeout(
+        () => {
+          if (
+            state?.finalArc?.phase !==
+              "cellarExplore"
+          ) {
+            return;
+          }
+
+          say(
+            [
+              ["Irmão", "Nossa... será que aqui estamos realmente seguros? Eu tô com medo."],
+              ["Estevão", "Eu espero que sim. Vamos esperar um pouco antes de sair daqui."]
+            ],
+            () => {
+              updateHud();
+              save();
+            }
+          );
+        },
+        720
+      );
     }
   );
 }
@@ -31096,6 +31143,7 @@ function v0828CellarClue(kind) {
     say([
       "Um documento antigo de mineração.",
       "Split Lancaster.",
+      "Há anotações agressivas nas margens. O nome aparece cercado de ordens e raiva.",
       "Isso é o nome do meu avô, se eu não me engano?"
     ]);
   }
@@ -31535,6 +31583,18 @@ getNear = function() {
     v0828GetNearBase();
 
   if (
+    state.room === "basement" &&
+    [
+      "basementNotebook",
+      "basementMap",
+      "basementCabinet",
+      "basementHole"
+    ].includes(target?.action)
+  ) {
+    return null;
+  }
+
+  if (
     target?.action === "yardBasement" &&
     ![
       "secondChase",
@@ -31798,6 +31858,22 @@ interact = function(action) {
   }
 
   if (
+    state.room === "basement" &&
+    [
+      "basementNotebook",
+      "basementMap",
+      "basementCabinet",
+      "basementHole"
+    ].includes(action) &&
+    [
+      "cellarExplore",
+      "cellarPush"
+    ].includes(f.phase)
+  ) {
+    return;
+  }
+
+  if (
     action ===
       "v0828CellarTools"
   ) {
@@ -31837,7 +31913,7 @@ interact = function(action) {
 
   if (
     action === "oldManTalk" &&
-    f.claudiaTestimonyDone &&
+    f.westCaseResolved &&
     !f.raimundoCoupleRumorDone
   ) {
     v0828TalkRaimundoCoupleRumor();
@@ -31862,7 +31938,7 @@ solid = function(x, y) {
       (
         x < 35 ||
         x > maps.village.w - 35 ||
-        y < 430 ||
+        y < 320 ||
         y > 900
       )
     ) {
@@ -33199,7 +33275,11 @@ function v0828EpilogueDialogue(
         ],
         [
           "Raimundo",
-          "Pelo que eu me lembro, seu pai teve responsabilidade no desabamento. Ele era adolescente como você. Carregou essa culpa e nunca gostou de falar sobre isso."
+          "Pelo que eu me lembro, seu pai teve responsabilidade no desabamento. Ele era adolescente como você."
+        ],
+        [
+          "Raimundo",
+          "Ele sabia que tinha feito alguma coisa e carregou essa culpa. Mas nunca me disse exatamente o quê."
         ]
       ],
       () => {
