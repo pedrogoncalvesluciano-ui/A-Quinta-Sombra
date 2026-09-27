@@ -9416,6 +9416,7 @@ update = function(dt) {
     state.stage !== "prologue" &&
     !state.gameOver &&
     state.day >= 1 &&
+    state.storyFlags?.sys07hBlackout !== false &&
     state.minutes >= 420 &&
     !state.dawnCollapse.active
   ) {
@@ -10891,6 +10892,7 @@ update = function(dt) {
   if (
     state.stage !== "prologue" &&
     state.day >= 1 &&
+    state.storyFlags?.sys07hBlackout !== false &&
     state.minutes >= 420 &&
     !state.dawnCollapse?.active &&
     !state.wakeUp?.active
@@ -11633,7 +11635,6 @@ function v0648Chapter2Unlocked() {
     state &&
     state.stage !== "prologue" &&
     state.finished &&
-    state.day >= 2 &&
     q &&
     q.clues.length >= 3
   );
@@ -13071,6 +13072,7 @@ update = function(dt) {
   // Há pilhas de reposição na própria casa para evitar softlock.
   if (
     state.flashlight.owned &&
+    state.flashlight.source !== "phone" &&
     state.flashlight.on &&
     state.flashlight.battery > 0
   ) {
@@ -14388,6 +14390,7 @@ prepareSystems = function() {
   // Isso impede um save de acordar no dia seguinte com a IA ainda ativa.
   if (
     state.copyFather.phase === "chase" &&
+    state.storyFlags?.sys07hBlackout !== false &&
     state.minutes >= 420 &&
     !state.chapter7.complete
   ) {
@@ -14504,6 +14507,11 @@ function v0650StartFatherChase() {
   const e = state.copyFather;
 
   e.phase = "chase";
+
+  state.storyFlags =
+    state.storyFlags || {};
+  state.storyFlags.sys07hBlackout = false;
+
   e.room = state.room;
   e.x = Math.max(
     housePoint(80),
@@ -16867,6 +16875,7 @@ function v070EnterUnderground() {
   }
 
   if (
+    state.flashlight.source !== "phone" &&
     state.flashlight.battery < 20
   ) {
     say([
@@ -18227,6 +18236,7 @@ update = function(dt) {
   if (
     ["undergroundPassage", "mineDeep"].includes(state.room) &&
     state.flashlight?.owned &&
+    state.flashlight.source !== "phone" &&
     state.flashlight.on &&
     state.flashlight.battery > 0
   ) {
@@ -27977,14 +27987,23 @@ const v0825Chapter4UnlockedBase =
   v0649Chapter4Unlocked;
 
 v0649Chapter4Unlocked = function() {
-  if (
-    state?.storyFlags
-      ?.osmarWestUnlocked
-  ) {
+  const legacyProgress =
+    Boolean(
+      state?.storyFlags?.chapter4Complete ||
+      state?.chapter4?.bodySeen ||
+      state?.chapter4?.bodyReported ||
+      state?.garciaEvent?.phase === "resolved" ||
+      state?.room === "westRoad"
+    );
+
+  if (legacyProgress) {
     return true;
   }
 
-  return v0825Chapter4UnlockedBase();
+  return Boolean(
+    state?.storyFlags
+      ?.osmarWestUnlocked
+  );
 };
 
 const v0825OsmarHomeBase =
@@ -28315,6 +28334,7 @@ v0649ToggleFlashlight = function() {
   }
 
   if (
+    state.flashlight.source !== "phone" &&
     state.flashlight.battery <= 0
   ) {
     state.flashlight.on = false;
@@ -28443,16 +28463,10 @@ v0649DrawFlashlightDarkness = function() {
 
   if (state.flashlight?.owned) {
     txt(
-      "CELULAR " +
-      Math.ceil(
-        state.flashlight.battery
-      ) +
-      "% · L",
+      "CELULAR · L",
       14,
       H - 14,
-      state.flashlight.battery < 20
-        ? "#c49a83"
-        : "#c9c2ad",
+      "#c9c2ad",
       7
     );
   }
@@ -29081,7 +29095,108 @@ prepareSystems = function() {
 // não como trava arbitrária de capítulo.
 
 
-$("version").textContent = "PROTÓTIPO · 0.8.26";
+// =========================================================
+// 0.8.27 — ALINHAMENTO COM BÍBLIA MESTRE v3.1
+// Progressão por descoberta + 07h final + lanterna do celular
+// =========================================================
+
+const v0827PrepareBase =
+  prepareSystems;
+
+prepareSystems = function() {
+  v0827PrepareBase();
+
+  if (!state) {
+    return;
+  }
+
+  state.storyFlags =
+    state.storyFlags || {};
+
+  if (
+    typeof state.storyFlags
+      .sys07hBlackout !== "boolean"
+  ) {
+    state.storyFlags
+      .sys07hBlackout = true;
+  }
+
+  if (
+    state.copyFather?.phase === "chase" ||
+    state.chapter9?.entered ||
+    state.ending?.complete
+  ) {
+    state.storyFlags
+      .sys07hBlackout = false;
+  }
+
+  if (
+    state.flashlight?.owned &&
+    state.flashlight.source === "phone"
+  ) {
+    state.flashlight.battery = 100;
+    state.flashlight.emptyWarned = false;
+  }
+};
+
+const v0827InventoryBase =
+  v0645OpenInventory;
+
+v0645OpenInventory = function() {
+  v0827InventoryBase();
+
+  const root =
+    $("modalText");
+
+  if (!root) {
+    return;
+  }
+
+  for (
+    const node of
+      root.querySelectorAll("div")
+  ) {
+    if (
+      node.childElementCount === 0 &&
+      /Lanterna do celular · \d+%/.test(
+        node.textContent || ""
+      )
+    ) {
+      node.textContent =
+        node.textContent.replace(
+          /Lanterna do celular · \d+%/,
+          "Lanterna do celular"
+        );
+    }
+  }
+};
+
+const v0827HudBase =
+  updateHud;
+
+updateHud = function() {
+  v0827HudBase();
+
+  if (
+    !state ||
+    state.flashlight?.source !== "phone"
+  ) {
+    return;
+  }
+
+  const inventory =
+    $("inventory");
+
+  if (inventory) {
+    inventory.textContent =
+      inventory.textContent.replace(
+        / · LANTERNA(?: DO CELULAR)? \d+%/g,
+        " · LANTERNA CELULAR"
+      );
+  }
+};
+
+$("version").textContent = "PROTÓTIPO · 0.8.27";
   
   requestAnimationFrame(frame);
   showBootSplash();
