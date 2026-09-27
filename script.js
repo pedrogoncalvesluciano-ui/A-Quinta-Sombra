@@ -29220,6 +29220,7 @@ function v0828EnsureFinalArc() {
     finalHomeUnlocked: false,
     homeBrotherDone: false,
     homeMotherDone: false,
+    epilogueTvOn: false,
     finalFigureStarted: false,
     completed: false,
     pursuersActive: false,
@@ -31060,6 +31061,14 @@ function v0828FlorindaUrgent() {
       [
         "Florinda",
         "Quando você apaga na rua, eu te levo de volta. Eu não sei por que você desmaia. Só não vou deixar você jogado lá."
+      ],
+      [
+        "Irmão",
+        "Eles ainda estão dentro da nossa casa."
+      ],
+      [
+        "Estevão",
+        "Se estão usando nossos pais, podem ter a chave deles também. Eles conseguem sair."
       ]
     ],
     () => {
@@ -31869,6 +31878,21 @@ interact = function(action) {
       "v0828BrotherEscape"
   ) {
     v0828CollectBrotherForEscape();
+    return;
+  }
+
+  if (
+    action === "home" &&
+    [
+      "florindaUrgent",
+      "secondChase"
+    ].includes(f.phase)
+  ) {
+    say([
+      f.phase === "florindaUrgent"
+        ? "Não posso voltar lá agora. Preciso falar com a Florinda."
+        : "Não. Eles saíram da casa. Preciso achar outro abrigo."
+    ]);
     return;
   }
 
@@ -32689,8 +32713,14 @@ function v0828MotherConversation() {
     return;
   }
 
+  f.motherFound = true;
+  f.worldDay = true;
+  state.minutes = 12 * 60;
+  state.firstExit = false;
+
   say(
     [
+      "Ela se mexe no chão e consegue se levantar.",
       ["Mãe", "...Filhos?"],
       ["Estevão", "MÃE!!"],
       ["Irmão", "MÃÃE!!"],
@@ -32724,8 +32754,6 @@ function v0828MotherConversation() {
       ]
     ],
     () => {
-      f.motherFound = true;
-      f.worldDay = true;
       f.phase = "mine";
 
       state.chapter9.motherMet =
@@ -32896,6 +32924,8 @@ function v0828StartObserverFinal() {
       "Vocês se viram para voltar pela passagem.",
       "A saída parece escurecer antes de qualquer um conseguir dar o primeiro passo.",
       "A forma preta ocupa o corredor. Não tem olhos definidos. Não tem boca. Só interferência nas bordas.",
+      "O ruído parece trazer o desabamento inteiro de volta: medo coletivo, pedra cedendo e uma raiva antiga presa ao nome de Split.",
+      "Não são vozes separadas dos mortos. É um padrão que aprendeu a existir no que as pessoas lembram e no que passam a acreditar.",
       [
         "Mãe",
         "Estevão... não escuta tudo o que ele disser."
@@ -33730,6 +33760,7 @@ function v0828FinalMotherConversation() {
     () => {
       f.homeMotherDone = true;
       f.brotherWithPlayer = false;
+      f.epilogueTvOn = true;
 
       fade(
         "",
@@ -33760,6 +33791,7 @@ function v0828ThanksAndFinalFigure() {
     return;
   }
 
+  f.epilogueTvOn = true;
   f.finalFigureStarted = true;
   f.phase = "finalFigure";
 
@@ -34084,6 +34116,64 @@ function v0828OpenEndingsMenu() {
     buttons
   );
 }
+
+const v0828FurnishingBase =
+  furnishing;
+
+furnishing = function(o) {
+  if (
+    o?.type === "tv" &&
+    state?.finalArc?.epilogueTvOn &&
+    state?.finalArc?.phase === "finalHome"
+  ) {
+    const { x, y, w, h } = o;
+
+    rect(
+      x + 5,
+      y + h - 1,
+      w,
+      7,
+      "#0005"
+    );
+    rect(
+      x,
+      y,
+      w,
+      h,
+      "#242827"
+    );
+    rect(
+      x + 5,
+      y + 5,
+      w - 10,
+      h - 13,
+      "#0f1516"
+    );
+    rect(
+      x + 9,
+      y + 9,
+      w - 18,
+      h - 21,
+      "#718981"
+    );
+
+    for (let i = 0; i < 5; i++) {
+      rect(
+        x + 12,
+        y + 12 + i * 5,
+        w - 24,
+        1,
+        i % 2
+          ? "#d7deca44"
+          : "#edf0dc55"
+      );
+    }
+
+    return;
+  }
+
+  v0828FurnishingBase(o);
+};
 
 const v0828Part2PrepareBase =
   prepareSystems;
@@ -34485,7 +34575,11 @@ drawWorld = function() {
 
       if (
         f.phase === "finalHome" &&
-        state.room === "living"
+        state.room === "living" &&
+        (
+          !f.homeBrotherDone ||
+          f.homeMotherDone
+        )
       ) {
         person(
           housePoint(160),
