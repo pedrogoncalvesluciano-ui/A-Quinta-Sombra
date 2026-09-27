@@ -30348,10 +30348,6 @@ function v0828StartCameraReveal() {
 function v0828StartKitchenHide() {
   const f = v0828EnsureFinalArc();
 
-  v0828RememberArcCheckpoint(
-    "prePlates"
-  );
-
   f.phase = "kitchenHide";
   f.kitchenTimer = 20;
   f.kitchenHideDone = false;
@@ -30361,6 +30357,10 @@ function v0828StartKitchenHide() {
     "kitchen",
     310,
     320
+  );
+
+  v0828RememberArcCheckpoint(
+    "prePlates"
   );
 
   v06Toast(
@@ -30446,10 +30446,6 @@ function v0828TakePlates() {
       f.platesDownTimer = 0;
       state.atticUnlocked = true;
 
-      v0828RememberArcCheckpoint(
-        "plates"
-      );
-
       fade(
         "Andar superior",
         "Eles saem do quarto do seu irmão.",
@@ -30458,6 +30454,10 @@ function v0828TakePlates() {
             "hall",
             330,
             285
+          );
+
+          v0828RememberArcCheckpoint(
+            "plates"
           );
         }
       );
@@ -31068,6 +31068,14 @@ function v0828FlorindaUrgent() {
       f.phase = "secondChase";
       f.secondChaseActive = true;
       f.secondChaseTimer = 20;
+
+      if (state.room === "village") {
+        state.x = 335;
+        state.y = 620;
+        state.facing = "up";
+        state.walk = 0;
+        keys.clear();
+      }
 
       state.storyFlags.sys07hBlackout =
         false;
@@ -32017,7 +32025,11 @@ solid = function(x, y) {
     }
 
     if (
-      f.pursuersActive
+      [
+        "findExit",
+        "returnBrother",
+        "escapeHouse"
+      ].includes(f.phase)
     ) {
       for (const p of f.pursuers) {
         if (
@@ -32025,7 +32037,7 @@ solid = function(x, y) {
           Math.hypot(
             x - p.x,
             y - p.y
-          ) < 18
+          ) < 15
         ) {
           return true;
         }
