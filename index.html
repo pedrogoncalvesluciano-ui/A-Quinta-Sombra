@@ -7,9 +7,9 @@
   <title>A Quinta Sombra</title>
 
   <link rel="preload" as="image" href="assets/ui/logo.png" fetchpriority="high">
-  <link rel="stylesheet" href="style.css?v=0.8.28">
+  <link rel="stylesheet" href="style.css?v=0.8.29">
   <link rel="stylesheet" href="journal.css?v=0.5.0">
-<script src="script.js?v=0.8.28" defer></script>
+<script src="script.js?v=0.8.29" defer></script>
 </head>
 
 <body>
@@ -104,6 +104,15 @@
       <span id="transitionHint"></span>
     </div>
 
+    <button
+      id="mobileFullscreen"
+      class="mobile-fullscreen"
+      type="button"
+      aria-label="Entrar em tela cheia"
+      title="Tela cheia"
+      hidden
+    >⛶</button>
+
     <section id="mobileControls" class="mobile-controls" aria-label="Controles para celular">
       <div class="mobile-dpad" aria-label="Movimento">
         <button class="mobile-control mobile-up" data-hold-key="w" aria-label="Mover para cima">▲</button>
@@ -132,7 +141,7 @@
       </div>
     </section>
 
-  <span id="version">PROTÓTIPO · 0.8.28</span>
+  <span id="version">PROTÓTIPO · 0.8.29</span>
   </main>
   <div id="bootSplash" role="status" aria-label="A Quinta Sombra — carregando">
     <img id="bootLogo" src="assets/ui/logo.png" alt="A Quinta Sombra" fetchpriority="high" loading="eager" decoding="async">
