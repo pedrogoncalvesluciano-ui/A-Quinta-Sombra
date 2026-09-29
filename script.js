@@ -37007,7 +37007,259 @@ prepareSystems = function() {
   }
 };
 
-$("version").textContent = "PROTÓTIPO · 0.8.30";
+// =========================================================
+// 0.8.31 — PRAÇA CONTÍNUA + GATILHO DO OBSERVADOR
+// Corrige regressão da 0.8.30: praça/rua voltam a ser uma única área.
+// =========================================================
+
+const V0831_SQUARE_W = 2500;
+const V0831_SQUARE_H = 760;
+const V0831_PLAZA_LIMIT = 1080;
+
+function v0831RestoreUnifiedSquareMap() {
+  if (!maps.square) return;
+
+  const plazaObjects =
+    maps.square.objects.filter(
+      o => o.x < V0831_PLAZA_LIMIT
+    );
+
+  maps.square.w = V0831_SQUARE_W;
+  maps.square.h = V0831_SQUARE_H;
+  maps.square.doors = [];
+
+  maps.square.objects = [
+    ...plazaObjects,
+
+    obj(1270, 70, 235, 165, "building"),
+    obj(1615, 72, 225, 165, "building"),
+    obj(1950, 68, 235, 170, "building"),
+
+    obj(1310, 515, 235, 165, "building"),
+    obj(1665, 520, 225, 160, "building"),
+    obj(2005, 510, 235, 170, "building")
+  ];
+
+  roomNames.square =
+    "Rua da praça + Praça central · Forgotten";
+}
+
+v0831RestoreUnifiedSquareMap();
+
+v0648GoSquare = function() {
+  if (
+    !state ||
+    transitionBusy ||
+    dialog ||
+    !v0648Chapter2Unlocked() ||
+    !state.storyFlags
+      ?.marketParentsConfirmed
+  ) {
+    return;
+  }
+
+  fade(
+    "Rua da praça",
+    "Siga pela rua até a Praça Central.",
+    () => {
+      v076SetOutdoorRoom(
+        "square",
+        maps.square.w - 72,
+        367,
+        "left"
+      );
+    }
+  );
+};
+
+v0648ReturnFromSquare = function() {
+  if (
+    !state ||
+    transitionBusy ||
+    dialog
+  ) {
+    return;
+  }
+
+  // O Observador precisa aparecer DEPOIS da primeira conversa
+  // com o homem da cadeira de rodas, quando Estevão sai da Praça.
+  if (
+    state.storyFlags
+      ?.squareObserverArmed &&
+    !state.storyFlags
+      ?.squareObserverSeen
+  ) {
+    v077TriggerSquareObserver();
+
+    // Pequena trava evita atravessar o evento no mesmo frame.
+    state.x = Math.min(
+      maps.square.w - 90,
+      Math.max(
+        V0831_PLAZA_LIMIT + 70,
+        state.x
+      )
+    );
+
+    return;
+  }
+
+  fade(
+    "",
+    "",
+    () => {
+      v076SetOutdoorRoom(
+        "village",
+        maps.village.w - 58,
+        424,
+        "left"
+      );
+    }
+  );
+};
+
+// A regressão da 0.8.30 criou "plazaRoad" como uma segunda tela.
+// Saves parados nela são trazidos de volta à rua integrada,
+// preservando aproximadamente a posição ao longo do caminho.
+const v0831PrepareBase =
+  prepareSystems;
+
+prepareSystems = function() {
+  const wasSplitRoad =
+    state?.room ===
+      V0830_PLAZA_ROAD_ROOM;
+
+  const splitX =
+    Number.isFinite(state?.x)
+      ? state.x
+      : 72;
+
+  const splitY =
+    Number.isFinite(state?.y)
+      ? state.y
+      : 367;
+
+  v0831PrepareBase();
+
+  if (!state) return;
+
+  v0831RestoreUnifiedSquareMap();
+
+  state.storyFlags =
+    state.storyFlags || {};
+
+  if (wasSplitRoad) {
+    state.room = "square";
+
+    // plazaRoad ia da esquerda (bairro) para a direita (praça).
+    // No mapa unificado a rua vai da direita (bairro) para a esquerda (praça).
+    const ratio =
+      Math.max(
+        0,
+        Math.min(
+          1,
+          splitX /
+            V0830_PLAZA_ROAD_W
+        )
+      );
+
+    state.x =
+      (maps.square.w - 72) -
+      ratio *
+        (
+          maps.square.w -
+          V0831_PLAZA_LIMIT -
+          144
+        );
+
+    state.x =
+      Math.max(
+        V0831_PLAZA_LIMIT + 72,
+        Math.min(
+          maps.square.w - 72,
+          state.x
+        )
+      );
+
+    state.y =
+      Math.max(
+        45,
+        Math.min(
+          maps.square.h - 45,
+          splitY
+        )
+      );
+
+    state.facing = "left";
+    state.walk = 0;
+
+    state.storyFlags
+      .v0830SquareRoadMigrated =
+      true;
+
+    state.storyFlags
+      .v0831UnifiedSquareMigrated =
+      true;
+
+    keys.clear();
+    near = null;
+
+    save();
+  }
+};
+
+// A 0.8.30 ainda possui um update final dedicado a plazaRoad.
+// Como o fluxo 0.8.31 nunca entra nessa sala, ele fica apenas
+// como compatibilidade técnica para saves antigos até a migração.
+const v0831UpdateBase = update;
+
+update = function(dt) {
+  v0831UpdateBase(dt);
+
+  if (
+    !state ||
+    mode !== "game" ||
+    dialog ||
+    transitionBusy ||
+    !$("overlay").hidden ||
+    state.gameOver
+  ) {
+    return;
+  }
+
+  if (
+    state.room === "square" &&
+    state.storyFlags
+      ?.squareObserverArmed &&
+    !state.storyFlags
+      ?.squareObserverSeen
+  ) {
+    // Depois de falar com o cadeirante, o evento fica preparado
+    // enquanto o jogador ainda está na praça.
+    if (
+      state.x <=
+        V0831_PLAZA_LIMIT
+    ) {
+      state.eventDirector
+        .squareReturnReady = true;
+    }
+
+    // Ao começar a sair da praça em direção à Rua da Praça,
+    // dispara o Observador e a estática.
+    if (
+      state.eventDirector
+        ?.squareReturnReady &&
+      state.x >=
+        V0831_PLAZA_LIMIT + 45 &&
+      !dialog &&
+      $("overlay").hidden
+    ) {
+      v077TriggerSquareObserver();
+      return;
+    }
+  }
+};
+
+$("version").textContent = "PROTÓTIPO · 0.8.31";
   
   requestAnimationFrame(frame);
   showBootSplash();
