@@ -37269,7 +37269,11 @@ const V0833_SQUARE_OFFSET = 620;
 const V0833_SQUARE_W = 1700;
 const V0833_PLAZA_START = V0833_SQUARE_OFFSET;
 const V0833_PLAZA_END = V0833_SQUARE_OFFSET + 1080;
-let v0833SquareLayoutApplied = false;
+const V0833_PLAZA_OBJECTS =
+  maps.square.objects
+    .filter(o => o.x < 1080)
+    .map(o => ({ ...o }));
+let v0833SquarePointsShifted = false;
 
 function v0833ShiftPoint(point) {
   if (
@@ -37281,20 +37285,18 @@ function v0833ShiftPoint(point) {
 }
 
 function v0833ApplySquareLayout() {
-  if (
-    v0833SquareLayoutApplied ||
-    !maps.square
-  ) {
+  if (!maps.square) {
     return;
   }
 
   const plazaObjects =
-    maps.square.objects
-      .filter(o => o.x < 1080)
-      .map(o => ({
+    V0833_PLAZA_OBJECTS.map(
+      o => ({
         ...o,
-        x: o.x + V0833_SQUARE_OFFSET
-      }));
+        x: o.x +
+          V0833_SQUARE_OFFSET
+      })
+    );
 
   maps.square.w = V0833_SQUARE_W;
   maps.square.h = 760;
@@ -37310,19 +37312,21 @@ function v0833ApplySquareLayout() {
   ];
 
   // Mantém todos os NPCs e interações na mesma posição RELATIVA
-  // dentro da praça; só desloca o conjunto para a direita.
-  v0833ShiftPoint(v0633SquareMan);
-  v0833ShiftPoint(V0650_SQUARE_RESIDENT);
-  v0833ShiftPoint(V0650_SQUARE_PLAQUE);
-  v0833ShiftPoint(V071_SQUARE_VENDOR);
-  v0833ShiftPoint(V071_SQUARE_CARD_A);
-  v0833ShiftPoint(V071_SQUARE_CARD_B);
-  v0833ShiftPoint(V070_TOY_POS);
+  // dentro da praça; só desloca o conjunto uma única vez.
+  if (!v0833SquarePointsShifted) {
+    v0833ShiftPoint(v0633SquareMan);
+    v0833ShiftPoint(V0650_SQUARE_RESIDENT);
+    v0833ShiftPoint(V0650_SQUARE_PLAQUE);
+    v0833ShiftPoint(V071_SQUARE_VENDOR);
+    v0833ShiftPoint(V071_SQUARE_CARD_A);
+    v0833ShiftPoint(V071_SQUARE_CARD_B);
+    v0833ShiftPoint(V070_TOY_POS);
+
+    v0833SquarePointsShifted = true;
+  }
 
   roomNames.square =
     "Rua da praça + Praça central · Forgotten";
-
-  v0833SquareLayoutApplied = true;
 }
 
 v0833ApplySquareLayout();
