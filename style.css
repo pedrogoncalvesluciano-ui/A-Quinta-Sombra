@@ -181,8 +181,7 @@ nav button span {
   width: min(46%, 620px);
   max-width: calc(100% - 8%);
   padding: 10px 14px 11px;
-  background:
-    linear-gradient(90deg, #0a1118f3, #0d151de8 82%, #0d151d00);
+  background: #0b1119ee;
   border-left: 2px solid #c39f61;
   border-top: 1px solid #8c765440;
   color: #ead7ad;
