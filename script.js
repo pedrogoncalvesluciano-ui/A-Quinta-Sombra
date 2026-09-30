@@ -37710,7 +37710,230 @@ window.addEventListener(
   v0834RefreshHudLayout
 );
 
-$("version").textContent = "PROTÓTIPO · 0.8.35";
+// =========================================================
+// 0.8.36 — CENA DA PORTA DO OSMAR
+// =========================================================
+
+const V0836_OSMAR_PLAYER_POS = {
+  x: 548,
+  y: 750
+};
+
+const V0836_OSMAR_OUTSIDE_POS = {
+  x: 600,
+  y: 750
+};
+
+let v0836OsmarOutside = false;
+let v0836OsmarDoorSceneBusy = false;
+
+function v0836Pause(ms) {
+  return new Promise(
+    resolve =>
+      setTimeout(resolve, ms)
+  );
+}
+
+function v0836EnsureKnockOverlay() {
+  let overlay =
+    document.getElementById(
+      "v0836KnockOverlay"
+    );
+
+  if (overlay) {
+    return overlay;
+  }
+
+  overlay =
+    document.createElement("div");
+
+  overlay.id =
+    "v0836KnockOverlay";
+
+  overlay.innerHTML = [
+    '<div class="v0836-knock-title">TOC-TOC</div>',
+    '<div class="v0836-knock-subtitle">Você bateu na porta.</div>'
+  ].join("");
+
+  $("game").appendChild(
+    overlay
+  );
+
+  return overlay;
+}
+
+async function v0836StartOsmarDoorScene(
+  continueConversation
+) {
+  if (
+    v0836OsmarDoorSceneBusy ||
+    !state ||
+    state.room !== "northRoad"
+  ) {
+    return;
+  }
+
+  v0836OsmarDoorSceneBusy = true;
+  transitionBusy = true;
+  keys.clear();
+
+  const overlay =
+    v0836EnsureKnockOverlay();
+
+  overlay.hidden = false;
+  overlay.classList.remove(
+    "v0836-knock-fade"
+  );
+
+  // Força o estilo inicial antes do fade futuro.
+  void overlay.offsetWidth;
+
+  await v0836Pause(5000);
+
+  if (
+    !state ||
+    state.room !== "northRoad"
+  ) {
+    overlay.hidden = true;
+    transitionBusy = false;
+    v0836OsmarDoorSceneBusy = false;
+    return;
+  }
+
+  // Reposiciona Estevão e coloca Osmar para fora,
+  // um de frente para o outro.
+  state.x =
+    V0836_OSMAR_PLAYER_POS.x;
+  state.y =
+    V0836_OSMAR_PLAYER_POS.y;
+  state.facing = "right";
+  state.walk = 0;
+
+  v0836OsmarOutside = true;
+
+  keys.clear();
+  near = null;
+
+  overlay.classList.add(
+    "v0836-knock-fade"
+  );
+
+  await v0836Pause(900);
+
+  overlay.hidden = true;
+  overlay.classList.remove(
+    "v0836-knock-fade"
+  );
+
+  transitionBusy = false;
+  v0836OsmarDoorSceneBusy = false;
+
+  if (
+    typeof continueConversation ===
+      "function"
+  ) {
+    continueConversation();
+  }
+}
+
+const v0836OsmarTalkBase =
+  v080TalkOsmar;
+
+v080TalkOsmar = function() {
+  prepareSystems();
+
+  const f =
+    state?.forgottenAlive;
+
+  // Casos em que Osmar não está disponível continuam
+  // usando o comportamento existente, sem a cena da porta.
+  if (
+    !f ||
+    f.osmarStage <= 0 ||
+    f.completed.osmar ||
+    f.osmarStage >= 3 ||
+    !v080OsmarHomeNow()
+  ) {
+    v0836OsmarTalkBase();
+    return;
+  }
+
+  // A cena acontece antes da primeira conversa válida.
+  if (!v0836OsmarOutside) {
+    v0836StartOsmarDoorScene(
+      () => {
+        v0836OsmarTalkBase();
+      }
+    );
+    return;
+  }
+
+  v0836OsmarTalkBase();
+};
+
+const v0836DrawWorldBase =
+  drawWorld;
+
+drawWorld = function() {
+  v0836DrawWorldBase();
+
+  if (
+    !state ||
+    state.room !== "northRoad" ||
+    !v0836OsmarOutside
+  ) {
+    return;
+  }
+
+  c.save();
+  c.translate(
+    -Math.floor(camera.x),
+    -Math.floor(camera.y)
+  );
+
+  person(
+    V0836_OSMAR_OUTSIDE_POS.x,
+    V0836_OSMAR_OUTSIDE_POS.y,
+    "npcMale",
+    0,
+    "left",
+    0.94
+  );
+
+  txt(
+    "OSMAR",
+    V0836_OSMAR_OUTSIDE_POS.x - 18,
+    V0836_OSMAR_OUTSIDE_POS.y - 36,
+    "#b8b09b",
+    7
+  );
+
+  c.restore();
+};
+
+const v0836PrepareBase =
+  prepareSystems;
+
+prepareSystems = function() {
+  v0836PrepareBase();
+
+  if (!state) {
+    return;
+  }
+
+  // Se o encontro já terminou, Osmar não fica parado
+  // eternamente na rua ao recarregar o jogo.
+  if (
+    state.forgottenAlive
+      ?.completed?.osmar ||
+    state.forgottenAlive
+      ?.osmarStage >= 3
+  ) {
+    v0836OsmarOutside = false;
+  }
+};
+
+$("version").textContent = "PROTÓTIPO · 0.8.36";
   
   requestAnimationFrame(frame);
   showBootSplash();
