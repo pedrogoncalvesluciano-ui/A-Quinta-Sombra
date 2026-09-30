@@ -153,7 +153,7 @@ nav button span {
   padding: 12px 16px;
   background: #0b1119da;
   border-left: 2px solid #a99164;
-  max-width: 50%;
+  max-width: min(50%, 640px);
 }
 
 .objective span {
@@ -166,15 +166,17 @@ nav button span {
 }
 
 .objective strong {
+  display: block;
   font-size: clamp(11px, 1.2vw, 17px);
   font-weight: normal;
+  line-height: 1.38;
+  white-space: normal;
 }
 
 
 #eventToast {
   position: absolute;
   z-index: 60;
-  top: calc(5% + 58px);
   left: 4%;
   width: min(46%, 620px);
   max-width: calc(100% - 8%);
