@@ -37259,7 +37259,378 @@ update = function(dt) {
   }
 };
 
-$("version").textContent = "PROTÓTIPO · 0.8.32";
+// =========================================================
+// 0.8.33 — ENTRADA/SAÍDA DA PRAÇA PELO LADO ESQUERDO
+// Fluxo: rua à esquerda -> vendedor -> praça -> cadeirante.
+// Para voltar, o jogador refaz o mesmo caminho pela esquerda.
+// =========================================================
+
+const V0833_SQUARE_OFFSET = 620;
+const V0833_SQUARE_W = 1700;
+const V0833_PLAZA_START = V0833_SQUARE_OFFSET;
+const V0833_PLAZA_END = V0833_SQUARE_OFFSET + 1080;
+let v0833SquareLayoutApplied = false;
+
+function v0833ShiftPoint(point) {
+  if (
+    point &&
+    Number.isFinite(point.x)
+  ) {
+    point.x += V0833_SQUARE_OFFSET;
+  }
+}
+
+function v0833ApplySquareLayout() {
+  if (
+    v0833SquareLayoutApplied ||
+    !maps.square
+  ) {
+    return;
+  }
+
+  const plazaObjects =
+    maps.square.objects
+      .filter(o => o.x < 1080)
+      .map(o => ({
+        ...o,
+        x: o.x + V0833_SQUARE_OFFSET
+      }));
+
+  maps.square.w = V0833_SQUARE_W;
+  maps.square.h = 760;
+  maps.square.doors = [];
+
+  // A rua de acesso/retorno fica à esquerda da praça.
+  maps.square.objects = [
+    obj(40, 70, 210, 165, "building"),
+    obj(320, 72, 220, 165, "building"),
+    obj(45, 520, 210, 160, "building"),
+    obj(325, 515, 220, 165, "building"),
+    ...plazaObjects
+  ];
+
+  // Mantém todos os NPCs e interações na mesma posição RELATIVA
+  // dentro da praça; só desloca o conjunto para a direita.
+  v0833ShiftPoint(v0633SquareMan);
+  v0833ShiftPoint(V0650_SQUARE_RESIDENT);
+  v0833ShiftPoint(V0650_SQUARE_PLAQUE);
+  v0833ShiftPoint(V071_SQUARE_VENDOR);
+  v0833ShiftPoint(V071_SQUARE_CARD_A);
+  v0833ShiftPoint(V071_SQUARE_CARD_B);
+  v0833ShiftPoint(V070_TOY_POS);
+
+  roomNames.square =
+    "Rua da praça + Praça central · Forgotten";
+
+  v0833SquareLayoutApplied = true;
+}
+
+v0833ApplySquareLayout();
+
+v0648DrawSquareEnvironment = function(m) {
+  drawGrassGround(
+    0,
+    0,
+    m.w,
+    m.h
+  );
+
+  // Rua de acesso e retorno — lado ESQUERDO.
+  drawRoadTiledHorizontal(
+    "pavedHorizontal",
+    0,
+    270,
+    V0833_PLAZA_START + 70,
+    200
+  );
+
+  rect(
+    V0833_PLAZA_START - 70,
+    330,
+    145,
+    186,
+    "#77746a"
+  );
+
+  // Praça original deslocada para a direita.
+  const ox =
+    V0833_SQUARE_OFFSET;
+
+  rect(
+    ox + 330,
+    185,
+    330,
+    390,
+    "#77746a"
+  );
+
+  rect(
+    ox,
+    430,
+    1080,
+    86,
+    "#77746a"
+  );
+
+  rect(
+    ox + 490,
+    0,
+    86,
+    m.h,
+    "#77746a"
+  );
+
+  for (
+    let y = 195;
+    y < 565;
+    y += 20
+  ) {
+    for (
+      let x = 340;
+      x < 650;
+      x += 24
+    ) {
+      const offset =
+        (Math.floor(y / 20) % 2) *
+        10;
+
+      rect(
+        ox + x + offset,
+        y,
+        16,
+        10,
+        "#858177"
+      );
+    }
+  }
+
+  for (const [tx, ty] of [
+    [345, 135],
+    [650, 145],
+    [340, 610],
+    [660, 610],
+    [70, 360],
+    [1010, 350]
+  ]) {
+    rect(
+      ox + tx,
+      ty,
+      8,
+      30,
+      "#493f31"
+    );
+    rect(
+      ox + tx - 17,
+      ty - 19,
+      42,
+      30,
+      "#244438"
+    );
+    rect(
+      ox + tx - 10,
+      ty - 30,
+      29,
+      26,
+      "#315441"
+    );
+  }
+
+  for (const [bx, by] of [
+    [370, 420],
+    [600, 420],
+    [425, 545],
+    [570, 545]
+  ]) {
+    rect(
+      ox + bx,
+      by,
+      60,
+      8,
+      "#5d4a38"
+    );
+    rect(
+      ox + bx + 7,
+      by + 8,
+      5,
+      12,
+      "#3f342b"
+    );
+    rect(
+      ox + bx + 48,
+      by + 8,
+      5,
+      12,
+      "#3f342b"
+    );
+  }
+
+  txt(
+    "PRAÇA CENTRAL",
+    ox + 430,
+    150,
+    "#bbaa88",
+    8
+  );
+
+  v071DrawSquareAmbientWorld();
+
+  for (const o of m.objects) {
+    building(o);
+  }
+};
+
+// Entrando no setor da praça, Estevão já nasce na borda esquerda
+// da praça, perto do vendedor, e segue para a direita.
+v0648GoSquare = function() {
+  if (
+    !state ||
+    transitionBusy ||
+    dialog ||
+    !v0648Chapter2Unlocked() ||
+    !state.storyFlags
+      ?.marketParentsConfirmed
+  ) {
+    return;
+  }
+
+  fade(
+    "Praça central",
+    "Entre pela esquerda e atravesse a praça.",
+    () => {
+      v076SetOutdoorRoom(
+        "square",
+        V0833_PLAZA_START + 90,
+        488,
+        "right"
+      );
+    }
+  );
+};
+
+function v0833LeaveSquareToVillage() {
+  fade(
+    "",
+    "",
+    () => {
+      v076SetOutdoorRoom(
+        "village",
+        maps.village.w - 58,
+        424,
+        "left"
+      );
+    }
+  );
+}
+
+// O código antigo ainda tenta sair pela direita.
+// Nesta versão, a direita é o fundo da praça: não troca de mapa.
+v0648ReturnFromSquare = function() {
+  if (
+    !state ||
+    transitionBusy ||
+    dialog
+  ) {
+    return;
+  }
+
+  if (
+    state.room === "square" &&
+    state.x >=
+      maps.square.w - 80
+  ) {
+    state.x =
+      maps.square.w - 82;
+    return;
+  }
+
+  v0833LeaveSquareToVillage();
+};
+
+const v0833PrepareBase =
+  prepareSystems;
+
+prepareSystems = function() {
+  v0833PrepareBase();
+
+  if (!state) return;
+
+  v0833ApplySquareLayout();
+
+  // Corrige saves feitos na 0.8.31 que nasceram no lado direito.
+  state.storyFlags =
+    state.storyFlags || {};
+
+  if (
+    state.room === "square" &&
+    !state.storyFlags
+      .v0833SquareEntryMigrated &&
+    state.x >
+      V0833_PLAZA_END
+  ) {
+    state.x =
+      V0833_PLAZA_START + 90;
+    state.y = 488;
+    state.facing = "right";
+    state.walk = 0;
+
+    state.storyFlags
+      .v0833SquareEntryMigrated =
+      true;
+
+    keys.clear();
+    near = null;
+    save();
+  }
+};
+
+const v0833UpdateBase = update;
+
+update = function(dt) {
+  v0833UpdateBase(dt);
+
+  if (
+    !state ||
+    mode !== "game" ||
+    dialog ||
+    transitionBusy ||
+    !$("overlay").hidden ||
+    state.gameOver ||
+    state.room !== "square"
+  ) {
+    return;
+  }
+
+  const left =
+    keys.has("a") ||
+    keys.has("arrowleft");
+
+  // Depois da conversa com o cadeirante, o Observador aparece
+  // quando Estevão volta para a rua de saída, à esquerda.
+  if (
+    state.storyFlags
+      ?.squareObserverArmed &&
+    !state.storyFlags
+      ?.squareObserverSeen &&
+    state.x <=
+      V0833_PLAZA_START + 25
+  ) {
+    v077TriggerSquareObserver();
+    state.x =
+      V0833_PLAZA_START + 32;
+    return;
+  }
+
+  // ÚNICA saída da praça: refazer o caminho para a esquerda.
+  if (
+    state.x <= 42 &&
+    left
+  ) {
+    state.x = 44;
+    v0833LeaveSquareToVillage();
+  }
+};
+
+$("version").textContent = "PROTÓTIPO · 0.8.33";
   
   requestAnimationFrame(frame);
   showBootSplash();
