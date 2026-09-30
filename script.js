@@ -37710,7 +37710,7 @@ window.addEventListener(
   v0834RefreshHudLayout
 );
 
-$("version").textContent = "PROTÓTIPO · 0.8.34";
+$("version").textContent = "PROTÓTIPO · 0.8.35";
   
   requestAnimationFrame(frame);
   showBootSplash();
