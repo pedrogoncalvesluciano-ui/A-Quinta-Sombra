@@ -806,7 +806,7 @@
     const hardTimeout = setTimeout(() => {
       console.warn("A abertura excedeu o tempo limite. Abrindo o menu.");
       releaseBoot();
-    }, 12000);
+    }, 16000);
 
     const fadeOpacity = async (element, from, to, ms) => {
       if (!element || splash.hidden) return;
@@ -876,7 +876,7 @@
         900
       );
 
-      await pause(900);
+      await pause(3000);
 
       await fadeOpacity(
         logo,
@@ -37259,7 +37259,7 @@ update = function(dt) {
   }
 };
 
-$("version").textContent = "PROTÓTIPO · 0.8.31";
+$("version").textContent = "PROTÓTIPO · 0.8.32";
   
   requestAnimationFrame(frame);
   showBootSplash();
