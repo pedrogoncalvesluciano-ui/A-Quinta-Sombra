@@ -19090,9 +19090,14 @@ function v072FlorindaStoryPending() {
 function v072NeighborDoorAvailable() {
   prepareSystems();
 
+  const florindaNight3Visit =
+    state.day >= 3 &&
+    !state.forgottenAlive?.westPresenceSeen;
+
   return Boolean(
     state.stage === "prologue" ||
     v072FlorindaStoryPending() ||
+    florindaNight3Visit ||
     (
       state.brotherFood < 60 &&
       state.food <= 0
@@ -37634,7 +37639,78 @@ update = function(dt) {
   }
 };
 
-$("version").textContent = "PROTÓTIPO · 0.8.33";
+// =========================================================
+// 0.8.34 — HUD DINÂMICO + FLORINDA NA NOITE 3
+// =========================================================
+
+function v0834RefreshHudLayout() {
+  const objectiveBox =
+    document.querySelector(
+      "#hud .objective"
+    );
+
+  const toast =
+    $("eventToast");
+
+  if (
+    !objectiveBox ||
+    !toast
+  ) {
+    return;
+  }
+
+  const objectiveTop =
+    parseFloat(
+      getComputedStyle(
+        objectiveBox
+      ).top
+    ) || 0;
+
+  toast.style.top =
+    (
+      objectiveTop +
+      objectiveBox.offsetHeight +
+      10
+    ) +
+    "px";
+}
+
+const v0834HudBase =
+  updateHud;
+
+updateHud = function() {
+  v0834HudBase();
+
+  if (!state) {
+    return;
+  }
+
+  v0834RefreshHudLayout();
+};
+
+const v0834ToastBase =
+  v06Toast;
+
+v06Toast = function(
+  text,
+  seconds = 3.8
+) {
+  v0834ToastBase(
+    text,
+    seconds
+  );
+
+  requestAnimationFrame(
+    v0834RefreshHudLayout
+  );
+};
+
+window.addEventListener(
+  "resize",
+  v0834RefreshHudLayout
+);
+
+$("version").textContent = "PROTÓTIPO · 0.8.34";
   
   requestAnimationFrame(frame);
   showBootSplash();
