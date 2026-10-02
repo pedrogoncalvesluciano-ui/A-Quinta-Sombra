@@ -38030,6 +38030,13 @@ newGame = function() {
   $("prompt").hidden = true;
 
   void (async () => {
+    // Espera o cartão "A QUINTA SOMBRA" terminar por completo.
+    // Antes, a narração seguinte sobrescrevia esse texto cedo demais.
+    await v0826Pause(
+      V0837_START_TRANSITION_MS +
+      1100
+    );
+
     await v0826NarrationSequence(
       [
         {
