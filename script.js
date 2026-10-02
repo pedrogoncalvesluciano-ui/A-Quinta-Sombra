@@ -37933,7 +37933,449 @@ prepareSystems = function() {
   }
 };
 
-$("version").textContent = "PROTÓTIPO · 0.8.36";
+// =========================================================
+// 0.8.37 — POLIMENTO DO PRÓLOGO DOS PAIS
+// Mais leitura, orientação visual, estática e transição de 9 horas.
+// =========================================================
+
+// A tela inicial após clicar em Jogar fica mais tempo legível.
+const V0837_START_TRANSITION_MS = 7600;
+
+const v0837EnterGameBase =
+  enterGame;
+
+enterGame = function() {
+  const opening =
+    state &&
+    state.stage === "prologue" &&
+    !state.startupShown;
+
+  if (!opening) {
+    v0837EnterGameBase();
+    return;
+  }
+
+  state.startupShown = true;
+
+  transitionBusy = true;
+  keys.clear();
+
+  const transition =
+    $("transition");
+
+  $("transitionTitle").textContent =
+    "A QUINTA SOMBRA";
+
+  $("transitionHint").textContent =
+    "14:00 · A família ainda está reunida.";
+
+  transition.style.transition =
+    "none";
+  transition.style.opacity = "1";
+  transition.classList.add(
+    "active"
+  );
+
+  // Usa a implementação antiga apenas para revelar o jogo atrás
+  // da tela preta, sem deixar o cartão desaparecer cedo demais.
+  mode = "game";
+  $("menu").hidden = true;
+  $("hud").hidden = false;
+  $("overlay").hidden = true;
+  loadedAreaRoom = null;
+  updateHud();
+
+  void transition.offsetWidth;
+
+  requestAnimationFrame(() => {
+    transition.style.transition =
+      "opacity 0.8s";
+
+    setTimeout(() => {
+      transition.classList.remove(
+        "active"
+      );
+      transition.style.opacity = "";
+
+      setTimeout(() => {
+        transitionBusy = false;
+        save();
+      }, 820);
+    }, V0837_START_TRANSITION_MS);
+  });
+};
+
+// Mantém a narração inicial mais tempo em tela para leitura.
+const v0837NewGameBase =
+  newGame;
+
+newGame = function() {
+  state = initial();
+
+  state.protagonistName =
+    "Estevão Lancaster";
+  state.protagonistAge = 13;
+  state.brotherAge = 8;
+
+  state.storyFlags =
+    state.storyFlags || {};
+  state.storyFlags
+    .progressionByDiscovery = true;
+
+  enterGame();
+
+  state.walk = 0;
+  keys.clear();
+  near = null;
+  $("prompt").hidden = true;
+
+  void (async () => {
+    await v0826NarrationSequence(
+      [
+        {
+          text:
+            "Forgotten não é uma cidade grande.",
+          hold: 3000
+        },
+        {
+          text:
+            "As pessoas aqui se conhecem. Se cumprimentam na rua. Sabem o nome umas das outras — e o nome dos pais, e às vezes até o nome dos avós.",
+          hold: 5200
+        },
+        {
+          text:
+            "É esse tipo de lugar onde nada costuma acontecer.",
+          hold: 3600
+        },
+        {
+          text:
+            "Pelo menos foi isso que eu sempre pensei.",
+          hold: 3900
+        }
+      ],
+      {
+        title: "FORGOTTEN",
+        firstHold: 1500,
+        lastHold: 1400
+      }
+    );
+
+    $("prompt").hidden = true;
+    updateHud();
+  })();
+};
+
+function v0837DrawRouteArrow(
+  x,
+  y,
+  direction = "up"
+) {
+  const pulse =
+    0.72 +
+    Math.sin(
+      elapsed * 4.5 +
+      x * 0.01 +
+      y * 0.01
+    ) * 0.18;
+
+  c.save();
+  c.globalAlpha = pulse;
+  c.fillStyle = "#d6c89a";
+
+  c.beginPath();
+
+  if (direction === "right") {
+    c.moveTo(x + 12, y);
+    c.lineTo(x - 2, y - 9);
+    c.lineTo(x - 2, y - 4);
+    c.lineTo(x - 13, y - 4);
+    c.lineTo(x - 13, y + 4);
+    c.lineTo(x - 2, y + 4);
+    c.lineTo(x - 2, y + 9);
+  } else {
+    c.moveTo(x, y - 12);
+    c.lineTo(x - 9, y + 2);
+    c.lineTo(x - 4, y + 2);
+    c.lineTo(x - 4, y + 13);
+    c.lineTo(x + 4, y + 13);
+    c.lineTo(x + 4, y + 2);
+    c.lineTo(x + 9, y + 2);
+  }
+
+  c.closePath();
+  c.fill();
+
+  c.restore();
+}
+
+const v0837DrawWorldBase =
+  drawWorld;
+
+drawWorld = function() {
+  v0837DrawWorldBase();
+
+  if (
+    !state ||
+    state.stage !== "prologue"
+  ) {
+    return;
+  }
+
+  // Setas aparecem apenas no trajeto dos pais até o mercado.
+  if (
+    state.room === "village" &&
+    state.familyFarewell
+  ) {
+    c.save();
+    c.translate(
+      -Math.floor(camera.x),
+      -Math.floor(camera.y)
+    );
+
+    v0837DrawRouteArrow(
+      520,
+      705,
+      "right"
+    );
+
+    for (const y of [
+      675,
+      555,
+      435,
+      315,
+      195,
+      95
+    ]) {
+      v0837DrawRouteArrow(
+        649,
+        y,
+        "up"
+      );
+    }
+
+    c.restore();
+  }
+
+  // Mais interferência enquanto o jogador controla os pais.
+  const moving =
+    keys.has("w") ||
+    keys.has("a") ||
+    keys.has("s") ||
+    keys.has("d") ||
+    keys.has("arrowup") ||
+    keys.has("arrowleft") ||
+    keys.has("arrowdown") ||
+    keys.has("arrowright");
+
+  if (
+    moving &&
+    $("overlay").hidden &&
+    !transitionBusy
+  ) {
+    const activeFrame =
+      Math.floor(
+        elapsed * 12
+      ) % 3 !== 1;
+
+    if (activeFrame) {
+      for (
+        let i = 0;
+        i < 20;
+        i++
+      ) {
+        const y =
+          (
+            i * 17 +
+            Math.floor(
+              elapsed * 530
+            )
+          ) % H;
+
+        rect(
+          -3,
+          y,
+          W + 6,
+          i % 5 === 0 ? 2 : 1,
+          i % 4 === 0
+            ? "#d8d8c626"
+            : "#c8c9b118"
+        );
+      }
+
+      for (
+        let i = 0;
+        i < 5;
+        i++
+      ) {
+        const x =
+          (
+            i * 103 +
+            Math.floor(
+              elapsed * 71
+            )
+          ) % W;
+
+        const y =
+          (
+            i * 47 +
+            Math.floor(
+              elapsed * 39
+            )
+          ) % H;
+
+        rect(
+          x,
+          y,
+          18 + (i % 3) * 13,
+          2,
+          "#ecebd51c"
+        );
+      }
+    }
+  }
+};
+
+// A transição narrativa é dona da tela preta.
+// O preload do quarto acontece por trás sem substituir por "CARREGANDO".
+v0826ParentsLeaveTransition =
+  async function() {
+    transitionBusy = true;
+    areaLoadingOverlay = true;
+    keys.clear();
+    near = null;
+    $("prompt").hidden = true;
+
+    const transition =
+      $("transition");
+    const titleEl =
+      $("transitionTitle");
+    const hintEl =
+      $("transitionHint");
+
+    transition.style.transition =
+      "opacity 0.7s";
+    transition.style.opacity = "1";
+    transition.classList.add(
+      "active"
+    );
+
+    await v0826Pause(1500);
+
+    const timeline = [
+      {
+        title:
+          "14:05 · +00h05",
+        text:
+          "Eles saíram a pé.",
+        hold: 3000
+      },
+      {
+        title:
+          "14:20 · +00h20",
+        text:
+          "O mercado não ficava longe.",
+        hold: 3000
+      },
+      {
+        title:
+          "18:13 · +04h13",
+        text:
+          "Liguei para minha mãe. Sem sinal.",
+        hold: 3400
+      },
+      {
+        title:
+          "18:14 · +04h14",
+        text:
+          "Meu pai estava fora de área.",
+        hold: 3300
+      },
+      {
+        title:
+          "19:41 · +05h41",
+        text:
+          "Meu irmão perguntou onde eles estavam. Eu disse que provavelmente estavam voltando.",
+        hold: 4300
+      },
+      {
+        title:
+          "22:17 · +08h17",
+        text:
+          "Nenhuma mensagem. Nenhuma ligação.",
+        hold: 3600
+      },
+      {
+        title:
+          "23:00 · 9 HORAS DEPOIS",
+        text:
+          "Meus pais não voltaram.",
+        hold: 5000
+      }
+    ];
+
+    for (
+      const item of timeline
+    ) {
+      titleEl.textContent =
+        item.title;
+      hintEl.textContent =
+        item.text;
+
+      await v0826Pause(
+        item.hold
+      );
+    }
+
+    titleEl.textContent =
+      "9 HORAS DEPOIS";
+    hintEl.textContent =
+      "23:00 · A casa está silenciosa.";
+
+    // Muda para o quarto ainda com a tela narrativa cobrindo tudo.
+    state.minutes = 1380;
+    state.stage = "parents";
+    state.room = "bedroom";
+    state.x = housePoint(180);
+    state.y = housePoint(235);
+    state.facing = "down";
+    state.walk = 0;
+
+    keys.clear();
+    near = null;
+
+    // Preload sem trocar o título da tela.
+    await preloadAreaAssets(
+      "bedroom"
+    );
+
+    titleEl.textContent =
+      "9 HORAS DEPOIS";
+    hintEl.textContent =
+      "23:00 · A casa está silenciosa.";
+
+    updateHud();
+    save();
+
+    await v0826Pause(2600);
+
+    transition.classList.remove(
+      "active"
+    );
+    transition.style.opacity = "";
+
+    await v0826Pause(900);
+
+    areaLoadingOverlay = false;
+    transitionBusy = false;
+    keys.clear();
+
+    v06Toast(
+      "Verifique o quarto dos seus pais.",
+      4.2
+    );
+  };
+
+$("version").textContent = "PROTÓTIPO · 0.8.37";
   
   requestAnimationFrame(frame);
   showBootSplash();
