@@ -1095,6 +1095,7 @@
       obj(245, 90, 145, 140, "bed", "Investigar a cama", "parents"),
       obj(415, 100, 40, 40, "lamp"),
       obj(80, 100, 95, 45, "shelf"),
+      obj(500, 185, 30, 20, "wallet"),
       obj(255, 290, 130, 50, "rug")
     ],
     [
@@ -2150,6 +2151,16 @@ function drawCharacterSprite(
     if (item) {
       drawRoomItem(item);
       if (item === "nightstand") drawRoomItem(state?.playerLampOn ? "lampOn" : "lampOff");
+      return;
+    }
+
+    if (type === "wallet") {
+      if (!state?.walletFound) {
+        rect(x + 3, y + 5, w - 6, h - 5, "#17191a");
+        rect(x, y + 2, w, h - 5, "#3b3028");
+        rect(x + 3, y + 5, w - 6, h - 11, "#5b4938");
+        rect(x + w - 8, y + 5, 3, h - 11, "#8b6d4d");
+      }
       return;
     }
 
@@ -6766,6 +6777,18 @@ drawWorld = function () {
         10,
         7,
         "#dfc997"
+      );
+    }
+
+    // Os marcadores das pistas ficam no chão. Recoloca o personagem
+    // por último para que nenhum marcador atravesse o sprite.
+    if (state.room === "parents") {
+      person(
+        state.x,
+        state.y,
+        "player",
+        state.walk,
+        state.facing
       );
     }
   }
@@ -29089,9 +29112,8 @@ newGame = function() {
   state.storyFlags
     .progressionByDiscovery = true;
 
-  enterGame();
-
-  state.walk = 0;
+  // Mantém o menu por trás da tela narrativa. O mundo jogável só
+  // é liberado depois que toda a introdução terminar.
   keys.clear();
   near = null;
   $("prompt").hidden = true;
@@ -29128,6 +29150,7 @@ newGame = function() {
       }
     );
 
+    enterGame();
     $("prompt").hidden = true;
     updateHud();
   })();
@@ -29143,7 +29166,19 @@ familyConversation = function() {
   }
 
   state.walk = 0;
-  state.facing = "up";
+
+  // O pai olha para os filhos a partir da posição real em que chegou,
+  // em vez de assumir sempre que eles estão abaixo/acima dele.
+  const targetX = children.x;
+  const targetY = children.y;
+  const toChildrenX = targetX - state.x;
+  const toChildrenY = targetY - state.y;
+
+  state.facing =
+    Math.abs(toChildrenX) > Math.abs(toChildrenY)
+      ? (toChildrenX > 0 ? "right" : "left")
+      : (toChildrenY > 0 ? "down" : "up");
+
   openingStaticUntil =
     elapsed + 1.8;
 
@@ -36120,6 +36155,37 @@ v081OpenMessages = function() {
 function v0830OpenBrotherTopics() {
   const topics = [
     {
+      id: "feed",
+      label:
+        state.food > 0
+          ? "Dar comida para ele"
+          : "Dar comida para ele",
+      tone: "CUIDAR",
+      run: () => {
+        if (state.food <= 0) {
+          say([
+            ["Estevão", "Eu queria te dar comida, mas não tenho nenhuma porção comigo."]
+          ]);
+          return;
+        }
+
+        say(
+          [
+            ["Estevão", "Toma. Come um pouco."],
+            ["Irmão", "Obrigado, irmão."]
+          ],
+          () => {
+            if (v06FeedBrother()) {
+              state.finished = true;
+              state.lastBrotherFeedDay = state.day;
+              updateHud();
+              save();
+            }
+          }
+        );
+      }
+    },
+    {
       id: "parents",
       label:
         "Falar sobre nossos pais",
@@ -36819,7 +36885,7 @@ update = function(dt) {
         () => {
           v076SetOutdoorRoom(
             "square",
-            1000,
+            940,
             430,
             "left"
           );
@@ -38158,6 +38224,21 @@ drawWorld = function() {
         y,
         "up"
       );
+    }
+
+    // As setas pertencem ao chão; personagens pertencem à camada de
+    // atores. Redesenhar os atores aqui corrige o caso em que uma seta
+    // passa visualmente por cima deles.
+    person(
+      state.x,
+      state.y,
+      "father",
+      state.walk,
+      state.facing
+    );
+
+    if (state.mother) {
+      drawMother();
     }
 
     c.restore();
