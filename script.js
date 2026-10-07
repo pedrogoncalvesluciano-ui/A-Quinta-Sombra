@@ -36157,11 +36157,19 @@ function v0830OpenBrotherTopics() {
     {
       id: "feed",
       label:
-        state.food > 0
-          ? "Dar comida para ele"
+        state.brotherFood >= 100
+          ? "Ele não está com fome"
           : "Dar comida para ele",
       tone: "CUIDAR",
       run: () => {
+        if (state.brotherFood >= 100) {
+          say([
+            ["Estevão", "Você não está com fome, né?"],
+            ["Irmão", "Não. Estou bem por enquanto."]
+          ]);
+          return;
+        }
+
         if (state.food <= 0) {
           say([
             ["Estevão", "Eu queria te dar comida, mas não tenho nenhuma porção comigo."]
@@ -36175,12 +36183,9 @@ function v0830OpenBrotherTopics() {
             ["Irmão", "Obrigado, irmão."]
           ],
           () => {
-            if (v06FeedBrother()) {
-              state.finished = true;
-              state.lastBrotherFeedDay = state.day;
-              updateHud();
-              save();
-            }
+            v06FeedBrother();
+            updateHud();
+            save();
           }
         );
       }
