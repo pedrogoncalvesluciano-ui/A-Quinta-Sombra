@@ -36154,42 +36154,26 @@ v081OpenMessages = function() {
 
 function v0830OpenBrotherTopics() {
   const topics = [
-    {
-      id: "feed",
-      label:
-        state.brotherFood >= 100
-          ? "Ele não está com fome"
-          : "Dar comida para ele",
-      tone: "CUIDAR",
-      run: () => {
-        if (state.brotherFood >= 100) {
-          say([
-            ["Estevão", "Você não está com fome, né?"],
-            ["Irmão", "Não. Estou bem por enquanto."]
-          ]);
-          return;
-        }
-
-        if (state.food <= 0) {
-          say([
-            ["Estevão", "Eu queria te dar comida, mas não tenho nenhuma porção comigo."]
-          ]);
-          return;
-        }
-
-        say(
-          [
-            ["Estevão", "Toma. Come um pouco."],
-            ["Irmão", "Obrigado, irmão."]
-          ],
-          () => {
-            v06FeedBrother();
-            updateHud();
-            save();
+    ...(state.food > 0 && state.brotherFood < 100
+      ? [{
+          id: "feed",
+          label: "Dar comida para ele",
+          tone: "CUIDAR",
+          run: () => {
+            say(
+              [
+                ["Estevão", "Toma. Come um pouco."],
+                ["Irmão", "Obrigado, irmão."]
+              ],
+              () => {
+                v06FeedBrother();
+                updateHud();
+                save();
+              }
+            );
           }
-        );
-      }
-    },
+        }]
+      : []),
     {
       id: "parents",
       label:
