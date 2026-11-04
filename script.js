@@ -2813,6 +2813,7 @@ function drawCharacterSprite(
         rect(25, 45, 12, 342, "#353a38");
         rect(603, 45, 12, 342, "#353a38");
         rect(25, 378, 590, 12, "#353a38");
+        v088DrawGenericInteriorDetails(state.room);
         c.restore();
       }
 
@@ -38452,7 +38453,550 @@ v0826ParentsLeaveTransition =
     );
   };
 
-$("version").textContent = "PROTÓTIPO · 0.8.37";
+
+  // =========================================================
+  // 0.8.38 — PASSE VISUAL DA CASA E DO AMBIENTE
+  // Apenas desenho Canvas: não altera sprites, mapas, colisões,
+  // coordenadas, interações, controles, estados ou progressão.
+  // =========================================================
+
+  function v088DrawGroundDetails(x, y, w, h) {
+    if (w <= 0 || h <= 0) return;
+
+    const left = Math.max(x, Math.floor(camera.x || 0) - 24);
+    const top = Math.max(y, Math.floor(camera.y || 0) - 24);
+    const right = Math.min(x + w, Math.ceil((camera.x || 0) + W) + 24);
+    const bottom = Math.min(y + h, Math.ceil((camera.y || 0) + H) + 24);
+
+    if (right <= left || bottom <= top) return;
+
+    c.save();
+    for (let gy = Math.floor(top / 68) * 68; gy < bottom; gy += 68) {
+      for (let gx = Math.floor(left / 76) * 76; gx < right; gx += 76) {
+        const n = hash(gx + 19, gy + 7);
+        const px = gx + 10 + Math.floor(hash(gx, gy + 33) * 40);
+        const py = gy + 10 + Math.floor(hash(gx + 51, gy) * 42);
+
+        if (n > 0.58) {
+          rect(px, py + 2, 2, 4, "#405a3a");
+          rect(px + 3, py, 2, 6, "#526b43");
+          rect(px + 6, py + 3, 2, 3, "#344c35");
+          rect(px + 2, py + 5, 4, 1, "#71805255");
+        } else if (n < 0.09) {
+          rect(px + 2, py + 3, 5, 2, "#17251e55");
+          rect(px + 3, py + 2, 3, 1, "#7d806455");
+        }
+      }
+    }
+    c.restore();
+  }
+
+  const v088DrawGrassGroundBase = drawGrassGround;
+  drawGrassGround = function(x, y, w, h) {
+    v088DrawGrassGroundBase(x, y, w, h);
+    v088DrawGroundDetails(x, y, w, h);
+  };
+
+  function v088DrawHouseApproach(o) {
+    if (!["house", "neighborHouse", "oldHouse"].includes(o.type)) return;
+
+    const center = o.x + o.w / 2;
+    const pathWidth = o.type === "house" ? 34 : 27;
+    const startY = o.y + o.h - 2;
+
+    c.save();
+    rect(center - pathWidth / 2 - 2, startY, pathWidth + 4, 43, "#17191425");
+
+    for (let i = 0; i < 5; i++) {
+      const py = startY + 5 + i * 8;
+      const inset = i % 2 === 0 ? 0 : 2;
+      rect(
+        center - pathWidth / 2 + inset,
+        py,
+        pathWidth - inset * 2,
+        6,
+        i % 2 === 0 ? "#625847" : "#554c3e"
+      );
+      rect(
+        center - pathWidth / 2 + inset + 2,
+        py,
+        pathWidth - inset * 2 - 4,
+        1,
+        "#9a896b55"
+      );
+      rect(center - 1, py + 2, 1, 2, "#3f3a31");
+    }
+
+    for (const side of [-1, 1]) {
+      const sx = center + side * (pathWidth / 2 + 10);
+      rect(sx, startY + 5, 2, 5, "#405c3e");
+      rect(sx + side * 3, startY + 8, 2, 4, "#607747");
+      rect(sx - side * 2, startY + 12, 2, 3, "#304a35");
+    }
+    c.restore();
+  }
+
+  function v088DrawWindow(wx, y, lit, weathered) {
+    const frame = weathered ? "#403a31" : "#4b4438";
+    const trim = weathered ? "#806b50" : "#a28d68";
+
+    if (lit) {
+      const glow = c.createRadialGradient(
+        wx + 13, y + 87, 2,
+        wx + 13, y + 87, 27
+      );
+      glow.addColorStop(0, "rgba(231,184,105,0.18)");
+      glow.addColorStop(1, "rgba(231,184,105,0)");
+      c.fillStyle = glow;
+      c.fillRect(wx - 16, y + 56, 58, 62);
+    }
+
+    rect(wx - 5, y + 68, 38, 39, "#252827");
+    rect(wx - 2, y + 70, 32, 34, frame);
+    rect(wx + 1, y + 73, 26, 28, lit ? "#b99559" : "#35474b");
+    rect(wx + 3, y + 75, 8, 24, lit ? "#d3b471" : "#52656a");
+    rect(wx + 18, y + 75, 7, 24, lit ? "#9c8050" : "#41575d");
+
+    // Cortinas e esquadrias internas.
+    rect(wx + 2, y + 73, 4, 28, "#b7a58a");
+    rect(wx + 22, y + 73, 4, 28, "#9e927d");
+    rect(wx + 13, y + 73, 2, 28, "#292e2d");
+    rect(wx + 1, y + 86, 26, 2, "#292e2d");
+    rect(wx - 7, y + 70, 4, 31, "#5a4a39");
+    rect(wx + 30, y + 70, 4, 31, "#5a4a39");
+
+    // Peitoril e pequenas marcas de uso.
+    rect(wx - 6, y + 103, 40, 4, trim);
+    rect(wx - 4, y + 103, 36, 1, "#c4ad7a");
+    rect(wx + 4, y + 108, 22, 2, "#382f28");
+
+    if (!weathered) {
+      // Caixa de flores baixa, sem ultrapassar a silhueta da fachada.
+      rect(wx + 3, y + 109, 24, 4, "#4c3e30");
+      rect(wx + 5, y + 107, 20, 2, "#6e5a3f");
+      for (let i = 0; i < 4; i++) {
+        const fx = wx + 7 + i * 5;
+        rect(fx, y + 104 - (i % 2), 2, 4, i % 2 ? "#4e6b43" : "#667b4b");
+        rect(fx + 1, y + 103 - (i % 2), 2, 2, i % 2 ? "#b48b72" : "#d0b17a");
+      }
+    }
+  }
+
+  function v088DrawHouseFacadeDetails(o) {
+    const { x, y, w, h, type } = o;
+    if (!["house", "neighborHouse", "oldHouse", "building", "market", "policeStation"].includes(type)) return;
+
+    const weathered = type === "oldHouse";
+    const roofDark = weathered ? "#322f2a" : type === "neighborHouse" ? "#354047" : "#2b3940";
+    const roofLight = weathered ? "#594b3a" : type === "neighborHouse" ? "#66716c" : "#52646a";
+    const wallTrim = weathered ? "#715b43" : "#938365";
+    const bottom = y + h - 12;
+
+    c.save();
+
+    // Plano do telhado: telhas, juntas, cumeeira e beiral.
+    const roof = c.createLinearGradient(x, y, x + w, y + 54);
+    roof.addColorStop(0, roofLight);
+    roof.addColorStop(0.48, roofDark);
+    roof.addColorStop(1, weathered ? "#292822" : "#202d34");
+    c.fillStyle = roof;
+    c.fillRect(x - 10, y + 1, w + 20, 52);
+
+    rect(x - 10, y + 2, w + 20, 3, "#172126");
+    rect(x - 8, y + 5, w + 16, 1, "#91a09a35");
+
+    for (let row = 0; row < 5; row++) {
+      const ry = y + 10 + row * 8;
+      const offset = row % 2 ? 7 : 0;
+      rect(x - 8, ry + 6, w + 16, 1, "#18232977");
+
+      for (let px = x - 8 + offset; px < x + w + 12; px += 16) {
+        const shade = hash(px + row * 9, y + row);
+        rect(
+          px,
+          ry,
+          14,
+          5,
+          shade > 0.62 ? roofLight : shade < 0.18 ? "#202c31" : roofDark
+        );
+        rect(px + 1, ry, 11, 1, "#a8b1a34a");
+        rect(px + 13, ry + 1, 1, 4, "#17212688");
+      }
+    }
+
+    rect(x - 10, y + 50, w + 20, 5, "#1c272c");
+    rect(x - 8, y + 50, w + 16, 1, "#8b998d55");
+    rect(x - 10, y + 54, w + 20, 3, "#121a1d");
+
+    // Chaminé baixa, apenas decorativa.
+    if (type === "house" || type === "oldHouse") {
+      rect(x + 17, y + 7, 17, 22, "#222728");
+      rect(x + 19, y + 5, 14, 4, "#4a4d45");
+      rect(x + 20, y + 10, 11, 15, weathered ? "#624a37" : "#665e50");
+      for (let by = y + 12; by < y + 24; by += 5) {
+        rect(x + 20, by, 11, 1, "#2c2c28");
+        rect(x + 25, by + 1, 1, 3, "#8c7860");
+      }
+      rect(x + 16, y + 4, 19, 2, "#858174");
+    }
+
+    // Fachada com tábuas de acabamento, rejunte e base de alvenaria.
+    rect(x + 9, y + 34, 3, h - 48, "#343b35");
+    rect(x + w - 12, y + 34, 3, h - 48, "#3c4139");
+    rect(x + 12, y + 35, 1, h - 48, "#b1a17b33");
+    rect(x + w - 10, y + 35, 1, h - 48, "#b1a17b22");
+
+    for (let sy = y + 43; sy < bottom - 2; sy += 20) {
+      rect(x + 12, sy, w - 24, 1, weathered ? "#312e28" : "#3f443a");
+      rect(x + 12, sy + 1, w - 24, 1, "#d0c29a16");
+      for (let sx = x + 19 + ((Math.floor(sy / 20) % 2) * 12); sx < x + w - 18; sx += 28) {
+        rect(sx, sy + 2, 1, 5, "#272d29");
+      }
+    }
+
+    rect(x + 6, bottom, w - 12, 5, "#393a32");
+    rect(x + 8, bottom, w - 16, 1, "#9a8b6a66");
+    for (let sx = x + 14; sx < x + w - 14; sx += 22) {
+      rect(sx, bottom + 1, 12, 3, weathered ? "#554635" : "#5a5949");
+      rect(sx + 2, bottom + 1, 1, 1, "#b6a17b55");
+    }
+
+    const nightWindow =
+      !!state &&
+      state.stage !== "prologue" &&
+      (state.minutes < 420 || state.minutes >= 1080);
+
+    for (const wx of [x + 24, x + w - 51]) {
+      const lit =
+        !!state &&
+        nightWindow &&
+        hash(wx + x, y + h) > 0.36;
+      v088DrawWindow(wx, y, lit, weathered);
+    }
+
+    // Porta principal com guarnição, almofadas, ferragem e degrau.
+    const dx = x + w / 2 - 18;
+    const dy = y + h - 49;
+    const doorWood = weathered ? "#49372b" : "#584333";
+    rect(dx - 5, dy - 5, 46, 55, "#252722");
+    rect(dx - 3, dy - 3, 42, 52, wallTrim);
+    rect(dx, dy, 36, 49, doorWood);
+    rect(dx + 3, dy + 3, 30, 43, weathered ? "#5e4430" : "#75583d");
+    rect(dx + 5, dy + 5, 26, 15, "#4d3a2d");
+    rect(dx + 7, dy + 7, 22, 11, "#8b6b49");
+    rect(dx + 5, dy + 24, 26, 17, "#49372b");
+    rect(dx + 7, dy + 26, 22, 13, "#72543a");
+    rect(dx + 6, dy + 21, 24, 2, "#b09263");
+    rect(dx + 6, dy + 43, 24, 2, "#342921");
+    rect(dx + 28, dy + 25, 3, 3, "#d3b16c");
+    rect(dx + 29, dy + 26, 1, 1, "#fff0b0");
+
+    // Pequena cobertura sobre a entrada.
+    rect(dx - 9, dy - 9, 54, 5, "#252d2d");
+    rect(dx - 7, dy - 8, 50, 2, "#9c835b");
+    rect(dx - 8, dy - 4, 3, 8, "#3f4037");
+    rect(dx + 39, dy - 4, 3, 8, "#3f4037");
+    rect(dx - 5, dy - 2, 48, 1, "#c5ad7a55");
+
+    // Soleira, capacho e pequenos pontos de luz junto à porta.
+    rect(dx - 4, y + h + 1, 44, 5, "#494337");
+    rect(dx - 2, y + h + 1, 40, 1, "#9a8a69");
+    rect(dx + 7, y + h + 8, 22, 4, "#3e4038");
+    rect(dx + 9, y + h + 8, 18, 1, "#8e7958");
+
+    const sconceY = dy + 8;
+    for (const sx of [dx - 11, dx + 42]) {
+      if (nightWindow) {
+        const lampGlow = c.createRadialGradient(
+          sx + 2, sconceY + 2, 1,
+          sx + 2, sconceY + 2, 22
+        );
+        lampGlow.addColorStop(0, "rgba(226,181,104,0.22)");
+        lampGlow.addColorStop(1, "rgba(226,181,104,0)");
+        c.fillStyle = lampGlow;
+        c.fillRect(sx - 18, sconceY - 18, 40, 40);
+      }
+      rect(sx, sconceY, 5, 8, "#302b24");
+      rect(sx + 1, sconceY + 1, 3, 4, nightWindow ? "#d7b46e" : "#8f805f");
+      rect(sx - 1, sconceY - 1, 7, 2, "#a68c5d");
+    }
+
+    // Pequenos sinais de uso na madeira antiga.
+    if (weathered) {
+      for (let i = 0; i < 7; i++) {
+        const sx = x + 17 + hash(i, 31) * (w - 34);
+        const sy = y + 118 + hash(i + 8, 13) * Math.max(4, h - 138);
+        rect(sx, sy, 5 + (i % 3), 1, "#201f1b66");
+      }
+    }
+
+    c.restore();
+  }
+
+  const v088BuildingBase = building;
+  building = function(o) {
+    v088DrawHouseApproach(o);
+    v088BuildingBase(o);
+    v088DrawHouseFacadeDetails(o);
+  };
+
+  function v088DrawBedroomSurfaceDetails() {
+    const floorX = housePoint(58);
+    const floorY = housePoint(76);
+    const floorW = housePoint(524);
+    const floorH = housePoint(282);
+    const wall = housePoint(18);
+
+    c.save();
+
+    const floorShade = c.createLinearGradient(
+      floorX, floorY, floorX + floorW, floorY + floorH
+    );
+    floorShade.addColorStop(0, "rgba(226,190,134,0.07)");
+    floorShade.addColorStop(0.5, "rgba(16,12,9,0)");
+    floorShade.addColorStop(1, "rgba(13,10,9,0.17)");
+    c.fillStyle = floorShade;
+    c.fillRect(floorX, floorY, floorW, floorH);
+
+    // Tábuas com emendas alternadas, veios discretos e pequenos nós.
+    let row = 0;
+    for (let py = floorY + 9; py < floorY + floorH - 4; py += 18) {
+      const offset = row % 2 ? 27 : 0;
+      rect(floorX + 2, py, floorW - 4, 1, "#2f281f");
+      rect(floorX + 2, py + 1, floorW - 4, 1, "#a2876540");
+
+      for (let px = floorX + 8 + offset; px < floorX + floorW - 8; px += 64) {
+        rect(px, py - 7, 1, 7, "#332a22");
+        rect(px + 1, py - 7, 1, 7, "#92745220");
+      }
+
+      for (let n = 0; n < 3; n++) {
+        const gx = floorX + 14 + hash(row, n + 5) * (floorW - 28);
+        rect(gx, py + 5, 7 + n, 1, "#c3a07822");
+        rect(gx + 2, py + 7, 3, 1, "#30271f66");
+      }
+      row++;
+    }
+
+    // Acabamento das paredes laterais e da parede superior.
+    const wallTop = floorY - wall;
+    rect(floorX - wall, wallTop, floorW + wall * 2, 2, "#59605b");
+    rect(floorX - wall, wallTop + 3, floorW + wall * 2, 1, "#8b856d");
+    rect(floorX - wall, floorY - 3, floorW + wall * 2, 2, "#1d2423");
+    rect(floorX - wall, floorY - 1, floorW + wall * 2, 1, "#a59a7a55");
+
+    rect(floorX - wall, floorY + 7, 2, floorH - 8, "#68706a");
+    rect(floorX + floorW + wall - 2, floorY + 7, 2, floorH - 8, "#202725");
+    for (let py = floorY + 18; py < floorY + floorH - 4; py += 34) {
+      rect(floorX - wall + 4, py, wall - 7, 1, "#9a927c45");
+      rect(floorX + floorW + 3, py, wall - 7, 1, "#9a927c30");
+    }
+
+    // Frisos curtos na parede, sem acrescentar objetos interativos.
+    for (let px = floorX + 34; px < floorX + floorW - 20; px += 52) {
+      rect(px, wallTop + 5, 1, wall - 8, "#171e1d55");
+      rect(px + 1, wallTop + 5, 1, wall - 8, "#a59a7a22");
+    }
+
+    c.restore();
+  }
+
+  const v088BedroomBackgroundBase = drawPlayerRoomBackground;
+  drawPlayerRoomBackground = function(m) {
+    v088BedroomBackgroundBase(m);
+    v088DrawBedroomSurfaceDetails();
+  };
+
+  function v088DrawBedroomFrontWallDetails() {
+    const x = housePoint(40);
+    const y = housePoint(316);
+    const w = housePoint(560);
+    const h = housePoint(28);
+
+    c.save();
+    rect(x, y, w, 2, "#77776b");
+    rect(x, y + 3, w, 1, "#171e1d");
+    for (let px = x + 18; px < x + w - 8; px += 34) {
+      rect(px, y + 5, 1, h - 7, "#161d1c");
+      rect(px + 1, y + 5, 1, h - 7, "#74766c45");
+    }
+    rect(x + 3, y + h - 3, w - 6, 2, "#171e1d");
+    c.restore();
+  }
+
+  const v088BedroomForegroundBase = drawPlayerRoomForeground;
+  drawPlayerRoomForeground = function(m) {
+    v088BedroomForegroundBase(m);
+    v088DrawBedroomFrontWallDetails();
+  };
+
+  function v088DrawGenericInteriorDetails(roomId) {
+    c.save();
+
+    // Frisos, rodapés, molduras e junções dos cômodos.
+    rect(25, 18, 590, 2, "#242c2c");
+    rect(25, 20, 590, 1, "#8b8068");
+    rect(25, 44, 590, 2, "#303431");
+    rect(25, 46, 590, 1, "#a2916c55");
+    rect(25, 378, 590, 2, "#1e2524");
+    rect(25, 380, 590, 1, "#8d8062");
+
+    for (let px = 42; px < 602; px += 42) {
+      rect(px, 22, 1, 20, "#171e1d55");
+      rect(px + 1, 22, 1, 20, "#b8a98720");
+    }
+
+    // Emendas de piso mais claras e variadas, sem alterar os móveis.
+    for (let py = 58, row = 0; py < 376; py += 36, row++) {
+      const offset = row % 2 ? 32 : 0;
+      for (let px = 42 + offset; px < 600; px += 84) {
+        rect(px, py, 1, 18, "#342a23");
+        rect(px + 1, py, 1, 18, "#9b805b22");
+      }
+      const gx = 60 + hash(row + 4, 18) * 500;
+      rect(gx, py + 8, 9, 1, "#d0b08422");
+      rect(gx + 4, py + 10, 4, 1, "#33292155");
+    }
+
+    if (roomId === "kitchen") {
+      // Faixa de azulejos antigos acima da bancada.
+      rect(70, 53, 500, 22, "#454743");
+      rect(70, 53, 500, 2, "#9d8f70");
+      for (let ty = 56; ty < 73; ty += 8) {
+        rect(72, ty, 496, 1, "#262d2a");
+        for (let tx = 80 + (ty % 16 ? 0 : 12); tx < 565; tx += 24) {
+          rect(tx, ty, 1, 7, "#242b29");
+          rect(tx + 2, ty + 1, 18, 1, "#b1a0801e");
+        }
+      }
+    } else if (roomId === "living") {
+      // Moldura discreta na parede superior, sem texto ou pista nova.
+      rect(280, 21, 76, 23, "#292a25");
+      rect(283, 23, 70, 19, "#8e7a5b");
+      rect(286, 26, 64, 13, "#303a3b");
+      rect(288, 28, 25, 9, "#718078");
+      rect(315, 28, 32, 9, "#4c5755");
+      rect(310, 24, 2, 17, "#c1ab7b66");
+    } else if (roomId === "foyer") {
+      // Relógio decorativo central na parede da entrada.
+      rect(294, 20, 32, 24, "#292d2b");
+      rect(297, 22, 26, 20, "#9a8969");
+      rect(299, 24, 22, 16, "#303735");
+      rect(309, 27, 2, 7, "#d2bd8d");
+      rect(311, 33, 6, 1, "#d2bd8d");
+      rect(307, 25, 6, 1, "#d2bd8d");
+    } else if (roomId === "attic") {
+      // Caibros aparentes para dar leitura de sótão.
+      for (let px = 58; px < 590; px += 88) {
+        rect(px, 20, 7, 28, "#332a22");
+        rect(px + 1, 20, 2, 28, "#8e7758");
+      }
+    } else if (roomId === "hall") {
+      // Painéis da parede do corredor.
+      for (let px = 50; px < 590; px += 54) {
+        rect(px, 23, 1, 18, "#252b29");
+        rect(px + 1, 23, 1, 18, "#a28c6740");
+      }
+    }
+
+    c.restore();
+  }
+
+  const v088FurnishingBase = furnishing;
+  furnishing = function(o) {
+    v088FurnishingBase(o);
+
+    if (!o) return;
+
+    let key = o.roomItem || {
+      playerBed: "bed",
+      playerShelf: "shelf",
+      playerDesk: "desk",
+      playerNightstand: "nightstand"
+    }[o.type];
+
+    let b = key ? roomItemBounds(key) : o;
+    if (!b || b.w <= 0 || b.h <= 0) return;
+
+    const { x, y, w, h } = b;
+    c.save();
+
+    if (key === "bed" || o.type === "bed" || o.type === "brotherbed") {
+      rect(x + w * 0.08, y + h * 0.10, w * 0.84, 1, "#e0d2b377");
+      rect(x + w * 0.13, y + h * 0.30, w * 0.74, 1, "#2a343044");
+      rect(x + w * 0.12, y + h * 0.34, w * 0.76, 2, "#d8c8a344");
+      for (let px = x + w * 0.22; px < x + w * 0.78; px += 13) {
+        rect(px, y + h * 0.48, 1, h * 0.38, "#d9c7a022");
+      }
+      rect(x + w * 0.16, y + h * 0.88, w * 0.68, 1, "#292b2a66");
+    } else if (key === "rug" || o.type === "rug") {
+      rect(x + 3, y + 3, w - 6, h - 6, "#b29a6e55");
+      rect(x + 7, y + 7, w - 14, h - 14, "#332b2855");
+      for (let px = x + 5; px < x + w - 4; px += 9) {
+        rect(px, y + 1, 2, 2, "#ad936b");
+        rect(px, y + h - 3, 2, 2, "#ad936b");
+      }
+    } else if (key === "desk" || o.type === "table" || o.type === "counter") {
+      rect(x + 4, y + 3, w - 8, 1, "#c4a27677");
+      for (let py = y + 8; py < y + h - 5; py += 7) {
+        rect(x + 7, py, Math.max(3, w - 14), 1, "#2d251d35");
+      }
+      if (key === "desk") {
+        rect(x + 8, y + 10, Math.min(18, w * 0.34), Math.min(12, h * 0.22), "#c3b79b");
+        rect(x + 10, y + 12, Math.min(14, w * 0.26), 1, "#7e7664");
+        rect(x + w - 12, y + 9, 3, 3, "#b18f5a");
+      }
+    } else if (o.type === "sofa") {
+      rect(x + 7, y + 7, w - 14, h * 0.35, "#6e7b70");
+      rect(x + 9, y + h * 0.48, w - 18, h * 0.34, "#394943");
+      rect(x + w / 2 - 1, y + 8, 2, h - 17, "#242d2a");
+      rect(x + 4, y + 5, 2, h - 12, "#a4a18a55");
+      rect(x + w - 6, y + 5, 2, h - 12, "#a4a18a44");
+    } else if (o.type === "stove") {
+      for (const bx of [x + w * 0.32, x + w * 0.68]) {
+        c.strokeStyle = "#252a29";
+        c.lineWidth = 2;
+        c.beginPath();
+        c.ellipse(bx, y + h * 0.38, Math.max(3, w * 0.12), Math.max(3, h * 0.13), 0, 0, Math.PI * 2);
+        c.stroke();
+        rect(bx - 1, y + h * 0.38 - 1, 2, 2, "#9a9d91");
+      }
+      rect(x + w * 0.24, y + h * 0.78, 3, 2, "#b8a27a");
+      rect(x + w * 0.45, y + h * 0.78, 3, 2, "#b8a27a");
+      rect(x + w * 0.66, y + h * 0.78, 3, 2, "#b8a27a");
+    } else if (key === "shelf" || o.type === "shelf") {
+      for (let px = x + 8; px < x + w - 8; px += 13) {
+        const bh = 7 + Math.floor(hash(px, y) * Math.max(3, h * 0.25));
+        rect(px, y + h * 0.34, 2, bh, "#b39a71");
+        rect(px + 3, y + h * 0.34, 2, Math.max(4, bh - 2), "#59685b");
+      }
+      rect(x + 5, y + h * 0.68, w - 10, 2, "#2c2924");
+    } else if (o.type === "stairs") {
+      rect(x + 8, y + 5, 3, h - 10, "#a28a64");
+      rect(x + w - 11, y + 5, 3, h - 10, "#a28a64");
+      for (let py = y + 12; py < y + h - 8; py += 15) {
+        rect(x + 12, py, w - 24, 1, "#c0a98066");
+      }
+    } else if (o.type === "chest" || o.type === "crate") {
+      rect(x + 3, y + h * 0.28, w - 6, 2, "#2b2925");
+      rect(x + 3, y + h * 0.72, w - 6, 2, "#2b2925");
+      rect(x + w * 0.48, y + 4, 2, h - 8, "#b0925c");
+      rect(x + 5, y + 5, 2, 2, "#d1b779");
+      rect(x + w - 7, y + 5, 2, 2, "#d1b779");
+    } else if (key === "nightstand" || o.type === "lamp") {
+      rect(x + 4, y + h * 0.55, w - 8, 1, "#2d2924");
+      rect(x + w * 0.48, y + h * 0.62, 3, 3, "#c4a16a");
+      rect(x + w * 0.32, y + 3, w * 0.36, 1, "#c9b17f66");
+    }
+
+    c.restore();
+  };
+
+  // =========================================================
+  // FIM DO PASSE VISUAL 0.8.38
+  // =========================================================
+
+  $("version").textContent = "PROTÓTIPO · 0.8.38";
   
   requestAnimationFrame(frame);
   showBootSplash();
