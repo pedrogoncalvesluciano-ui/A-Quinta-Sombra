@@ -39194,7 +39194,387 @@ v0826ParentsLeaveTransition =
   // FIM DA ABERTURA 0.8.39
   // =========================================================
 
-  $("version").textContent = "PROTÓTIPO · 0.8.39";
+
+  // =========================================================
+  // 0.8.40 — VARIEDADE DAS CASAS + LIMPEZA DO PROMPT EM DIÁLOGOS
+  // Apenas renderização e visibilidade de interface.
+  // Não altera sprites, mapas, posições, colisões ou gameplay.
+  // =========================================================
+
+  const V08840_HOUSE_STYLES = [
+    {
+      wall: "rgba(174,135,91,0.48)", trim: "#d8c39a",
+      roof: "#3c4b50", roofHi: "#77837a", door: "#5b3e2d",
+      pattern: "clapboard", roofShape: "gable", window: "shutters",
+      accent: "#ad8a5b"
+    },
+    {
+      wall: "rgba(87,132,119,0.48)", trim: "#c8c0a1",
+      roof: "#583c37", roofHi: "#9b6754", door: "#354d48",
+      pattern: "timber", roofShape: "lean", window: "awning",
+      accent: "#c49a69"
+    },
+    {
+      wall: "rgba(154,157,116,0.48)", trim: "#d5c69d",
+      roof: "#594a38", roofHi: "#917652", door: "#5b4530",
+      pattern: "plaster", roofShape: "hip", window: "flowers",
+      accent: "#a28b60"
+    },
+    {
+      wall: "rgba(142,91,76,0.48)", trim: "#c8aa88",
+      roof: "#34424a", roofHi: "#627b80", door: "#46302c",
+      pattern: "brick", roofShape: "gable", window: "bars",
+      accent: "#a66f55"
+    },
+    {
+      wall: "rgba(181,151,91,0.48)", trim: "#e0c99a",
+      roof: "#3e5040", roofHi: "#71805d", door: "#5c402a",
+      pattern: "plaster", roofShape: "flat", window: "shutters",
+      accent: "#b28a4d"
+    },
+    {
+      wall: "rgba(112,111,119,0.50)", trim: "#c4b49a",
+      roof: "#473b45", roofHi: "#75616b", door: "#3f3632",
+      pattern: "weathered", roofShape: "lean", window: "boarded",
+      accent: "#8c7968"
+    }
+  ];
+
+  function v08840HouseStyle(o) {
+    if (o.type === "house") {
+      return {
+        wall: "rgba(181,145,99,0.42)", trim: "#ddc69a",
+        roof: "#35434a", roofHi: "#667875", door: "#62452f",
+        pattern: "clapboard", roofShape: "gable", window: "flowers",
+        accent: "#b28b5c"
+      };
+    }
+
+    if (o.type === "neighborHouse") {
+      return {
+        wall: "rgba(87,132,112,0.50)", trim: "#d3c7a5",
+        roof: "#554044", roofHi: "#986d61", door: "#394d42",
+        pattern: "plaster", roofShape: "hip", window: "shutters",
+        accent: "#c3a16d"
+      };
+    }
+
+    if (o.type === "oldHouse") {
+      return {
+        wall: "rgba(75,68,58,0.62)", trim: "#8f7859",
+        roof: "#292a28", roofHi: "#57483a", door: "#403126",
+        pattern: "weathered", roofShape: "lean", window: "boarded",
+        accent: "#76624a"
+      };
+    }
+
+    if (o.type === "market" || o.type === "policeStation") {
+      return null; // Mantém a identidade visual própria desses prédios.
+    }
+
+    const seed = Math.floor(hash(Math.round(o.x) + 731, Math.round(o.y) + 419) * V08840_HOUSE_STYLES.length);
+    return V08840_HOUSE_STYLES[seed];
+  }
+
+  function v08840DrawRoof(o, style) {
+    const { x, y, w } = o;
+    c.save();
+
+    c.beginPath();
+    if (style.roofShape === "gable") {
+      c.moveTo(x - 11, y + 54);
+      c.lineTo(x + w * 0.5, y - 12);
+      c.lineTo(x + w + 11, y + 54);
+    } else if (style.roofShape === "hip") {
+      c.moveTo(x - 10, y + 48);
+      c.lineTo(x + 13, y + 1);
+      c.lineTo(x + w - 13, y + 1);
+      c.lineTo(x + w + 10, y + 48);
+    } else if (style.roofShape === "flat") {
+      c.rect(x - 10, y + 4, w + 20, 50);
+    } else {
+      c.moveTo(x - 11, y + 17);
+      c.lineTo(x + w + 11, y - 9);
+      c.lineTo(x + w + 11, y + 54);
+      c.lineTo(x - 11, y + 54);
+    }
+    c.closePath();
+    c.clip();
+
+    const roofGradient = c.createLinearGradient(x, y, x + w, y + 52);
+    roofGradient.addColorStop(0, style.roofHi);
+    roofGradient.addColorStop(0.52, style.roof);
+    roofGradient.addColorStop(1, "#171f22");
+    c.fillStyle = roofGradient;
+    c.fillRect(x - 14, y - 16, w + 28, 74);
+
+    // Telhas variam de tamanho, brilho e alinhamento entre as casas.
+    for (let row = 0; row < 7; row++) {
+      const ry = y - 8 + row * 9;
+      const offset = row % 2 ? 8 : 0;
+      for (let px = x - 14 + offset; px < x + w + 14; px += 18) {
+        const shade = hash(px + Math.round(x), ry + Math.round(y));
+        rect(
+          px, ry, 16, 6,
+          shade > 0.68 ? style.roofHi : shade < 0.16 ? "#202729" : style.roof
+        );
+        rect(px + 2, ry, 11, 1, "#d0c4a044");
+        rect(px + 15, ry + 1, 1, 4, "#111719aa");
+      }
+      rect(x - 14, ry + 7, w + 28, 1, "#17202399");
+    }
+
+    c.restore();
+
+    c.save();
+    c.strokeStyle = "#172023";
+    c.lineWidth = 3;
+    c.beginPath();
+    if (style.roofShape === "gable") {
+      c.moveTo(x - 11, y + 54);
+      c.lineTo(x + w * 0.5, y - 12);
+      c.lineTo(x + w + 11, y + 54);
+    } else if (style.roofShape === "hip") {
+      c.moveTo(x - 10, y + 48);
+      c.lineTo(x + 13, y + 1);
+      c.lineTo(x + w - 13, y + 1);
+      c.lineTo(x + w + 10, y + 48);
+    } else if (style.roofShape === "flat") {
+      c.rect(x - 10, y + 4, w + 20, 50);
+    } else {
+      c.moveTo(x - 11, y + 17);
+      c.lineTo(x + w + 11, y - 9);
+      c.lineTo(x + w + 11, y + 54);
+    }
+    c.stroke();
+
+    // Beiral de madeira em toda a largura da fachada.
+    rect(x - 9, y + 49, w + 18, 5, "#1e2929");
+    rect(x - 7, y + 49, w + 14, 1, style.trim);
+    rect(x - 8, y + 54, w + 16, 2, "#11191b");
+
+    if (style.roofShape !== "flat") {
+      const chimneyX = style.roofShape === "lean" ? x + w - 37 : x + 18;
+      rect(chimneyX, y + 5, 13, 23, "#292a27");
+      rect(chimneyX - 2, y + 3, 17, 4, "#706657");
+      rect(chimneyX + 2, y + 10, 9, 16, style.accent);
+      for (let by = y + 12; by < y + 25; by += 5) {
+        rect(chimneyX + 2, by, 9, 1, "#292724");
+      }
+    }
+    c.restore();
+  }
+
+  function v08840DrawWallPattern(o, style) {
+    const { x, y, w, h } = o;
+    const top = y + 35;
+    const bottom = y + h - 14;
+
+    c.save();
+
+    // Cor própria da casa, aplicada apenas na alvenaria.
+    rect(x + 8, top, w - 16, Math.max(1, bottom - top), style.wall);
+
+    if (style.pattern === "clapboard") {
+      for (let py = top + 7; py < bottom; py += 10) {
+        rect(x + 10, py, w - 20, 1, "#342d2455");
+        rect(x + 12, py + 1, w - 24, 1, "#f0d9ad2c");
+      }
+      for (let px = x + 15; px < x + w - 12; px += 34) {
+        rect(px, top + 3, 2, bottom - top - 6, "#292d2855");
+      }
+    } else if (style.pattern === "timber") {
+      for (let px = x + 17; px < x + w - 12; px += 38) {
+        rect(px, top + 2, 5, bottom - top - 4, "#43382c");
+        rect(px + 1, top + 3, 1, bottom - top - 6, "#c2a47a55");
+      }
+      rect(x + 12, top + 18, w - 24, 4, "#43382c");
+      rect(x + 12, top + 19, w - 24, 1, "#d0b58b55");
+    } else if (style.pattern === "brick") {
+      for (let py = top + 7, row = 0; py < bottom; py += 10, row++) {
+        rect(x + 10, py, w - 20, 1, "#352a2755");
+        const offset = row % 2 ? 13 : 0;
+        for (let px = x + 13 + offset; px < x + w - 15; px += 26) {
+          rect(px, py - 5, 1, 5, "#38292566");
+          rect(px + 1, py - 5, 1, 5, "#e0b39a24");
+        }
+      }
+    } else if (style.pattern === "plaster") {
+      for (let i = 0; i < 12; i++) {
+        const px = x + 14 + hash(i + x, y) * (w - 30);
+        const py = top + 8 + hash(i + y, x) * Math.max(6, bottom - top - 18);
+        rect(px, py, 5 + (i % 4) * 2, 1, "#e4d6b044");
+        rect(px + 2, py + 1, 1, 3, "#4c514344");
+      }
+      rect(x + 12, top + 2, 2, bottom - top - 4, "#c9c0a044");
+      rect(x + w - 14, top + 2, 2, bottom - top - 4, "#464a4244");
+    } else {
+      for (let i = 0; i < 11; i++) {
+        const px = x + 14 + hash(i + 9, y + 5) * (w - 28);
+        const py = top + 12 + hash(i + 23, x) * Math.max(5, bottom - top - 24);
+        rect(px, py, 8 + (i % 3) * 3, 1, "#171b1966");
+        rect(px + 2, py + 1, 4, 1, "#b7a58a33");
+      }
+      for (let px = x + 18; px < x + w - 12; px += 42) {
+        rect(px, top + 3, 2, bottom - top - 6, "#2b292755");
+      }
+    }
+
+    // Cantoneiras e base com acabamento que acompanha a paleta.
+    rect(x + 7, top, 4, bottom - top, "#292d2a");
+    rect(x + 8, top, 1, bottom - top, style.trim);
+    rect(x + w - 11, top, 4, bottom - top, "#292d2a");
+    rect(x + w - 9, top, 1, bottom - top, style.trim);
+    rect(x + 7, bottom, w - 14, 5, "#383a34");
+    rect(x + 9, bottom, w - 18, 1, style.trim);
+
+    c.restore();
+  }
+
+  function v08840DrawWindowTreatment(wx, y, style) {
+    c.save();
+
+    if (style.window === "shutters") {
+      for (const side of [-1, 1]) {
+        const sx = side < 0 ? wx - 9 : wx + 29;
+        rect(sx, y + 72, 8, 30, style.door);
+        rect(sx + 1, y + 74, 1, 26, style.trim);
+        for (let py = y + 78; py < y + 100; py += 6) {
+          rect(sx + 1, py, 6, 1, "#252a27");
+        }
+      }
+    } else if (style.window === "awning") {
+      rect(wx - 7, y + 66, 40, 5, style.accent);
+      for (let i = 0; i < 5; i++) {
+        rect(wx - 6 + i * 8, y + 66, 4, 5, i % 2 ? "#dfc69a" : "#684d40");
+      }
+      rect(wx - 5, y + 71, 36, 2, "#302b27");
+    } else if (style.window === "bars") {
+      for (let px = wx + 5; px <= wx + 23; px += 6) {
+        rect(px, y + 74, 2, 27, "#262c2b");
+      }
+      rect(wx + 1, y + 86, 26, 2, "#262c2b");
+    } else if (style.window === "boarded") {
+      rect(wx + 2, y + 76, 25, 5, "#594838");
+      rect(wx + 1, y + 86, 27, 5, "#44392f");
+      rect(wx + 3, y + 96, 23, 4, "#604b37");
+      rect(wx + 7, y + 77, 2, 3, "#b08b5d");
+      rect(wx + 21, y + 88, 2, 3, "#b08b5d");
+    }
+    c.restore();
+  }
+
+  function v08840DrawDoor(o, style) {
+    const { x, y, w, h } = o;
+    const dx = x + w / 2 - 18;
+    const dy = y + h - 49;
+
+    c.save();
+    rect(dx - 5, dy - 5, 46, 55, "#252722");
+    rect(dx - 3, dy - 3, 42, 52, style.trim);
+    rect(dx, dy, 36, 49, style.door);
+    rect(dx + 3, dy + 3, 30, 43, "#251f1a66");
+    rect(dx + 5, dy + 5, 26, 37, style.door);
+
+    for (let px = dx + 9; px < dx + 29; px += 7) {
+      rect(px, dy + 7, 1, 33, "#1c211f66");
+      rect(px + 1, dy + 7, 1, 33, "#e1c18a30");
+    }
+    rect(dx + 5, dy + 21, 26, 2, style.trim);
+    rect(dx + 5, dy + 42, 26, 2, "#211e1b");
+    rect(dx + 28, dy + 25, 3, 3, "#d5b56d");
+    rect(dx + 29, dy + 26, 1, 1, "#fff0b0");
+
+    // Degrau e cobertura curta, com cores próprias de cada residência.
+    rect(dx - 7, dy - 9, 50, 5, "#242b29");
+    rect(dx - 5, dy - 8, 46, 2, style.trim);
+    rect(dx - 4, y + h + 1, 44, 5, "#494337");
+    rect(dx - 2, y + h + 1, 40, 1, style.trim);
+    c.restore();
+  }
+
+  function v08840DrawHouseVariation(o) {
+    if (!["house", "neighborHouse", "oldHouse", "building"].includes(o.type)) return;
+
+    const style = v08840HouseStyle(o);
+    if (!style) return;
+
+    v08840DrawWallPattern(o, style);
+    v08840DrawRoof(o, style);
+
+    const nightWindow =
+      !!state &&
+      state.stage !== "prologue" &&
+      (state.minutes < 420 || state.minutes >= 1080);
+
+    for (const wx of [o.x + 24, o.x + o.w - 51]) {
+      const lit = nightWindow && hash(wx + o.x, o.y + o.h) > 0.36;
+      v088DrawWindow(wx, o.y, lit, o.type === "oldHouse");
+      v08840DrawWindowTreatment(wx, o.y, style);
+    }
+
+    v08840DrawDoor(o, style);
+
+    // Varanda estreita para a casa principal; não cria objetos ou colisões.
+    if (o.type === "house") {
+      const dx = o.x + o.w / 2 - 27;
+      const dy = o.y + o.h + 7;
+      rect(dx, dy, 54, 3, "#34362f");
+      rect(dx + 2, dy, 50, 1, "#c5ae7d");
+      rect(dx + 4, dy + 3, 3, 10, "#514536");
+      rect(dx + 47, dy + 3, 3, 10, "#514536");
+    }
+
+    // Placa pequena e distinta da casa vizinha, sem texto de missão.
+    if (o.type === "neighborHouse") {
+      rect(o.x + o.w / 2 - 14, o.y + o.h - 68, 28, 12, "#302f29");
+      rect(o.x + o.w / 2 - 12, o.y + o.h - 66, 24, 8, "#c3ad80");
+      rect(o.x + o.w / 2 - 9, o.y + o.h - 63, 18, 1, "#5a4e3c");
+    }
+
+    if (o.type === "oldHouse") {
+      // Tábuas pregadas e pequenas marcas de deterioração.
+      rect(o.x + 15, o.y + 116, 24, 3, "#3b3028");
+      rect(o.x + 17, o.y + 114, 2, 7, "#8e714d");
+      rect(o.x + o.w - 43, o.y + 119, 27, 2, "#302a24");
+    }
+  }
+
+  // Mantém o desenho-base e acrescenta uma identidade própria em cada lote.
+  const v08840BuildingBase = building;
+  building = function(o) {
+    v08840BuildingBase(o);
+    v08840DrawHouseVariation(o);
+  };
+
+  // O prompt contextual não deve ficar por cima de uma caixa de diálogo,
+  // de uma escolha narrativa ou de um modal. A interação continua intacta:
+  // ao fechar a conversa, o aviso volta a aparecer se o jogador estiver perto.
+  const v08840UpdateBase = update;
+  update = function(dt) {
+    v08840UpdateBase(dt);
+
+    const promptEl = $("prompt");
+    const dialogEl = $("dialog");
+    const choiceEl = $("choiceScene");
+    const overlayEl = $("overlay");
+
+    if (
+      dialog ||
+      (dialogEl && !dialogEl.hidden) ||
+      (choiceEl && !choiceEl.hidden) ||
+      (overlayEl && !overlayEl.hidden) ||
+      transitionBusy
+    ) {
+      promptEl.hidden = true;
+    }
+  };
+
+  // =========================================================
+  // FIM DO PASSE VISUAL 0.8.40
+  // =========================================================
+
+  $("version").textContent = "PROTÓTIPO · 0.8.40";
   
   requestAnimationFrame(frame);
   showBootSplash();
