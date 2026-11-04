@@ -6922,18 +6922,7 @@ if (!maps.living.objects.some(o => o.action === "key")) {
   });
 }
 
-// Bilhete perto da entrada com a dica da chave.
-if (!maps.foyer.objects.some(o => o.action === "keyNote")) {
-  maps.foyer.objects.push({
-    x: housePoint(500),
-    y: housePoint(255),
-    w: housePoint(55),
-    h: housePoint(28),
-    type: "table",
-    label: "Ler a anotação",
-    action: "keyNote"
-  });
-}
+// 0.8.41 — o objeto físico da anotação foi removido da entrada.
 
 // O primeiro baú do sótão deixa de conter a chave.
 // O segundo móvel vira o baú da câmera.
@@ -7640,13 +7629,6 @@ interact = function (action) {
       }
     );
 
-    return;
-  }
-
-  if (action === "keyNote") {
-    say([
-      "A reserva ficou onde o tempo parou."
-    ]);
     return;
   }
 
@@ -11549,20 +11531,33 @@ function v0646DrawOldRoad() {
   }
   rect(525, 756, 325, 5, "#6b5844");
 
-  // Árvores emoldurando o caminho, sem fechar a estrada.
-  for (let i = 0; i < 34; i++) {
+  // Floresta de borda: árvores variadas, mantendo livres a estrada
+  // vertical e o braço de acesso à casa de Raimundo.
+  for (let i = 0; i < 44; i++) {
     const side = i % 2 === 0 ? 1 : -1;
-    const y = 70 + i * 31;
+    const y = 48 + i * 25;
     const baseX =
       side < 0
-        ? 270 + hash(i, 33) * 110
-        : 640 + hash(i, 44) * 120;
+        ? 255 + hash(i, 33) * 125
+        : 645 + hash(i, 44) * 145;
 
-    if (y > 760 && baseX > 520) continue;
+    if (side > 0 && y > 675) continue;
+    v08841DrawForestTree(
+      baseX,
+      y,
+      (i * 3 + Math.floor(hash(i, 8) * 5)) % 6,
+      0.78 + hash(i + 5, 18) * 0.38
+    );
+  }
 
-    rect(baseX, y, 8, 35, "#493c31");
-    rect(baseX - 20, y - 24, 48, 35, "#1e352b");
-    rect(baseX - 13, y - 34, 34, 31, "#2c4a38");
+  // Novas árvores preenchem os espaços vazios junto à curva e à
+  // propriedade de Raimundo. A trilha e a área de circulação ficam livres.
+  for (const tree of V08841_OLD_ROAD_GROVE) {
+    v08841DrawForestTree(tree.x, tree.y, tree.kind, tree.scale);
+  }
+
+  for (const patch of V08841_OLD_ROAD_UNDERGROWTH) {
+    v08841DrawForestUnderGrowth(patch.x, patch.y, patch.kind, patch.scale);
   }
 
   // Casa isolada. O gatilho da mina tem desenho próprio.
@@ -39574,7 +39569,298 @@ v0826ParentsLeaveTransition =
   // FIM DO PASSE VISUAL 0.8.40
   // =========================================================
 
-  $("version").textContent = "PROTÓTIPO · 0.8.40";
+
+  // =========================================================
+  // 0.8.41 — FLORESTA DA ESTRADA + ENTRADA DO PORÃO
+  // Somente arte ambiental. Sem sprites, colisões ou mudanças de rota.
+  // =========================================================
+
+  const V08841_OLD_ROAD_GROVE = [
+    { x: 72,  y: 390,  kind: 0, scale: 1.05 },
+    { x: 108, y: 625,  kind: 2, scale: 0.92 },
+    { x: 65,  y: 930,  kind: 3, scale: 1.14 },
+    { x: 185, y: 1080, kind: 1, scale: 1.16 },
+    { x: 345, y: 735,  kind: 4, scale: 0.98 },
+    { x: 365, y: 880,  kind: 0, scale: 1.10 },
+    { x: 300, y: 1035, kind: 2, scale: 1.17 },
+    { x: 380, y: 1130, kind: 5, scale: 1.02 },
+    { x: 555, y: 690,  kind: 1, scale: 0.82 },
+    { x: 842, y: 665,  kind: 0, scale: 0.94 },
+    { x: 880, y: 755,  kind: 2, scale: 0.98 },
+    { x: 875, y: 850,  kind: 1, scale: 1.14 },
+    { x: 892, y: 980,  kind: 3, scale: 1.20 },
+    { x: 832, y: 1060, kind: 0, scale: 1.05 },
+    { x: 935, y: 1120, kind: 4, scale: 1.16 },
+    { x: 690, y: 1085, kind: 5, scale: 1.03 },
+    { x: 520, y: 1065, kind: 2, scale: 1.03 },
+    { x: 245, y: 650,  kind: 5, scale: 0.88 },
+    { x: 910, y: 535,  kind: 3, scale: 0.91 },
+    { x: 780, y: 1135, kind: 1, scale: 1.12 },
+    { x: 55,  y: 1120, kind: 4, scale: 1.02 },
+    { x: 355, y: 575,  kind: 0, scale: 0.88 },
+    { x: 850, y: 570,  kind: 2, scale: 0.90 }
+  ];
+
+  const V08841_OLD_ROAD_UNDERGROWTH = [
+    { x: 55,  y: 520, kind: 0, scale: 1.0 },
+    { x: 185, y: 710, kind: 1, scale: 1.1 },
+    { x: 335, y: 980, kind: 2, scale: 0.9 },
+    { x: 490, y: 925, kind: 0, scale: 0.9 },
+    { x: 850, y: 740, kind: 2, scale: 1.0 },
+    { x: 910, y: 1035, kind: 1, scale: 1.2 },
+    { x: 730, y: 1070, kind: 0, scale: 1.1 },
+    { x: 90,  y: 1040, kind: 2, scale: 1.0 }
+  ];
+
+  function v08841DrawForestUnderGrowth(x, y, kind = 0, scale = 1) {
+    c.save();
+    c.globalAlpha = 0.88;
+
+    const palettes = [
+      ["#1d3428", "#294632", "#49633d"],
+      ["#253a2d", "#3b5238", "#64724a"],
+      ["#29372d", "#40513a", "#6c6849"]
+    ];
+    const colors = palettes[Math.abs(kind) % palettes.length];
+
+    c.fillStyle = "#10171155";
+    c.beginPath();
+    c.ellipse(x + 2, y + 7, 24 * scale, 7 * scale, 0, 0, Math.PI * 2);
+    c.fill();
+
+    const clusters = [
+      [-16, 0, 18, 12],
+      [-7, -5, 20, 15],
+      [8, 0, 19, 12],
+      [0, 4, 23, 10]
+    ];
+    for (let i = 0; i < clusters.length; i++) {
+      const [dx, dy, w, h] = clusters[i];
+      rect(x + dx * scale, y + dy * scale, w * scale, h * scale, colors[i % 3]);
+      rect(x + (dx + 3) * scale, y + (dy + 2) * scale, 5 * scale, 2 * scale, "#8b98604a");
+    }
+
+    for (let i = 0; i < 5; i++) {
+      const px = x - 13 * scale + i * 6 * scale;
+      rect(px, y - 4 * scale - (i % 2) * 3 * scale, 2 * scale, 3 * scale, colors[(i + 1) % 3]);
+    }
+    c.restore();
+  }
+
+  function v08841DrawForestTree(x, y, kind = 0, scale = 1) {
+    const s = Math.max(0.65, Math.min(1.45, scale));
+    const top = y - 55 * s;
+
+    c.save();
+
+    // Sombra no chão para assentar a copa no cenário.
+    c.fillStyle = "rgba(8,13,10,0.36)";
+    c.beginPath();
+    c.ellipse(x + 5 * s, y + 5 * s, 28 * s, 9 * s, 0, 0, Math.PI * 2);
+    c.fill();
+
+    if (kind === 0) {
+      // Carvalho largo, com copa em vários planos.
+      rect(x - 4 * s, y - 25 * s, 8 * s, 39 * s, "#493a2d");
+      rect(x - 2 * s, y - 24 * s, 3 * s, 33 * s, "#8a6c48");
+      rect(x - 1 * s, y - 31 * s, 3 * s, 12 * s, "#493a2d");
+      const blobs = [
+        [-29, -44, 28, 25], [-13, -56, 31, 27],
+        [9, -50, 27, 27], [22, -37, 23, 24],
+        [-21, -25, 34, 24], [2, -27, 37, 26],
+        [-4, -43, 36, 28]
+      ];
+      const shades = ["#203c2c", "#2c4b34", "#36583b", "#496443", "#1b3327"];
+      for (let i = 0; i < blobs.length; i++) {
+        const [dx, dy, w, h] = blobs[i];
+        rect(x + dx * s, y + dy * s, w * s, h * s, shades[(i + kind) % shades.length]);
+        rect(x + (dx + 5) * s, y + (dy + 4) * s, 7 * s, 3 * s, "#82915b35");
+      }
+    } else if (kind === 1) {
+      // Pinheiro alto, com andares de galhos.
+      rect(x - 3 * s, y - 20 * s, 6 * s, 39 * s, "#493729");
+      rect(x - 1 * s, y - 18 * s, 2 * s, 33 * s, "#96704b");
+      const layers = [
+        [0, -70, 12, 27],
+        [0, -55, 21, 28],
+        [0, -39, 30, 27],
+        [0, -22, 40, 24]
+      ];
+      for (let i = 0; i < layers.length; i++) {
+        const [cx, cy, half, height] = layers[i];
+        c.fillStyle = ["#254231", "#2e5038", "#3d6041", "#1c372b"][i];
+        c.beginPath();
+        c.moveTo(x + cx * s, y + cy * s);
+        c.lineTo(x - half * s, y + (cy + height) * s);
+        c.lineTo(x + half * s, y + (cy + height) * s);
+        c.closePath();
+        c.fill();
+        rect(x - half * 0.45 * s, y + (cy + height * 0.62) * s, half * 0.9 * s, 2 * s, "#8a9b6040");
+      }
+      rect(x - 1 * s, y - 71 * s, 2 * s, 9 * s, "#9ca16c");
+    } else if (kind === 2) {
+      // Bétula de tronco claro e copa verde-oliva.
+      rect(x - 3 * s, y - 12 * s, 7 * s, 30 * s, "#a9a187");
+      rect(x - 1 * s, y - 12 * s, 2 * s, 26 * s, "#d0c4a2");
+      for (let i = 0; i < 5; i++) {
+        const by = y - 8 * s + i * 9 * s;
+        rect(x - 4 * s, by, 7 * s, 2 * s, "#46443b");
+      }
+      const blobs = [
+        [-22, -43, 27, 23], [-8, -57, 28, 25],
+        [12, -46, 25, 24], [-13, -27, 35, 22],
+        [6, -29, 29, 22]
+      ];
+      for (let i = 0; i < blobs.length; i++) {
+        const [dx, dy, w, h] = blobs[i];
+        rect(x + dx * s, y + dy * s, w * s, h * s, ["#354b35", "#4c603d", "#647048", "#293f30"][i % 4]);
+        rect(x + (dx + 5) * s, y + (dy + 4) * s, 7 * s, 3 * s, "#c1b47a38");
+      }
+    } else if (kind === 3) {
+      // Salgueiro de copa larga e ramos pendentes.
+      rect(x - 4 * s, y - 19 * s, 8 * s, 39 * s, "#59432e");
+      rect(x - 1 * s, y - 17 * s, 3 * s, 33 * s, "#9a7950");
+      const canopy = [
+        [-31, -48, 34, 27], [-16, -59, 34, 30],
+        [7, -54, 33, 30], [23, -39, 26, 27],
+        [-20, -30, 43, 25], [4, -32, 38, 25]
+      ];
+      for (let i = 0; i < canopy.length; i++) {
+        const [dx, dy, w, h] = canopy[i];
+        rect(x + dx * s, y + dy * s, w * s, h * s, ["#263f2d", "#355339", "#456744"][i % 3]);
+      }
+      for (let i = 0; i < 7; i++) {
+        const side = i % 2 ? 1 : -1;
+        const px = x + side * (18 + (i % 3) * 6) * s;
+        const py = y - (26 - (i % 4) * 3) * s;
+        rect(px, py, 2 * s, (18 + (i % 3) * 4) * s, "#3e5d3b");
+        rect(px + side * 2 * s, py + 9 * s, 2 * s, 7 * s, "#66804a");
+      }
+    } else if (kind === 4) {
+      // Árvore morta, torta, para reforçar o clima de Forgotten.
+      c.strokeStyle = "#4b3a2d";
+      c.lineWidth = 7 * s;
+      c.beginPath();
+      c.moveTo(x, y + 15 * s);
+      c.lineTo(x - 2 * s, y - 17 * s);
+      c.lineTo(x + 5 * s, y - 41 * s);
+      c.moveTo(x - 1 * s, y - 18 * s);
+      c.lineTo(x - 20 * s, y - 34 * s);
+      c.lineTo(x - 28 * s, y - 48 * s);
+      c.moveTo(x + 3 * s, y - 28 * s);
+      c.lineTo(x + 21 * s, y - 42 * s);
+      c.lineTo(x + 30 * s, y - 57 * s);
+      c.moveTo(x - 16 * s, y - 31 * s);
+      c.lineTo(x - 12 * s, y - 48 * s);
+      c.stroke();
+      c.strokeStyle = "#91704b";
+      c.lineWidth = 2 * s;
+      c.beginPath();
+      c.moveTo(x - 1 * s, y - 12 * s);
+      c.lineTo(x + 4 * s, y - 39 * s);
+      c.moveTo(x - 14 * s, y - 29 * s);
+      c.lineTo(x - 26 * s, y - 46 * s);
+      c.stroke();
+      for (let i = 0; i < 5; i++) {
+        rect(x + (-24 + i * 12) * s, y + (-47 + (i % 3) * 8) * s, 4 * s, 2 * s, "#6c6244");
+      }
+    } else {
+      // Cipreste alto, fino e irregular.
+      rect(x - 3 * s, y - 9 * s, 6 * s, 31 * s, "#44372b");
+      for (let i = 0; i < 8; i++) {
+        const width = (11 + i * 3.8) * s;
+        const cy = y - (68 - i * 7) * s;
+        rect(x - width * 0.5, cy, width, (15 + (i % 2) * 3) * s, i % 2 ? "#2b4935" : "#203d2d");
+        rect(x - width * 0.31, cy + 2 * s, width * 0.62, 3 * s, "#69805244");
+      }
+    }
+
+    // Musgo e folhas junto à raiz.
+    rect(x - 12 * s, y + 10 * s, 9 * s, 3 * s, "#3b5738");
+    rect(x + 5 * s, y + 12 * s, 10 * s, 3 * s, "#2b482f");
+    rect(x - 2 * s, y + 16 * s, 5 * s, 2 * s, "#7c8050");
+    c.restore();
+  }
+
+  function v08841DrawBasementEntrance(o) {
+    const { x, y, w, h } = o;
+    c.save();
+
+    // Sombra e solo revolvido ao redor da escada.
+    rect(x - 4, y + 29, w + 8, 12, "#17191435");
+    rect(x + 2, y + 8, w - 4, h - 8, "#292b26");
+    rect(x + 5, y + 10, w - 10, h - 12, "#7a705d");
+    rect(x + 8, y + 12, w - 16, h - 15, "#3c403b");
+
+    // Pedras laterais da mureta, desenhadas em blocos irregulares.
+    const stones = [
+      [4, 12, 12, 7], [18, 10, 14, 6], [34, 10, 15, 6], [51, 12, 13, 7],
+      [4, 22, 10, 8], [4, 32, 13, 7], [55, 23, 11, 8], [53, 33, 14, 7]
+    ];
+    for (let i = 0; i < stones.length; i++) {
+      const [dx, dy, sw, sh] = stones[i];
+      rect(x + dx, y + dy, sw, sh, i % 2 ? "#777363" : "#625f52");
+      rect(x + dx + 1, y + dy + 1, Math.max(2, sw - 3), 1, "#b0a18266");
+      rect(x + dx + 2, y + dy + sh - 2, Math.max(2, sw - 4), 1, "#292d29");
+    }
+
+    // Vão em profundidade e três degraus que conduzem à porta.
+    rect(x + 13, y + 15, w - 26, h - 17, "#171918");
+    rect(x + 16, y + 17, w - 32, h - 20, "#0c1010");
+    for (let i = 0; i < 3; i++) {
+      const sy = y + 19 + i * 5;
+      rect(x + 17 + i, sy, w - 34 - i * 2, 3, ["#726a57", "#5c5548", "#47443c"][i]);
+      rect(x + 19 + i, sy + 1, w - 38 - i * 2, 1, "#b7a58455");
+    }
+
+    // Porta dupla de madeira no fundo da entrada.
+    const doorY = y + h - 17;
+    rect(x + 20, doorY - 2, w - 40, 13, "#242622");
+    rect(x + 21, doorY, (w - 42) / 2 - 1, 10, "#594431");
+    rect(x + 22, doorY + 1, (w - 44) / 2 - 2, 8, "#76583b");
+    rect(x + w / 2 + 1, doorY, (w - 42) / 2 - 1, 10, "#513d2e");
+    rect(x + w / 2 + 2, doorY + 1, (w - 44) / 2 - 2, 8, "#6b5037");
+
+    // Tábuas, travessas, dobradiças e puxador de ferro.
+    for (let px = x + 25; px < x + w - 24; px += 7) {
+      rect(px, doorY + 1, 1, 8, "#302920");
+      rect(px + 1, doorY + 2, 1, 5, "#ae8757");
+    }
+    rect(x + 22, doorY + 3, w - 44, 2, "#322d27");
+    rect(x + 22, doorY + 7, w - 44, 2, "#302920");
+    rect(x + 25, doorY + 3, 3, 2, "#b1a17b");
+    rect(x + w - 28, doorY + 3, 3, 2, "#b1a17b");
+    rect(x + w / 2 - 2, doorY + 4, 4, 3, "#b9a16d");
+    rect(x + w / 2 - 1, doorY + 5, 2, 2, "#282824");
+
+    // Ferragens externas e pequenas rachaduras no reboco.
+    rect(x + 8, y + 19, 3, 14, "#393b35");
+    rect(x + w - 11, y + 19, 3, 14, "#393b35");
+    rect(x + 10, y + 21, 1, 9, "#c2ad8066");
+    rect(x + w - 10, y + 21, 1, 9, "#c2ad8066");
+    rect(x + 2, y + h - 4, w - 4, 2, "#393d36");
+
+    // Folhas e mato baixo nas bordas, longe da área de interação central.
+    rect(x + 2, y + 5, 3, 5, "#3e5938");
+    rect(x + 6, y + 4, 4, 3, "#647447");
+    rect(x + w - 8, y + 6, 4, 4, "#3f5939");
+    rect(x + w - 5, y + 4, 3, 3, "#6b7546");
+    c.restore();
+  }
+
+  const v08841BuildingBase = building;
+  building = function(o) {
+    v08841BuildingBase(o);
+    if (o?.type === "yardBasement") {
+      v08841DrawBasementEntrance(o);
+    }
+  };
+
+  // =========================================================
+  // FIM DO PASSE AMBIENTAL 0.8.41
+  // =========================================================
+
+  $("version").textContent = "PROTÓTIPO · 0.8.41";
   
   requestAnimationFrame(frame);
   showBootSplash();
