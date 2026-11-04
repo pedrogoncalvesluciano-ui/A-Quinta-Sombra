@@ -40681,8 +40681,113 @@ v0826ParentsLeaveTransition =
   // FIM DO PASSE 0.8.42
   // =========================================================
 
-  // 0.8.45 — detalhes de asfalto/terra com coordenadas estáveis do mapa.
-  $("version").textContent = "PROTÓTIPO · 0.8.45";
+  // 0.8.46 — papéis e pistas visuais espalhados pelos cômodos.
+  // São desenhos de cenário: não alteram colisões, diálogos ou progressão.
+  function v08846DrawPaperClue(x, y, w, h, variant = "scribble", angle = 0) {
+    c.save();
+    c.translate(housePoint(x), housePoint(y));
+    c.rotate(angle);
+    const scale = HOUSE_SCALE;
+    c.scale(scale, scale);
+
+    // Sombra curta para destacar a folha do piso.
+    rect(2, 3, w, h, "rgba(0,0,0,0.28)");
+    rect(0, 0, w, h, "#b9ad91");
+    rect(1, 1, w - 2, h - 2, "#d8ceb3");
+    rect(3, 2, w - 6, 1, "#eee4c8");
+    // Canto dobrado.
+    rect(w - 6, 0, 6, 6, "#a99b7e");
+    rect(w - 5, 1, 4, 1, "#e8ddc0");
+
+    if (variant === "supplies") {
+      txt("MANTIMENTOS", 4, 7, "#51483b", 4);
+      rect(4, 10, w - 9, 1, "#8a806c");
+      const rows = Math.max(3, Math.floor((h - 13) / 4));
+      for (let i = 0; i < rows; i++) {
+        const yy = 13 + i * 4;
+        rect(4, yy, 3, 3, "#756b59");
+        if (i === 0 || i === 2) {
+          c.strokeStyle = "#665b4c";
+          c.lineWidth = 0.8;
+          c.beginPath();
+          c.moveTo(4.5, yy + 1.5);
+          c.lineTo(5.5, yy + 2.5);
+          c.lineTo(7.5, yy - 0.5);
+          c.stroke();
+        }
+        const length = 8 + ((i * 7 + 5) % Math.max(9, w - 17));
+        rect(10, yy + 1, Math.min(w - 15, length), 1, "#8b806b");
+      }
+      rect(4, h - 5, w * 0.42, 1, "#9a8b72");
+      rect(w - 13, h - 5, 8, 1, "#9a8b72");
+    } else {
+      // Linhas irregulares simulam escrita à mão sem texto legível.
+      const rows = Math.max(3, Math.floor((h - 7) / 4));
+      for (let i = 0; i < rows; i++) {
+        const yy = 5 + i * 4;
+        const length = 5 + ((i * 11 + Math.round(x)) % Math.max(7, w - 10));
+        rect(4, yy, Math.min(w - 8, length), 1, i % 3 === 0 ? "#817763" : "#9a8f79");
+        if (i === 1 || i === 4) {
+          rect(5 + (i * 3) % Math.max(4, w - 12), yy + 1, 2, 1, "#786d5a");
+        }
+      }
+      if (variant === "marked") {
+        rect(w - 9, h - 7, 4, 1, "#746956");
+        rect(w - 7, h - 9, 1, 4, "#746956");
+      }
+    }
+    c.restore();
+  }
+
+  function v08846DrawRoomClues() {
+    if (!state || !["bedroom","brother","parents","hall","foyer","kitchen","living","attic"].includes(state.room)) return;
+
+    const clues = {
+      parents: [
+        [334, 238, 46, 34, "supplies", -0.08],
+        [430, 218, 25, 18, "marked", 0.12]
+      ],
+      bedroom: [
+        [354, 278, 25, 18, "scribble", 0.16]
+      ],
+      brother: [
+        [205, 250, 24, 18, "scribble", -0.11]
+      ],
+      hall: [
+        [205, 235, 23, 17, "scribble", 0.07]
+      ],
+      foyer: [
+        [338, 285, 25, 18, "marked", -0.14]
+      ],
+      kitchen: [
+        [375, 285, 30, 21, "scribble", 0.09]
+      ],
+      living: [
+        [205, 285, 28, 20, "marked", -0.06]
+      ],
+      attic: [
+        [285, 245, 31, 22, "scribble", 0.13],
+        [465, 270, 22, 16, "scribble", -0.09]
+      ]
+    };
+
+    for (const clue of clues[state.room] || []) {
+      v08846DrawPaperClue(...clue);
+    }
+  }
+
+  const v08846DrawWorldBase = drawWorld;
+  drawWorld = function() {
+    v08846DrawWorldBase();
+    if (!state || mode !== "game") return;
+    c.save();
+    c.translate(-Math.floor(camera.x), -Math.floor(camera.y));
+    v08846DrawRoomClues();
+    c.restore();
+  };
+
+  // 0.8.46 — pistas de papel e lista de mantimentos nos interiores.
+  $("version").textContent = "PROTÓTIPO · 0.8.46";
   
   requestAnimationFrame(frame);
   showBootSplash();
