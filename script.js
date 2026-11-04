@@ -40933,8 +40933,180 @@ v0826ParentsLeaveTransition =
     c.restore();
   };
 
-  // 0.8.47 — van redesenhada e animação de chegada/estacionamento.
-  $("version").textContent = "PROTÓTIPO · 0.8.47";
+
+  // =========================================================
+  // 0.8.48 — CASA DA FLORINDA, PISTAS AGRUPADAS E ÁRVORES VARIADAS
+  // Preserva os seis desenhos de árvores já existentes na estrada.
+  // =========================================================
+
+  // A vegetação do bairro também passa a usar as seis espécies
+  // procedurais já presentes na estrada: carvalho, pinheiro, bétula,
+  // salgueiro, árvore morta e cipreste.
+  v08842DrawVillageTree = function(x, y) {
+    const sx = Math.round(x);
+    const sy = Math.round(y);
+    const kind = Math.min(5, Math.floor(hash(sx + 173, sy + 411) * 6));
+    const scale = 0.84 + hash(sx + 271, sy + 509) * 0.30;
+    v08841DrawForestTree(x, y + 32, kind, scale);
+  };
+
+  // Os papéis deixam de aparecer espalhados pelos outros cômodos.
+  // Três folhas ficam agrupadas no chão do quarto dos pais,
+  // ocupando a área dos antigos quadrados claros.
+  v08846DrawRoomClues = function() {
+    if (!state || state.room !== "parents") return;
+
+    const clues = [
+      [334, 238, 46, 34, "supplies", -0.08],
+      [390, 242, 30, 22, "scribble", 0.06],
+      [438, 220, 25, 18, "marked", -0.10]
+    ];
+
+    for (const clue of clues) {
+      v08846DrawPaperClue(...clue);
+    }
+  };
+
+  // Reorganiza o interior da Florinda sem alterar a porta,
+  // a posição da personagem ou a ação de conversar com ela.
+  if (maps.shop) {
+    maps.shop.objects = [
+      // Balcão de atendimento — mantém a interação com Florinda.
+      obj(255, 95, 205, 62, "counter", "Falar com a vizinha", "vendor"),
+
+      // Sala: televisão e sofá, com espaço livre entre eles.
+      obj(78, 145, 78, 48, "tv"),
+      obj(65, 205, 130, 62, "sofa"),
+      obj(55, 282, 155, 55, "rug"),
+
+      // Mesa de refeições, afastada do corredor de entrada.
+      obj(215, 190, 92, 54, "table"),
+
+      // Quarto: cama no canto superior direito.
+      obj(470, 78, 112, 105, "bed"),
+
+      // Cozinha: bancada, pia, fogão e geladeira lado a lado.
+      obj(320, 188, 125, 42, "kitchenCounter"),
+      obj(320, 240, 70, 48, "sink"),
+      obj(400, 240, 60, 58, "stove"),
+      obj(520, 205, 58, 88, "fridge")
+    ];
+  }
+
+  // Retira a passadeira antiga que atravessava o centro da casa.
+  // O novo tapete é um objeto próprio, com colisão desativada.
+  const v08848FlorindaInteriorBase = v08842DrawFlorindaInteriorDetails;
+  v08842DrawFlorindaInteriorDetails = function() {
+    v08848FlorindaInteriorBase();
+
+    rect(220, 285, 200, 64, "#61503d");
+    for (let py = 293; py < 347; py += 17) {
+      rect(222, py, 196, 1, "#3f342b");
+      rect(222, py + 1, 196, 1, "#92785635");
+    }
+  };
+
+  // Detalhamento dos móveis novos. As próprias dimensões de cada
+  // objeto também são usadas pelo sistema de colisão do cenário.
+  const v08848FurnishingBase = furnishing;
+  furnishing = function(o) {
+    v08848FurnishingBase(o);
+    if (!o || state?.room !== "shop") return;
+
+    const { x, y, w, h, type } = o;
+
+    if (type === "bed") {
+      // Cabeceira, travesseiros e colcha.
+      rect(x + 2, y + 2, w - 4, 9, "#49372b");
+      rect(x + 5, y + 11, w - 10, h - 16, "#a99a78");
+      rect(x + 9, y + 15, w - 18, 20, "#ded3b6");
+      rect(x + 12, y + 18, w * 0.30, 13, "#eee5ce");
+      rect(x + w * 0.56, y + 18, w * 0.30, 13, "#eee5ce");
+      rect(x + 8, y + 39, w - 16, h - 48, "#78877a");
+      rect(x + 8, y + 39, w - 16, 3, "#a7a88c");
+      rect(x + 12, y + 45, w - 24, 1, "#d3c9a64a");
+      rect(x + 12, y + h - 13, w - 24, 2, "#52665c");
+      rect(x + 6, y + h - 5, 5, 5, "#433329");
+      rect(x + w - 11, y + h - 5, 5, 5, "#433329");
+    } else if (type === "sofa") {
+      rect(x + 3, y + 7, w - 6, h - 11, "#57463a");
+      rect(x + 8, y + 10, w - 16, 18, "#9a8063");
+      rect(x + 10, y + 31, w - 20, h - 39, "#6e7d70");
+      rect(x + 12, y + 33, w * 0.38, h - 43, "#8c9a83");
+      rect(x + w * 0.55, y + 33, w * 0.34, h - 43, "#788a79");
+      rect(x + 3, y + 9, 8, h - 16, "#8e735a");
+      rect(x + w - 11, y + 9, 8, h - 16, "#8e735a");
+      rect(x + 8, y + h - 5, 5, 5, "#382d26");
+      rect(x + w - 13, y + h - 5, 5, 5, "#382d26");
+    } else if (type === "tv") {
+      // Suporte baixo e televisão de tubo, coerente com a época do cenário.
+      rect(x + 2, y + h - 9, w - 4, 7, "#493629");
+      rect(x + 6, y + h - 12, w - 12, 3, "#9b7954");
+      rect(x + 10, y + 2, w - 20, h - 15, "#252a29");
+      rect(x + 13, y + 5, w - 26, h - 21, "#101719");
+      rect(x + 16, y + 8, w - 32, h - 27, "#49605e");
+      rect(x + 18, y + 10, w - 39, 2, "#8fa19666");
+      rect(x + 18, y + 14, w - 37, 1, "#a9b6a244");
+      rect(x + w - 19, y + 10, 3, 3, "#b6a275");
+      rect(x + w - 19, y + 17, 3, 3, "#59665f");
+      rect(x + w * 0.38, y + h - 15, 4, 3, "#352b25");
+      rect(x + w * 0.58, y + h - 15, 4, 3, "#352b25");
+    } else if (type === "kitchenCounter") {
+      rect(x + 2, y + 2, w - 4, 6, "#b28f65");
+      rect(x + 4, y + 8, w - 8, h - 10, "#70543b");
+      rect(x + 7, y + 11, w - 14, h - 17, "#8c6c49");
+      const doors = 3;
+      for (let i = 0; i < doors; i++) {
+        const dx = x + 10 + i * ((w - 28) / doors);
+        rect(dx, y + 13, (w - 32) / doors, h - 23, "#6b5039");
+        rect(dx + 3, y + 17, 2, 2, "#c1a276");
+        rect(dx + 3, y + 23, 2, 2, "#c1a276");
+      }
+      rect(x + 7, y + 9, w - 14, 2, "#d2b18a");
+    } else if (type === "sink") {
+      rect(x + 2, y + 5, w - 4, h - 7, "#72553d");
+      rect(x + 5, y + 8, w - 10, h - 15, "#8e704e");
+      rect(x + 8, y + 9, w - 16, 5, "#c5b99a");
+      rect(x + 13, y + 14, w - 26, h * 0.40, "#4d5c5a");
+      rect(x + 16, y + 16, w - 32, h * 0.28, "#8ba19b");
+      rect(x + w * 0.50 - 2, y + 14, 4, 2, "#303a38");
+      rect(x + w * 0.50 - 1, y + 7, 2, 8, "#777f78");
+      rect(x + w * 0.50 - 7, y + 6, 14, 2, "#777f78");
+      rect(x + 8, y + h - 7, w - 16, 2, "#49382b");
+    } else if (type === "stove") {
+      // Boca do fogão, botões e porta do forno.
+      rect(x + 4, y + 5, w - 8, 5, "#d0c4a8");
+      rect(x + 7, y + 13, w - 14, h - 19, "#4b5150");
+      rect(x + 11, y + 17, w - 22, h - 29, "#252e30");
+      rect(x + 14, y + 20, w - 28, h - 35, "#71817c");
+      rect(x + 11, y + 20, w - 22, 2, "#c7c1a8");
+      for (let i = 0; i < 3; i++) {
+        const bx = x + 12 + i * ((w - 28) / 3);
+        c.fillStyle = "#292d2d";
+        c.beginPath();
+        c.arc(bx + 3, y + 8, 3, 0, Math.PI * 2);
+        c.fill();
+        rect(bx + 2, y + 7, 2, 2, "#b4aa8e");
+      }
+      rect(x + 15, y + h - 10, w - 30, 2, "#c6b99a");
+      rect(x + 18, y + h - 6, w - 36, 2, "#303738");
+    } else if (type === "fridge") {
+      rect(x + 2, y + 3, w - 4, h - 5, "#343c3b");
+      rect(x + 5, y + 5, w - 10, h - 10, "#c0c0aa");
+      rect(x + 7, y + 7, w - 14, h * 0.43, "#d7d6c1");
+      rect(x + 7, y + h * 0.51, w - 14, h * 0.39, "#b7b9a8");
+      rect(x + 7, y + h * 0.49, w - 14, 2, "#727c78");
+      rect(x + w - 13, y + 13, 3, h * 0.23, "#59645f");
+      rect(x + w - 13, y + h * 0.58, 3, h * 0.22, "#59645f");
+      rect(x + 9, y + 9, w - 22, 2, "#f0ecda");
+      rect(x + 10, y + h - 9, w - 20, 2, "#7f8980");
+    }
+  };
+
+  // 0.8.48 — versão e cache.
+  $("version").textContent = "PROTÓTIPO · 0.8.48";
+
+  $("version").textContent = "PROTÓTIPO · 0.8.48";
   
   requestAnimationFrame(frame);
   showBootSplash();
