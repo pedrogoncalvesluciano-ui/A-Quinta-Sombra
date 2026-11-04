@@ -2867,6 +2867,14 @@ function drawCharacterSprite(
       state.facing
     );
 
+    if (state.room === "village") {
+      for (const tree of v08842GetVillageTrees()) {
+        if (v08842ShouldVillageTreeCoverPlayer(tree, state.x, state.y)) {
+          v08842DrawVillageTree(tree.x, tree.y);
+        }
+      }
+    }
+
     if (
       state.stage === "prologue" &&
       state.mother &&
@@ -11533,26 +11541,8 @@ function v0646DrawOldRoad() {
 
   // Floresta de borda: árvores variadas, mantendo livres a estrada
   // vertical e o braço de acesso à casa de Raimundo.
-  for (let i = 0; i < 44; i++) {
-    const side = i % 2 === 0 ? 1 : -1;
-    const y = 48 + i * 25;
-    const baseX =
-      side < 0
-        ? 255 + hash(i, 33) * 125
-        : 645 + hash(i, 44) * 145;
-
-    if (side > 0 && y > 675) continue;
-    v08841DrawForestTree(
-      baseX,
-      y,
-      (i * 3 + Math.floor(hash(i, 8) * 5)) % 6,
-      0.78 + hash(i + 5, 18) * 0.38
-    );
-  }
-
-  // Novas árvores preenchem os espaços vazios junto à curva e à
-  // propriedade de Raimundo. A trilha e a área de circulação ficam livres.
-  for (const tree of V08841_OLD_ROAD_GROVE) {
+  const oldRoadTrees = v08842GetOldRoadTrees();
+  for (const tree of oldRoadTrees) {
     v08841DrawForestTree(tree.x, tree.y, tree.kind, tree.scale);
   }
 
@@ -11615,6 +11605,7 @@ function v0646DrawOldRoad() {
   }
 
   txt("MINA DESATIVADA", mineX + 18, mineY - 10, "#a69b80", 8);
+  v08842DrawMineDetails(mineX, mineY);
 
   // Player.
   person(
@@ -11624,6 +11615,14 @@ function v0646DrawOldRoad() {
     state.walk,
     state.facing
   );
+
+  // Quando Estevão está atrás de uma árvore, a copa é redesenhada
+  // na camada da frente. O tronco continua sólido pela hitbox separada.
+  for (const tree of oldRoadTrees) {
+    if (v08842ShouldTreeCoverPlayer(tree, state.x, state.y)) {
+      v08841DrawForestTree(tree.x, tree.y, tree.kind, tree.scale);
+    }
+  }
 
   c.restore();
 
@@ -19674,6 +19673,12 @@ function v076DrawSquareRoad() {
     state.walk,
     state.facing
   );
+
+  for (const tree of v08842GetSquareRoadTrees()) {
+    if (v08842ShouldVillageTreeCoverPlayer(tree, state.x, state.y)) {
+      v08842DrawVillageTree(tree.x, tree.y);
+    }
+  }
 
   c.restore();
   v0646ApplyOutdoorLight();
@@ -39860,7 +39865,850 @@ v0826ParentsLeaveTransition =
   // FIM DO PASSE AMBIENTAL 0.8.41
   // =========================================================
 
-  $("version").textContent = "PROTÓTIPO · 0.8.41";
+
+  // =========================================================
+  // 0.8.42 — DELEGACIA, INTERIORES, MINA, ÁRVORES E ESTRADAS
+  // Arte ambiental + colisão exclusiva nos troncos.
+  // Sprites existentes, entradas, objetos interativos e progressão preservados.
+  // =========================================================
+
+  // ---------------------------------------------------------
+  // DELEGACIA — FACHADA COM IDENTIDADE INSTITUCIONAL
+  // ---------------------------------------------------------
+
+  function v08842DrawPoliceExterior(o) {
+    const { x, y, w, h } = o;
+    c.save();
+
+    // Faixa de alvenaria azul-acinzentada e base de pedra.
+    rect(x + 5, y + 34, w - 10, 4, "#263944");
+    rect(x + 7, y + h - 17, w - 14, 5, "#344650");
+    rect(x + 9, y + h - 17, w - 18, 1, "#a6b5b0");
+
+    // Placa oficial cobre o letreiro antigo, sem alterar a entrada.
+    rect(x + 32, y + 45, w - 64, 19, "#172832");
+    rect(x + 34, y + 47, w - 68, 15, "#304754");
+    rect(x + 35, y + 47, w - 70, 1, "#a6b4ad");
+    rect(x + 35, y + 61, w - 70, 1, "#121e25");
+    txt("DELEGACIA", x + w / 2 - 31, y + 58, "#e1d8bd", 8);
+
+    // Brasão em escudo, com estrela central.
+    const sx = x + 15;
+    const sy = y + 44;
+    c.fillStyle = "#172832";
+    c.beginPath();
+    c.moveTo(sx + 11, sy);
+    c.lineTo(sx + 21, sy + 4);
+    c.lineTo(sx + 19, sy + 15);
+    c.lineTo(sx + 11, sy + 21);
+    c.lineTo(sx + 3, sy + 15);
+    c.lineTo(sx + 1, sy + 4);
+    c.closePath();
+    c.fill();
+    c.strokeStyle = "#c8b98e";
+    c.lineWidth = 1;
+    c.stroke();
+    rect(sx + 10, sy + 5, 2, 10, "#e3d7b5");
+    rect(sx + 6, sy + 9, 10, 2, "#e3d7b5");
+    rect(sx + 8, sy + 7, 6, 6, "#7b9aa0");
+
+    // Molduras de aço e grades nas janelas.
+    for (const wx of [x + 24, x + w - 51]) {
+      rect(wx - 5, y + 68, 38, 40, "#202e35");
+      rect(wx - 2, y + 71, 32, 33, "#8b9a94");
+      rect(wx + 1, y + 74, 26, 27, "#435c67");
+      rect(wx + 3, y + 75, 22, 24, "#718e94");
+      for (let px = wx + 5; px <= wx + 23; px += 6) {
+        rect(px, y + 74, 2, 28, "#263640");
+        rect(px + 1, y + 74, 1, 28, "#b6c0b1");
+      }
+      rect(wx + 1, y + 86, 26, 2, "#263640");
+      rect(wx - 7, y + 105, 42, 4, "#263740");
+      rect(wx - 5, y + 105, 38, 1, "#b3b9a8");
+    }
+
+    // Pilares discretos, mais pesados que os das casas residenciais.
+    rect(x + 13, y + 62, 7, h - 79, "#303f47");
+    rect(x + 15, y + 63, 2, h - 82, "#87938b");
+    rect(x + w - 20, y + 62, 7, h - 79, "#303f47");
+    rect(x + w - 17, y + 63, 2, h - 82, "#87938b");
+
+    // Bandeira municipal/institucional junto ao telhado.
+    rect(x + w - 28, y - 30, 2, 39, "#3c403c");
+    rect(x + w - 26, y - 29, 25, 13, "#203c4a");
+    rect(x + w - 25, y - 28, 23, 2, "#8b9d9c");
+    rect(x + w - 24, y - 23, 20, 2, "#ad9c72");
+    rect(x + w - 24, y - 18, 20, 1, "#8b9d9c");
+
+    // Escadaria e rampa frontal em alinhamento com a porta original.
+    const center = x + w / 2;
+    rect(center - 37, y + h + 1, 74, 7, "#555b58");
+    rect(center - 33, y + h + 1, 66, 1, "#c2b99c");
+    rect(center - 30, y + h + 8, 60, 5, "#414b4d");
+    rect(center - 27, y + h + 8, 54, 1, "#a6a58f");
+    rect(center - 22, y + h + 13, 44, 3, "#303b3f");
+
+    // Lanternas de parede e pequenas placas de identificação.
+    for (const lx of [x + 40, x + w - 47]) {
+      rect(lx, y + h - 68, 7, 12, "#242f33");
+      rect(lx + 1, y + h - 66, 5, 7, "#d2b878");
+      rect(lx - 2, y + h - 70, 11, 2, "#8c8e7a");
+    }
+
+    // Pequena linha de acabamento ao redor da fachada.
+    rect(x + 7, y + 33, w - 14, 2, "#aab5a8");
+    rect(x + 7, y + 36, w - 14, 1, "#1d2b31");
+    c.restore();
+  }
+
+  const v08842BuildingBase = building;
+  building = function(o) {
+    v08842BuildingBase(o);
+    if (o?.type === "policeStation") {
+      v08842DrawPoliceExterior(o);
+    }
+  };
+
+  // ---------------------------------------------------------
+  // INTERIORES — DELEGACIA E CASA DA FLORINDA
+  // ---------------------------------------------------------
+
+  function v08842DrawPoliceInteriorDetails() {
+    c.save();
+
+    // Piso de ladrilho gasto, diferente do assoalho da casa Lancaster.
+    rect(32, 55, 576, 322, "rgba(47,61,66,0.24)");
+    for (let py = 60, row = 0; py < 376; py += 28, row++) {
+      rect(33, py, 574, 1, "#1b292e");
+      rect(33, py + 1, 574, 1, "#b4b6a31a");
+      const offset = row % 2 ? 18 : 0;
+      for (let px = 34 + offset; px < 605; px += 40) {
+        rect(px, py + 2, 1, 24, "#243136");
+        rect(px + 1, py + 2, 1, 24, "#b6b09a18");
+      }
+    }
+    rect(33, 55, 574, 4, "#3d5059");
+    rect(33, 59, 574, 1, "#9ba69c");
+
+    // Moldura de parede e painel institucional.
+    rect(40, 18, 560, 29, "#303d42");
+    rect(42, 20, 556, 24, "#43545b");
+    rect(43, 20, 554, 1, "#a8b09f");
+    rect(43, 42, 554, 1, "#1c282c");
+
+    // Placa de identificação central.
+    rect(185, 22, 270, 18, "#1b2a31");
+    rect(188, 24, 264, 14, "#53656a");
+    rect(190, 25, 260, 1, "#c2b999");
+    txt("DELEGACIA DE FORGOTTEN", 219, 34, "#e1d7bd", 8);
+
+    // Brasão institucional.
+    rect(169, 23, 12, 15, "#1b2d36");
+    rect(172, 26, 6, 8, "#9aafaa");
+    rect(174, 27, 2, 6, "#2d5360");
+    rect(171, 29, 8, 2, "#d4c59f");
+
+    // Quadro de avisos com folhas, fotos e alfinetes.
+    rect(52, 74, 132, 77, "#342b25");
+    rect(55, 77, 126, 71, "#8b704e");
+    rect(58, 80, 120, 65, "#aa8c63");
+    rect(63, 86, 30, 22, "#d5c8aa");
+    rect(66, 89, 24, 2, "#6a706c");
+    rect(66, 94, 20, 1, "#7b8076");
+    rect(66, 98, 22, 1, "#7b8076");
+    rect(101, 85, 31, 29, "#d9d0b8");
+    rect(104, 88, 25, 23, "#4a5960");
+    rect(107, 91, 19, 17, "#71827b");
+    rect(142, 87, 29, 32, "#d6cbb2");
+    rect(145, 90, 23, 2, "#777a70");
+    rect(145, 95, 21, 1, "#777a70");
+    rect(145, 100, 22, 1, "#777a70");
+    rect(145, 105, 17, 1, "#777a70");
+    rect(75, 118, 83, 2, "#4b3e31");
+    rect(89, 125, 66, 1, "#5b4938");
+    for (const [px, py] of [[65,84],[105,83],[146,84],[169,121]]) {
+      rect(px, py, 3, 3, "#a84f43");
+      rect(px + 1, py + 1, 1, 1, "#ead5b0");
+    }
+    // Linha de barbante entre duas notas.
+    c.strokeStyle = "#8b453b";
+    c.lineWidth = 1;
+    c.beginPath();
+    c.moveTo(79, 103);
+    c.lineTo(116, 99);
+    c.lineTo(153, 111);
+    c.stroke();
+
+    // Relógio de parede.
+    c.fillStyle = "#222d31";
+    c.beginPath();
+    c.arc(552, 34, 15, 0, Math.PI * 2);
+    c.fill();
+    c.fillStyle = "#c8bea1";
+    c.beginPath();
+    c.arc(552, 34, 11, 0, Math.PI * 2);
+    c.fill();
+    rect(551, 26, 2, 8, "#3a4545");
+    rect(552, 33, 7, 2, "#3a4545");
+    rect(550, 23, 4, 2, "#8e8975");
+
+    // Luminária fluorescente no teto.
+    rect(260, 51, 122, 7, "#242d30");
+    rect(265, 52, 112, 3, "#c4c5aa");
+    rect(269, 55, 104, 1, "#7d928f");
+
+    // Armário de arquivo na parede direita, com gavetas numeradas.
+    rect(514, 80, 72, 112, "#26383f");
+    rect(517, 83, 66, 106, "#536268");
+    for (let py = 88, n = 1; py < 183; py += 23, n++) {
+      rect(520, py, 60, 18, "#35484f");
+      rect(522, py + 1, 56, 1, "#98a39a");
+      rect(543, py + 8, 13, 3, "#b5a982");
+      rect(548, py + 9, 3, 1, "#353c3a");
+      txt(String(n).padStart(2, "0"), 526, py + 12, "#d3c8a8", 5);
+    }
+
+    // Faixa de rodapé pintada de azul acinzentado.
+    rect(32, 368, 576, 7, "#36474d");
+    rect(32, 368, 576, 1, "#9ba69d");
+    c.restore();
+  }
+
+  function v08842DrawFlorindaInteriorDetails() {
+    c.save();
+
+    // Parede de casa habitada, em tom creme com acabamento de madeira.
+    rect(32, 18, 576, 31, "#6e624d");
+    rect(35, 20, 570, 25, "#b6a17b");
+    rect(35, 20, 570, 2, "#d7c5a0");
+    rect(35, 43, 570, 2, "#5e4b38");
+    for (let px = 44; px < 600; px += 22) {
+      rect(px, 24, 2, 16, "#876e4e27");
+    }
+
+    // Placa feita à mão.
+    rect(206, 21, 228, 21, "#4c3a2c");
+    rect(209, 23, 222, 17, "#d2bb91");
+    rect(211, 24, 218, 1, "#f1dfb4");
+    txt("CASA DA FLORINDA", 252, 34, "#514332", 8);
+
+    // Parede de madeira até a altura da bancada.
+    rect(35, 51, 570, 18, "#766047");
+    rect(35, 51, 570, 2, "#c0a47b");
+    for (let px = 42; px < 600; px += 34) {
+      rect(px, 54, 2, 13, "#382f25");
+      rect(px + 2, 55, 1, 11, "#c3a67a55");
+    }
+
+    // Fotografia de família e calendário antigo.
+    rect(56, 78, 60, 48, "#4e3b2c");
+    rect(59, 81, 54, 42, "#d4c4a2");
+    rect(62, 84, 48, 36, "#62706a");
+    rect(65, 87, 42, 30, "#78877c");
+    rect(69, 95, 8, 15, "#4b4e46");
+    rect(81, 91, 10, 19, "#3c4543");
+    rect(95, 95, 8, 15, "#555044");
+    rect(132, 77, 38, 49, "#51402f");
+    rect(135, 80, 32, 43, "#dfd4b9");
+    rect(139, 86, 24, 4, "#8d6d50");
+    for (let py = 96; py < 117; py += 6) {
+      rect(139, py, 24, 1, "#8e8b79");
+    }
+    txt("JUN", 145, 104, "#5a5142", 6);
+
+    // Relógio e ervas penduradas.
+    c.fillStyle = "#4b392a";
+    c.beginPath();
+    c.arc(550, 37, 13, 0, Math.PI * 2);
+    c.fill();
+    c.fillStyle = "#e2d2ac";
+    c.beginPath();
+    c.arc(550, 37, 10, 0, Math.PI * 2);
+    c.fill();
+    rect(549, 29, 2, 8, "#4c4337");
+    rect(550, 36, 6, 2, "#4c4337");
+
+    for (let i = 0; i < 3; i++) {
+      const hx = 205 + i * 25;
+      rect(hx, 49, 2, 11, "#53452f");
+      rect(hx - 5, 58, 12, 3, "#5a7143");
+      rect(hx - 3, 61, 3, 7, "#62784b");
+      rect(hx + 2, 61, 3, 6, "#8b975a");
+    }
+
+    // Piso com passadeira central, sem alterar a área de circulação.
+    rect(32, 55, 576, 322, "rgba(143,113,75,0.08)");
+    for (let py = 70; py < 370; py += 34) {
+      rect(34, py, 572, 1, "#3e30234b");
+      rect(34, py + 1, 572, 1, "#d1b48a20");
+    }
+    rect(220, 285, 200, 64, "#65533e");
+    rect(224, 289, 192, 56, "#a18a63");
+    for (let px = 230; px < 410; px += 12) {
+      rect(px, 291, 2, 52, "#55453455");
+    }
+    rect(229, 295, 182, 1, "#d1bd9677");
+    rect(229, 339, 182, 1, "#51432f");
+
+    c.restore();
+  }
+
+  const v08842GenericInteriorBase = v088DrawGenericInteriorDetails;
+  v088DrawGenericInteriorDetails = function(roomId) {
+    v08842GenericInteriorBase(roomId);
+
+    if (roomId === "police") {
+      v08842DrawPoliceInteriorDetails();
+    } else if (roomId === "shop") {
+      v08842DrawFlorindaInteriorDetails();
+    }
+  };
+
+  // Pequenos objetos visuais apoiados nos móveis existentes.
+  // Nenhuma peça é adicionada à lista de colisão ou de interações.
+  const v08842FurnishingBase = furnishing;
+  furnishing = function(o) {
+    v08842FurnishingBase(o);
+    if (!o || !state) return;
+
+    const { x, y, w, h, type } = o;
+
+    if (state.room === "police") {
+      if (type === "counter") {
+        // Monitor, rádio, teclado, telefone e documentos.
+        rect(x + 18, y + 6, 34, 22, "#202b30");
+        rect(x + 21, y + 8, 28, 17, "#536c72");
+        rect(x + 23, y + 10, 24, 12, "#273a40");
+        rect(x + 26, y + 13, 18, 1, "#8a9c94");
+        rect(x + 26, y + 16, 13, 1, "#8a9c94");
+        rect(x + 31, y + 28, 8, 3, "#3a4547");
+        rect(x + 25, y + 31, 20, 2, "#252d30");
+
+        rect(x + 61, y + 11, 19, 8, "#2d3638");
+        rect(x + 64, y + 13, 13, 3, "#71877f");
+        rect(x + 64, y + 18, 2, 5, "#9b8967");
+        rect(x + 82, y + 18, 8, 4, "#b4a17e");
+
+        rect(x + w - 52, y + 9, 35, 21, "#d0c5a8");
+        rect(x + w - 49, y + 12, 29, 1, "#73756d");
+        rect(x + w - 49, y + 16, 24, 1, "#73756d");
+        rect(x + w - 49, y + 20, 27, 1, "#73756d");
+        rect(x + w - 49, y + 24, 18, 1, "#73756d");
+        rect(x + w - 49, y + 26, 5, 2, "#a44d41");
+
+        // Carimbo e pequenos botões da bancada.
+        rect(x + w - 82, y + 8, 8, 12, "#493d30");
+        rect(x + w - 80, y + 6, 4, 3, "#94846a");
+        rect(x + w - 68, y + 10, 5, 5, "#6a4a3b");
+        rect(x + w - 67, y + 11, 3, 3, "#a36b54");
+      } else if (type === "shelf") {
+        for (let i = 0; i < 5; i++) {
+          const fx = x + 9 + i * 10;
+          const fy = y + 8 + (i % 2) * 3;
+          rect(fx, fy, 7, 17, ["#354d5b", "#7a5644", "#8d7955", "#4f6350", "#65536a"][i]);
+          rect(fx + 1, fy + 2, 5, 1, "#d2c4a5");
+          rect(fx + 1, fy + 7, 4, 1, "#b8ad91");
+          rect(fx + 1, fy + 13, 5, 1, "#252e31");
+        }
+        rect(x + 8, y + h - 10, w - 16, 2, "#343b3b");
+      } else if (type === "table") {
+        rect(x + 9, y + 8, 25, 16, "#d2c5a8");
+        rect(x + 11, y + 10, 21, 1, "#7e8279");
+        rect(x + 11, y + 14, 17, 1, "#7e8279");
+        rect(x + 11, y + 18, 19, 1, "#7e8279");
+        rect(x + w - 31, y + 9, 12, 11, "#4a4136");
+        rect(x + w - 29, y + 11, 8, 7, "#8b9e9b");
+        rect(x + w - 27, y + 21, 4, 3, "#3b4140");
+      }
+    } else if (state.room === "shop") {
+      if (type === "counter") {
+        // Caixa registradora e potes de mantimentos.
+        rect(x + w - 52, y + 7, 31, 20, "#49392c");
+        rect(x + w - 49, y + 10, 25, 12, "#30393a");
+        rect(x + w - 47, y + 12, 21, 8, "#9eaa91");
+        rect(x + w - 43, y + 13, 13, 1, "#495a4a");
+        rect(x + w - 43, y + 16, 10, 1, "#495a4a");
+        rect(x + w - 45, y + 24, 17, 3, "#94774e");
+
+        for (let i = 0; i < 4; i++) {
+          const jx = x + 15 + i * 15;
+          rect(jx, y + 9, 9, 15, ["#75916b", "#b48b5e", "#8a6c79", "#b8a16e"][i]);
+          rect(jx + 1, y + 10, 7, 3, "#e3d5b4");
+          rect(jx + 3, y + 13, 3, 6, "#4a5041");
+          rect(jx + 2, y + 7, 5, 2, "#67523a");
+        }
+
+        rect(x + 72, y + 8, 24, 13, "#d7c8a4");
+        rect(x + 75, y + 11, 18, 1, "#8d846e");
+        rect(x + 75, y + 15, 15, 1, "#8d846e");
+        rect(x + 75, y + 18, 17, 1, "#8d846e");
+      } else if (type === "shelf") {
+        for (let i = 0; i < 6; i++) {
+          const jx = x + 8 + i * 11;
+          const jy = y + 8 + (i % 2) * 2;
+          rect(jx, jy, 8, 14, ["#879b68", "#b18c5e", "#a86a59", "#6d8790", "#c1ad76", "#7e9270"][i]);
+          rect(jx + 1, jy + 2, 6, 3, "#e3d5b3");
+          rect(jx + 2, jy + 6, 4, 5, "#5c5442");
+          rect(jx + 2, jy - 2, 4, 2, "#594332");
+        }
+        rect(x + 7, y + h - 10, w - 14, 2, "#5b4936");
+      } else if (type === "crate") {
+        // Cestas de frutas e legumes.
+        for (let i = 0; i < 4; i++) {
+          const fx = x + 9 + (i % 2) * 16;
+          const fy = y + 7 + Math.floor(i / 2) * 10;
+          rect(fx, fy, 7, 6, ["#a45c43", "#b88b45", "#69814a", "#bd9b5d"][i]);
+          rect(fx + 2, fy - 1, 3, 2, "#4c6840");
+        }
+      } else if (type === "table") {
+        // Toalha xadrez e louça de uso diário.
+        rect(x + 7, y + 6, w - 14, h - 12, "#b6a37e");
+        for (let py = y + 8; py < y + h - 8; py += 8) {
+          for (let px = x + 8; px < x + w - 8; px += 10) {
+            if ((Math.floor(px / 10) + Math.floor(py / 8)) % 2 === 0) {
+              rect(px, py, 5, 4, "#8b5749");
+            }
+          }
+        }
+        c.fillStyle = "#e2d8bd";
+        c.beginPath();
+        c.arc(x + w * 0.35, y + h * 0.43, 5, 0, Math.PI * 2);
+        c.fill();
+        c.strokeStyle = "#8b795e";
+        c.lineWidth = 1;
+        c.stroke();
+        c.fillStyle = "#d0c3a4";
+        c.beginPath();
+        c.arc(x + w * 0.68, y + h * 0.42, 4, 0, Math.PI * 2);
+        c.fill();
+        rect(x + w * 0.49, y + h * 0.32, 8, 7, "#6d5440");
+        rect(x + w * 0.50, y + h * 0.29, 6, 3, "#b5a17a");
+      }
+    }
+  };
+
+  // ---------------------------------------------------------
+  // MINA — MADEIRA PODRE, TRILHOS, FERRUGEM E MATO
+  // ---------------------------------------------------------
+
+  function v08842DrawMineDetails(mineX, mineY) {
+    c.save();
+
+    // Talude de terra e cascalho empurrado para fora pela erosão.
+    rect(mineX - 29, mineY + 80, 226, 12, "#3b382f");
+    rect(mineX - 17, mineY + 86, 190, 8, "#51493b");
+    rect(mineX - 9, mineY + 91, 171, 5, "#292c27");
+
+    // Vigas partidas e escoramento empenado.
+    rect(mineX + 4, mineY - 2, 12, 10, "#59432e");
+    rect(mineX + 9, mineY + 9, 5, 72, "#392c24");
+    rect(mineX + 13, mineY + 10, 2, 62, "#95724c");
+    rect(mineX + 142, mineY + 3, 7, 67, "#3d2f27");
+    rect(mineX + 145, mineY + 6, 2, 55, "#8c6848");
+    rect(mineX - 2, mineY + 6, 173, 7, "#403126");
+    rect(mineX + 2, mineY + 7, 164, 2, "#98734c");
+    rect(mineX + 38, mineY + 23, 105, 6, "#3f3025");
+    rect(mineX + 42, mineY + 24, 94, 2, "#916d47");
+    rect(mineX + 86, mineY + 22, 5, 43, "#332920");
+    rect(mineX + 89, mineY + 24, 2, 34, "#9b7952");
+    // Lasca caída atravessada na boca, sem fechar visualmente o vão.
+    rect(mineX + 25, mineY + 44, 70, 5, "#3a2d25");
+    rect(mineX + 28, mineY + 45, 63, 2, "#8c6947");
+    rect(mineX + 31, mineY + 43, 13, 2, "#b18c5a");
+
+    // Trilhos enferrujados que desaparecem na escuridão.
+    for (let py = mineY + 83; py <= mineY + 119; py += 11) {
+      rect(mineX + 41, py, 91, 4, "#473b2d");
+      rect(mineX + 44, py + 1, 85, 1, "#8b7450");
+    }
+    rect(mineX + 53, mineY + 78, 4, 48, "#754a37");
+    rect(mineX + 116, mineY + 78, 4, 48, "#754a37");
+    rect(mineX + 54, mineY + 80, 1, 44, "#c18b5a");
+    rect(mineX + 117, mineY + 80, 1, 44, "#c18b5a");
+    for (let py = mineY + 85; py < mineY + 120; py += 11) {
+      rect(mineX + 50, py, 11, 2, "#292b28");
+      rect(mineX + 113, py, 11, 2, "#292b28");
+    }
+
+    // Poça escura e marcas de umidade no chão.
+    c.fillStyle = "rgba(12,23,24,0.72)";
+    c.beginPath();
+    c.ellipse(mineX + 25, mineY + 103, 18, 5, -0.12, 0, Math.PI * 2);
+    c.fill();
+    c.strokeStyle = "rgba(131,154,145,0.35)";
+    c.lineWidth = 1;
+    c.beginPath();
+    c.ellipse(mineX + 25, mineY + 102, 13, 3, -0.12, 0, Math.PI * 2);
+    c.stroke();
+    rect(mineX + 13, mineY + 106, 8, 1, "#a9b1a044");
+
+    // Placa de perigo caída e desbotada.
+    rect(mineX + 169, mineY + 21, 28, 25, "#332c23");
+    rect(mineX + 172, mineY + 24, 22, 19, "#8b7655");
+    rect(mineX + 174, mineY + 26, 18, 15, "#493f31");
+    txt("PERIGO", mineX + 174, mineY + 32, "#d0b47b", 5);
+    rect(mineX + 177, mineY + 35, 12, 1, "#b29c6d");
+    rect(mineX + 170, mineY + 45, 3, 10, "#3c3228");
+    rect(mineX + 192, mineY + 44, 3, 12, "#3c3228");
+
+    // Corrente pendurada e teia nos cantos da entrada.
+    c.strokeStyle = "#45443b";
+    c.lineWidth = 2;
+    c.beginPath();
+    c.moveTo(mineX + 153, mineY + 5);
+    c.lineTo(mineX + 157, mineY + 13);
+    c.lineTo(mineX + 153, mineY + 22);
+    c.lineTo(mineX + 158, mineY + 31);
+    c.stroke();
+
+    c.strokeStyle = "rgba(190,184,158,0.34)";
+    c.lineWidth = 1;
+    c.beginPath();
+    c.moveTo(mineX + 8, mineY + 17);
+    c.lineTo(mineX + 30, mineY + 38);
+    c.moveTo(mineX + 8, mineY + 38);
+    c.lineTo(mineX + 30, mineY + 17);
+    c.moveTo(mineX + 150, mineY + 18);
+    c.lineTo(mineX + 132, mineY + 38);
+    c.moveTo(mineX + 132, mineY + 18);
+    c.lineTo(mineX + 150, mineY + 38);
+    c.stroke();
+
+    // Pedras, raízes e mato avançando sobre a antiga entrada.
+    for (let i = 0; i < 18; i++) {
+      const px = mineX - 22 + hash(i + 11, 81) * 210;
+      const py = mineY + 72 + hash(i + 17, 82) * 48;
+      const rw = 4 + hash(i, 83) * 10;
+      const rh = 3 + hash(i + 7, 84) * 6;
+      rect(px, py, rw, rh, i % 2 ? "#555044" : "#343b32");
+      rect(px + 1, py, Math.max(2, rw - 3), 1, "#9d9376" + "55");
+    }
+    for (let i = 0; i < 8; i++) {
+      const px = mineX - 20 + i * 26;
+      rect(px, mineY + 77, 2, 7, "#354c32");
+      rect(px - 3, mineY + 78, 3, 4, "#5b7544");
+      rect(px + 2, mineY + 75, 3, 5, "#6e8048");
+    }
+
+    // Rachaduras e manchas úmidas nas paredes de pedra.
+    for (let i = 0; i < 7; i++) {
+      const px = mineX + 17 + hash(i + 4, 90) * 135;
+      const py = mineY + 13 + hash(i + 8, 92) * 50;
+      rect(px, py, 1, 5 + (i % 3) * 3, "#11181799");
+      rect(px + 2, py + 2, 4, 1, "#9c937455");
+    }
+
+    c.restore();
+  }
+
+  // ---------------------------------------------------------
+  // ÁRVORES — HITBOX NO TRONCO E COPA NA CAMADA DA FRENTE
+  // ---------------------------------------------------------
+
+  function v08842GetOldRoadTrees() {
+    const generated = [];
+
+    for (let i = 0; i < 44; i++) {
+      const side = i % 2 === 0 ? 1 : -1;
+      const y = 48 + i * 25;
+      const x = side < 0
+        ? 255 + hash(i, 33) * 125
+        : 645 + hash(i, 44) * 145;
+
+      if (side > 0 && y > 675) continue;
+
+      generated.push({
+        x,
+        y,
+        kind: (i * 3 + Math.floor(hash(i, 8) * 5)) % 6,
+        scale: 0.78 + hash(i + 5, 18) * 0.38
+      });
+    }
+
+    return generated.concat(V08841_OLD_ROAD_GROVE);
+  }
+
+  function v08842GetVillageTrees() {
+    const result = [];
+
+    for (let i = 0; i < 32; i++) {
+      const x = 40 + hash(i, 8) * 920;
+      const y = 45 + hash(i, 9) * 720;
+
+      const closeToBuilding = maps.village.objects.some(o =>
+        x > o.x - 30 &&
+        x < o.x + o.w + 30 &&
+        y > o.y - 40 &&
+        y < o.y + o.h + 40
+      );
+
+      if (
+        Math.abs(x - 650) < 92 ||
+        Math.abs(y - 424) < 72 ||
+        Math.abs(y - 796) < 76 ||
+        closeToBuilding
+      ) {
+        continue;
+      }
+
+      result.push({ x, y, baseY: y + 32 });
+    }
+
+    return result;
+  }
+
+  function v08842GetSquareRoadTrees() {
+    return [
+      { x: 1090, y: 180, baseY: 212 },
+      { x: 1180, y: 190, baseY: 222 },
+      { x: 1095, y: 555, baseY: 587 },
+      { x: 1190, y: 545, baseY: 577 }
+    ];
+  }
+
+  function v08842ShouldTreeCoverPlayer(tree, playerX, playerY) {
+    const scale = Math.max(0.65, Math.min(1.45, tree.scale || 1));
+    const crownHalfWidth = tree.kind === 1 ? 43 : tree.kind === 4 ? 35 : 48;
+    const crownTop = tree.y - 78 * scale;
+    const crownBottom = tree.y - 12 * scale;
+
+    return (
+      playerY < tree.y + 4 * scale &&
+      playerY >= crownTop &&
+      playerY <= crownBottom &&
+      Math.abs(playerX - tree.x) < crownHalfWidth * scale
+    );
+  }
+
+  function v08842ShouldVillageTreeCoverPlayer(tree, playerX, playerY) {
+    return (
+      playerY < tree.baseY + 3 &&
+      playerY >= tree.y - 60 &&
+      playerY <= tree.baseY - 5 &&
+      Math.abs(playerX - tree.x) < 42
+    );
+  }
+
+  function v08842DrawVillageTree(x, y) {
+    // Reproduz a árvore existente, sem mudar seu desenho nem seu lugar.
+    rect(x, y, 8, 32, "#473f30");
+    rect(x + 1, y + 1, 3, 29, "#6c573b");
+    rect(x - 18, y - 22, 44, 34, "#203d35");
+    rect(x - 13, y - 31, 34, 30, "#2d5140");
+    rect(x - 6, y - 36, 20, 22, "#426049");
+    rect(x - 8, y - 26, 11, 9, "#56714a");
+    rect(x + 8, y - 22, 11, 8, "#365b40");
+  }
+
+  function v08842TreeHit(px, py, tree, baseY, scale = 1) {
+    const half = 5.5 * scale;
+    const top = baseY - 19 * scale;
+    const bottom = baseY + 7 * scale;
+
+    return (
+      px + 7 > tree.x - half &&
+      px - 7 < tree.x + half &&
+      py > top &&
+      py - 6 < bottom
+    );
+  }
+
+  const v08842SolidBase = solid;
+  solid = function(x, y) {
+    if (state?.room === "oldRoad") {
+      for (const tree of v08842GetOldRoadTrees()) {
+        if (v08842TreeHit(x, y, tree, tree.y, tree.scale || 1)) {
+          return true;
+        }
+      }
+    } else if (state?.room === "village") {
+      for (const tree of v08842GetVillageTrees()) {
+        if (v08842TreeHit(x, y, tree, tree.baseY, 1)) {
+          return true;
+        }
+      }
+    } else if (state?.room === "squareRoad") {
+      for (const tree of v08842GetSquareRoadTrees()) {
+        if (v08842TreeHit(x, y, tree, tree.baseY, 1)) {
+          return true;
+        }
+      }
+    }
+
+    return v08842SolidBase(x, y);
+  };
+
+  // ---------------------------------------------------------
+  // ESTRADAS — ASFALTO GASTO, REPAROS, RACHADURAS E TERRA BATIDA
+  // ---------------------------------------------------------
+
+  const v08842DrawRoadWearBase = drawRoadWear;
+  drawRoadWear = function(x, y, w, h, horizontal = false, dirt = false) {
+    v08842DrawRoadWearBase(x, y, w, h, horizontal, dirt);
+
+    if (
+      w <= 0 ||
+      h <= 0 ||
+      !roadRectVisible(x, y, w, h, 28)
+    ) {
+      return;
+    }
+
+    const camX = Number.isFinite(camera?.x) ? camera.x : 0;
+    const camY = Number.isFinite(camera?.y) ? camera.y : 0;
+    const left = Math.max(x, camX - 24);
+    const top = Math.max(y, camY - 24);
+    const right = Math.min(x + w, camX + W + 24);
+    const bottom = Math.min(y + h, camY + H + 24);
+    if (right <= left || bottom <= top) return;
+
+    c.save();
+    c.beginPath();
+    c.rect(x, y, w, h);
+    c.clip();
+
+    if (dirt) {
+      // Duas marcas suaves de roda, mais escuras no centro da estrada.
+      if (horizontal) {
+        const rut1 = y + h * 0.34;
+        const rut2 = y + h * 0.67;
+        rect(left, rut1, right - left, 3, "#3e30264a");
+        rect(left, rut1 + 3, right - left, 1, "#b48a5b2b");
+        rect(left, rut2, right - left, 3, "#3e30264a");
+        rect(left, rut2 + 3, right - left, 1, "#b48a5b2b");
+
+        const start = Math.floor(left / 52) * 52;
+        for (let px = start; px < right; px += 52) {
+          const n = hash(px + 17, y + 81);
+          rect(px + n * 18, y + h * 0.18 + n * 20, 5 + n * 4, 2, "#9b785344");
+          if (n > 0.58) {
+            rect(px + 21, y + h * 0.80, 3, 2, "#39312966");
+          }
+        }
+      } else {
+        const rut1 = x + w * 0.32;
+        const rut2 = x + w * 0.68;
+        rect(rut1, top, 3, bottom - top, "#3e30264a");
+        rect(rut1 + 3, top, 1, bottom - top, "#b48a5b2b");
+        rect(rut2, top, 3, bottom - top, "#3e30264a");
+        rect(rut2 + 3, top, 1, bottom - top, "#b48a5b2b");
+
+        const start = Math.floor(top / 52) * 52;
+        for (let py = start; py < bottom; py += 52) {
+          const n = hash(x + 23, py + 51);
+          rect(x + w * (0.15 + n * 0.62), py + n * 17, 2, 5 + n * 4, "#9b785344");
+          if (n > 0.58) {
+            rect(x + w * 0.82, py + 21, 2, 3, "#39312966");
+          }
+        }
+      }
+
+      // Pedrinhas e pequenos torrões ao longo da terra.
+      const count = horizontal
+        ? Math.floor((right - left) / 38) + 1
+        : Math.floor((bottom - top) / 38) + 1;
+
+      for (let i = 0; i < count; i++) {
+        const seed = horizontal ? left + i * 38 : top + i * 38;
+        const n = hash(seed + (horizontal ? y : x), 707);
+        const px = horizontal
+          ? seed + n * 21
+          : x + 8 + n * Math.max(4, w - 16);
+        const py = horizontal
+          ? y + 8 + n * Math.max(2, h - 16)
+          : seed + n * 21;
+        rect(px, py, 2 + n * 2, 1 + n * 2, n > 0.5 ? "#b49a704a" : "#3a30264d");
+      }
+    } else {
+      // Remendos discretos de asfalto e manchas de pneu.
+      const areaW = Math.max(1, right - left);
+      const areaH = Math.max(1, bottom - top);
+
+      for (let i = 0; i < 7; i++) {
+        const n = hash(i + x * 0.1, y * 0.1 + 37);
+        const px = left + 8 + n * Math.max(1, areaW - 24);
+        const py = top + 8 + hash(i + 19, y + 5) * Math.max(1, areaH - 20);
+        rect(px, py, 8 + n * 10, 3 + n * 2, "#171d2070");
+        rect(px + 2, py + 1, 4 + n * 4, 1, "#8d929055");
+      }
+
+      // Rachaduras finas ramificadas, bem suaves.
+      c.strokeStyle = "rgba(13,18,20,0.42)";
+      c.lineWidth = 1;
+      for (let i = 0; i < 5; i++) {
+        const n = hash(i + 51, x + y);
+        const sx = left + 8 + n * Math.max(1, areaW - 18);
+        const sy = top + 7 + hash(i + 91, y + 12) * Math.max(1, areaH - 16);
+        c.beginPath();
+        c.moveTo(sx, sy);
+        c.lineTo(sx + (horizontal ? 8 : 3), sy + (horizontal ? 3 : 8));
+        c.lineTo(sx + (horizontal ? 15 : -2), sy + (horizontal ? 1 : 14));
+        c.stroke();
+        c.beginPath();
+        c.moveTo(sx + (horizontal ? 8 : 3), sy + (horizontal ? 3 : 8));
+        c.lineTo(sx + (horizontal ? 10 : 9), sy + (horizontal ? -3 : 11));
+        c.stroke();
+      }
+    }
+
+    c.restore();
+  };
+
+  // Costuras de placas nas calçadas: ajudam a rua a parecer construída,
+  // não um retângulo uniforme de asfalto.
+  const v08842DrawPavedVerticalBase = drawPavedVertical;
+  drawPavedVertical = function(x, y, w, h) {
+    v08842DrawPavedVerticalBase(x, y, w, h);
+    if (!roadRectVisible(x, y, w, h, 24)) return;
+
+    const sidewalk = Math.max(11, Math.round(w * 0.19));
+    const start = Math.max(y, (camera?.y || 0) - 18);
+    const end = Math.min(y + h, (camera?.y || 0) + H + 18);
+
+    c.save();
+    c.beginPath();
+    c.rect(x, y, w, h);
+    c.clip();
+
+    for (let py = Math.floor(start / 36) * 36; py < end; py += 36) {
+      rect(x + 2, py, Math.max(1, sidewalk - 5), 1, "#b8b3a655");
+      rect(x + w - sidewalk + 4, py, Math.max(1, sidewalk - 5), 1, "#b8b3a655");
+      rect(x + 2, py + 1, Math.max(1, sidewalk - 5), 1, "#31353635");
+      rect(x + w - sidewalk + 4, py + 1, Math.max(1, sidewalk - 5), 1, "#31353635");
+    }
+
+    c.restore();
+  };
+
+  const v08842DrawPavedHorizontalBase = drawPavedHorizontal;
+  drawPavedHorizontal = function(x, y, w, h) {
+    v08842DrawPavedHorizontalBase(x, y, w, h);
+    if (!roadRectVisible(x, y, w, h, 24)) return;
+
+    const sidewalk = Math.max(11, Math.round(h * 0.19));
+    const start = Math.max(x, (camera?.x || 0) - 18);
+    const end = Math.min(x + w, (camera?.x || 0) + W + 18);
+
+    c.save();
+    c.beginPath();
+    c.rect(x, y, w, h);
+    c.clip();
+
+    for (let px = Math.floor(start / 36) * 36; px < end; px += 36) {
+      rect(px, y + 2, 1, Math.max(1, sidewalk - 5), "#b8b3a655");
+      rect(px, y + h - sidewalk + 4, 1, Math.max(1, sidewalk - 5), "#b8b3a655");
+      rect(px + 1, y + 2, 1, Math.max(1, sidewalk - 5), "#31353635");
+      rect(px + 1, y + h - sidewalk + 4, 1, Math.max(1, sidewalk - 5), "#31353635");
+    }
+
+    c.restore();
+  };
+
+  // =========================================================
+  // FIM DO PASSE 0.8.42
+  // =========================================================
+
+  $("version").textContent = "PROTÓTIPO · 0.8.42";
   
   requestAnimationFrame(frame);
   showBootSplash();
