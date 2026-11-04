@@ -2772,6 +2772,10 @@ function drawCharacterSprite(
         rect(x - 6, y - 36, 20, 22, "#426049");
       }
 
+      for (const tree of v08842GetVillageSouthTrees()) {
+        v08842DrawVillageTree(tree.x, tree.y);
+      }
+
       for (const o of m.objects) {
         building(o);
       }
@@ -40428,6 +40432,17 @@ v0826ParentsLeaveTransition =
     return generated.concat(V08841_OLD_ROAD_GROVE);
   }
 
+  function v08842GetVillageSouthTrees() {
+    return [
+      { x: 500, y: 1085, baseY: 1117 },
+      { x: 790, y: 1165, baseY: 1197 },
+      { x: 520, y: 1325, baseY: 1357 },
+      { x: 790, y: 1455, baseY: 1487 },
+      { x: 500, y: 1590, baseY: 1622 },
+      { x: 785, y: 1730, baseY: 1762 }
+    ];
+  }
+
   function v08842GetVillageTrees() {
     const result = [];
 
@@ -40454,7 +40469,7 @@ v0826ParentsLeaveTransition =
       result.push({ x, y, baseY: y + 32 });
     }
 
-    return result;
+    return result.concat(v08842GetVillageSouthTrees());
   }
 
   function v08842GetSquareRoadTrees() {
@@ -40712,8 +40727,8 @@ v0826ParentsLeaveTransition =
   // FIM DO PASSE 0.8.42
   // =========================================================
 
-  // 0.8.43 — detalhes de asfalto/terra com coordenadas estáveis do mapa.
-  $("version").textContent = "PROTÓTIPO · 0.8.43";
+  // 0.8.44 — detalhes de asfalto/terra com coordenadas estáveis do mapa.
+  $("version").textContent = "PROTÓTIPO · 0.8.44";
   
   requestAnimationFrame(frame);
   showBootSplash();
