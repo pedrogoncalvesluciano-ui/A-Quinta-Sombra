@@ -40554,6 +40554,8 @@ v0826ParentsLeaveTransition =
       return;
     }
 
+    // Os detalhes são calculados exclusivamente com coordenadas do mapa.
+    // A câmera só limita a área desenhada, nunca decide onde fica uma marca.
     const camX = Number.isFinite(camera?.x) ? camera.x : 0;
     const camY = Number.isFinite(camera?.y) ? camera.y : 0;
     const left = Math.max(x, camX - 24);
@@ -40568,86 +40570,88 @@ v0826ParentsLeaveTransition =
     c.clip();
 
     if (dirt) {
-      // Duas marcas suaves de roda, mais escuras no centro da estrada.
+      // Sulcos contínuos, sempre presos à mesma posição do terreno.
       if (horizontal) {
         const rut1 = y + h * 0.34;
         const rut2 = y + h * 0.67;
-        rect(left, rut1, right - left, 3, "#3e30264a");
-        rect(left, rut1 + 3, right - left, 1, "#b48a5b2b");
-        rect(left, rut2, right - left, 3, "#3e30264a");
-        rect(left, rut2 + 3, right - left, 1, "#b48a5b2b");
+        rect(left, rut1, right - left, 2, "#3e302638");
+        rect(left, rut1 + 2, right - left, 1, "#b48a5b22");
+        rect(left, rut2, right - left, 2, "#3e302638");
+        rect(left, rut2 + 2, right - left, 1, "#b48a5b22");
 
-        const start = Math.floor(left / 52) * 52;
-        for (let px = start; px < right; px += 52) {
-          const n = hash(px + 17, y + 81);
-          rect(px + n * 18, y + h * 0.18 + n * 20, 5 + n * 4, 2, "#9b785344");
-          if (n > 0.58) {
-            rect(px + 21, y + h * 0.80, 3, 2, "#39312966");
-          }
+        const firstX = Math.floor(x / 56) * 56;
+        for (let gx = firstX; gx < x + w; gx += 56) {
+          const n = hash(gx + 17, y + 81);
+          const px = gx + 7 + n * 18;
+          const py = y + h * (0.18 + n * 0.42);
+          rect(px, py, 3 + n * 2, 2, "#9b785333");
+          if (n > 0.58) rect(gx + 31, y + h * 0.80, 2, 2, "#39312955");
         }
       } else {
         const rut1 = x + w * 0.32;
         const rut2 = x + w * 0.68;
-        rect(rut1, top, 3, bottom - top, "#3e30264a");
-        rect(rut1 + 3, top, 1, bottom - top, "#b48a5b2b");
-        rect(rut2, top, 3, bottom - top, "#3e30264a");
-        rect(rut2 + 3, top, 1, bottom - top, "#b48a5b2b");
+        rect(rut1, top, 2, bottom - top, "#3e302638");
+        rect(rut1 + 2, top, 1, bottom - top, "#b48a5b22");
+        rect(rut2, top, 2, bottom - top, "#3e302638");
+        rect(rut2 + 2, top, 1, bottom - top, "#b48a5b22");
 
-        const start = Math.floor(top / 52) * 52;
-        for (let py = start; py < bottom; py += 52) {
-          const n = hash(x + 23, py + 51);
-          rect(x + w * (0.15 + n * 0.62), py + n * 17, 2, 5 + n * 4, "#9b785344");
-          if (n > 0.58) {
-            rect(x + w * 0.82, py + 21, 2, 3, "#39312966");
-          }
+        const firstY = Math.floor(y / 56) * 56;
+        for (let gy = firstY; gy < y + h; gy += 56) {
+          const n = hash(x + 23, gy + 51);
+          const px = x + w * (0.15 + n * 0.62);
+          const py = gy + 7 + n * 18;
+          rect(px, py, 2, 3 + n * 2, "#9b785333");
+          if (n > 0.58) rect(x + w * 0.82, gy + 31, 2, 2, "#39312955");
         }
       }
 
-      // Pedrinhas e pequenos torrões ao longo da terra.
-      const count = horizontal
-        ? Math.floor((right - left) / 38) + 1
-        : Math.floor((bottom - top) / 38) + 1;
-
-      for (let i = 0; i < count; i++) {
-        const seed = horizontal ? left + i * 38 : top + i * 38;
-        const n = hash(seed + (horizontal ? y : x), 707);
+      // Pedrinhas distribuídas por uma grade fixa do mapa.
+      const first = Math.floor((horizontal ? x : y) / 44) * 44;
+      const last = horizontal ? x + w : y + h;
+      for (let g = first; g < last; g += 44) {
+        const n = hash(g + (horizontal ? y : x), 707);
         const px = horizontal
-          ? seed + n * 21
+          ? g + 5 + n * 20
           : x + 8 + n * Math.max(4, w - 16);
         const py = horizontal
           ? y + 8 + n * Math.max(2, h - 16)
-          : seed + n * 21;
-        rect(px, py, 2 + n * 2, 1 + n * 2, n > 0.5 ? "#b49a704a" : "#3a30264d");
+          : g + 5 + n * 20;
+        rect(px, py, 2 + n * 2, 1 + n * 2, n > 0.5 ? "#b49a7040" : "#3a302640");
       }
     } else {
-      // Remendos discretos de asfalto e manchas de pneu.
-      const areaW = Math.max(1, right - left);
-      const areaH = Math.max(1, bottom - top);
+      // Remendos e rachaduras presos a células absolutas do cenário.
+      // Não há mais posições calculadas a partir do início da câmera.
+      const cellW = 112;
+      const cellH = 104;
+      const firstCellX = Math.floor(x / cellW) * cellW;
+      const firstCellY = Math.floor(y / cellH) * cellH;
 
-      for (let i = 0; i < 7; i++) {
-        const n = hash(i + x * 0.1, y * 0.1 + 37);
-        const px = left + 8 + n * Math.max(1, areaW - 24);
-        const py = top + 8 + hash(i + 19, y + 5) * Math.max(1, areaH - 20);
-        rect(px, py, 8 + n * 10, 3 + n * 2, "#171d2070");
-        rect(px + 2, py + 1, 4 + n * 4, 1, "#8d929055");
-      }
+      for (let gy = firstCellY; gy < y + h; gy += cellH) {
+        for (let gx = firstCellX; gx < x + w; gx += cellW) {
+          const n = hash(gx + 13, gy + 37);
+          const m = hash(gx + 71, gy + 89);
 
-      // Rachaduras finas ramificadas, bem suaves.
-      c.strokeStyle = "rgba(13,18,20,0.42)";
-      c.lineWidth = 1;
-      for (let i = 0; i < 5; i++) {
-        const n = hash(i + 51, x + y);
-        const sx = left + 8 + n * Math.max(1, areaW - 18);
-        const sy = top + 7 + hash(i + 91, y + 12) * Math.max(1, areaH - 16);
-        c.beginPath();
-        c.moveTo(sx, sy);
-        c.lineTo(sx + (horizontal ? 8 : 3), sy + (horizontal ? 3 : 8));
-        c.lineTo(sx + (horizontal ? 15 : -2), sy + (horizontal ? 1 : 14));
-        c.stroke();
-        c.beginPath();
-        c.moveTo(sx + (horizontal ? 8 : 3), sy + (horizontal ? 3 : 8));
-        c.lineTo(sx + (horizontal ? 10 : 9), sy + (horizontal ? -3 : 11));
-        c.stroke();
+          const patchX = gx + 14 + n * 44;
+          const patchY = gy + 12 + m * 42;
+
+          if (n > 0.18) {
+            rect(patchX, patchY, 7 + n * 7, 2 + m * 2, "#171d2050");
+            rect(patchX + 2, patchY + 1, 3 + n * 3, 1, "#8d929044");
+          }
+
+          // Fissuras curtas e irregulares, sem formar símbolos ou letras.
+          if (m > 0.2) {
+            const sx = gx + 24 + n * 54;
+            const sy = gy + 20 + m * 50;
+            c.strokeStyle = "rgba(13,18,20,0.34)";
+            c.lineWidth = 1;
+            c.beginPath();
+            c.moveTo(sx, sy);
+            c.lineTo(sx + 3 + n * 4, sy + 2 + m * 2);
+            c.lineTo(sx + 6 + n * 5, sy + 5 + m * 3);
+            c.stroke();
+          }
+        }
       }
     }
 
@@ -40708,7 +40712,8 @@ v0826ParentsLeaveTransition =
   // FIM DO PASSE 0.8.42
   // =========================================================
 
-  $("version").textContent = "PROTÓTIPO · 0.8.42";
+  // 0.8.43 — detalhes de asfalto/terra com coordenadas estáveis do mapa.
+  $("version").textContent = "PROTÓTIPO · 0.8.43";
   
   requestAnimationFrame(frame);
   showBootSplash();
