@@ -38996,7 +38996,205 @@ v0826ParentsLeaveTransition =
   // FIM DO PASSE VISUAL 0.8.38
   // =========================================================
 
-  $("version").textContent = "PROTÓTIPO · 0.8.38";
+
+  // =========================================================
+  // 0.8.39 — ABERTURA EM ORDEM + PULAR HISTÓRIA
+  // Ordem: cartão do título → narração de Forgotten → prólogo dos pais.
+  // Não altera a cena, os sprites, controles ou sistemas de progressão.
+  // =========================================================
+
+  let v088IntroActive = false;
+  let v088IntroSkipRequested = false;
+  let v088IntroSkipResolver = null;
+
+  function v088WaitIntro(ms) {
+    return new Promise(resolve => {
+      let settled = false;
+      let timer = null;
+
+      const finish = skipped => {
+        if (settled) return;
+        settled = true;
+        if (timer !== null) clearTimeout(timer);
+        if (v088IntroSkipResolver === skipNow) {
+          v088IntroSkipResolver = null;
+        }
+        resolve(Boolean(skipped));
+      };
+
+      const skipNow = () => finish(true);
+      timer = setTimeout(() => finish(false), ms);
+      v088IntroSkipResolver = skipNow;
+    });
+  }
+
+  function v088SkipIntro() {
+    if (!v088IntroActive) return;
+    v088IntroSkipRequested = true;
+
+    const resume = v088IntroSkipResolver;
+    v088IntroSkipResolver = null;
+
+    if (typeof resume === "function") {
+      resume();
+    }
+  }
+
+  // A tecla E é capturada antes dos controles normais do jogo,
+  // para não virar uma interação acidental durante a narração.
+  window.addEventListener("keydown", event => {
+    if (!v088IntroActive) return;
+
+    const key = String(event.key || "").toLowerCase();
+    if (key !== "e" && key !== "enter") return;
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    v088SkipIntro();
+  }, true);
+
+  async function v088RunOpeningSequence() {
+    v088IntroActive = true;
+    v088IntroSkipRequested = false;
+    v088IntroSkipResolver = null;
+    transitionBusy = true;
+
+    keys.clear();
+    near = null;
+    dialog = null;
+
+    const transition = $("transition");
+    const titleEl = $("transitionTitle");
+    const hintEl = $("transitionHint");
+
+    const skipButton = document.createElement("button");
+    skipButton.type = "button";
+    skipButton.textContent = "PRESSIONE E PARA PULAR A HISTÓRIA";
+    skipButton.setAttribute("aria-label", "Pular a história de abertura");
+    skipButton.style.position = "absolute";
+    skipButton.style.left = "50%";
+    skipButton.style.bottom = "8%";
+    skipButton.style.transform = "translateX(-50%)";
+    skipButton.style.maxWidth = "88%";
+    skipButton.style.padding = "11px 17px";
+    skipButton.style.border = "1px solid #a58a5f";
+    skipButton.style.background = "rgba(11,17,22,.92)";
+    skipButton.style.color = "#d8c49b";
+    skipButton.style.font = "10px monospace";
+    skipButton.style.letterSpacing = ".12em";
+    skipButton.style.cursor = "pointer";
+    skipButton.style.zIndex = "4";
+    skipButton.style.pointerEvents = "auto";
+    skipButton.addEventListener("click", v088SkipIntro);
+    transition.append(skipButton);
+
+    // O jogo fica preparado por trás do cartão, mas ainda não mostra
+    // o pai controlável. Assim a cena dos pais não aparece antes da história.
+    mode = "game";
+    $("menu").hidden = true;
+    $("hud").hidden = true;
+    $("overlay").hidden = true;
+    $("prompt").hidden = true;
+    $("eventToast").hidden = true;
+    loadedAreaRoom = null;
+
+    transition.style.transition = "none";
+    transition.style.opacity = "1";
+    transition.classList.add("active");
+    titleEl.textContent = "A QUINTA SOMBRA";
+    hintEl.textContent = "14:00 · A família ainda está reunida.";
+
+    void transition.offsetWidth;
+    await v088WaitIntro(3000);
+
+    const narration = [
+      {
+        title: "FORGOTTEN",
+        text: "Forgotten não é uma cidade grande.",
+        hold: 2100
+      },
+      {
+        title: "FORGOTTEN",
+        text: "As pessoas aqui se conhecem. Se cumprimentam na rua. Sabem o nome umas das outras — e o nome dos pais, e às vezes até o nome dos avós.",
+        hold: 4300
+      },
+      {
+        title: "FORGOTTEN",
+        text: "É esse tipo de lugar onde nada costuma acontecer.",
+        hold: 2700
+      },
+      {
+        title: "FORGOTTEN",
+        text: "Pelo menos foi isso que eu sempre pensei.",
+        hold: 3000
+      }
+    ];
+
+    if (!v088IntroSkipRequested) {
+      titleEl.textContent = "FORGOTTEN";
+      hintEl.textContent = "";
+      await v088WaitIntro(900);
+    }
+
+    for (const line of narration) {
+      if (v088IntroSkipRequested) break;
+
+      titleEl.textContent = line.title;
+      hintEl.textContent = line.text;
+
+      const skipped = await v088WaitIntro(line.hold);
+      if (skipped || v088IntroSkipRequested) break;
+    }
+
+    // A cena de 14:00 só é revelada depois da narração ou do comando de pular.
+    v088IntroActive = false;
+    v088IntroSkipResolver = null;
+    skipButton.remove();
+
+    transition.classList.remove("active");
+    transition.style.opacity = "";
+    transition.style.transition = "";
+
+    $("menu").hidden = true;
+    $("hud").hidden = false;
+    $("overlay").hidden = true;
+    $("prompt").hidden = true;
+
+    mode = "game";
+    transitionBusy = false;
+    areaLoadingOverlay = false;
+    keys.clear();
+    near = null;
+
+    updateHud();
+  }
+
+  // Substitui somente o agendamento antigo da introdução. A configuração
+  // canônica da partida e a cena jogável original continuam sendo usadas.
+  newGame = function() {
+    state = initial();
+
+    state.protagonistName = "Estevão Lancaster";
+    state.protagonistAge = 13;
+    state.brotherAge = 8;
+    state.startupShown = true;
+
+    state.storyFlags = state.storyFlags || {};
+    state.storyFlags.progressionByDiscovery = true;
+
+    keys.clear();
+    near = null;
+    dialog = null;
+    $("prompt").hidden = true;
+
+    void v088RunOpeningSequence();
+  };
+
+  // =========================================================
+  // FIM DA ABERTURA 0.8.39
+  // =========================================================
+
+  $("version").textContent = "PROTÓTIPO · 0.8.39";
   
   requestAnimationFrame(frame);
   showBootSplash();
