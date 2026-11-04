@@ -40786,8 +40786,155 @@ v0826ParentsLeaveTransition =
     c.restore();
   };
 
-  // 0.8.46 — pistas de papel e lista de mantimentos nos interiores.
-  $("version").textContent = "PROTÓTIPO · 0.8.46";
+  // 0.8.47 — chegada da van preta, com rastro de pneus temporário.
+  // Desativa o desenho antigo em blocos e usa um veículo lateral mais completo.
+  let v08847VanStartedAt = -Infinity;
+  const v08847VanTargetX = 525;
+  const v08847VanY = 782;
+  const v08847VanDuration = 2.8;
+  const v08847VanStay = 10.5;
+  const v08847TrackDuration = 27;
+
+  const v08847TriggerBase = v0645TriggerRandomEvent;
+  v0645TriggerRandomEvent = function() {
+    const isVanEvent =
+      state?.randomEventState?.pending &&
+      state.randomEventState.type === "van";
+
+    v08847TriggerBase();
+
+    if (isVanEvent) {
+      // Impede o desenho antigo de aparecer por cima do cenário.
+      v0645VanVisibleUntil = 0;
+      v08847VanStartedAt = elapsed;
+    }
+  };
+
+  function v08847DrawTireTracks(age) {
+    if (age < 1.2 || age > v08847TrackDuration) return;
+
+    const fadeStart = 9.5;
+    const alpha = age <= fadeStart
+      ? 0.42
+      : 0.42 * Math.max(0, 1 - (age - fadeStart) / (v08847TrackDuration - fadeStart));
+
+    if (alpha <= 0.005) return;
+
+    c.save();
+    c.globalAlpha = alpha;
+
+    // Duas marcas paralelas, levemente irregulares, avançando pela rua à direita.
+    const reveal = Math.min(1, Math.max(0, (age - 1.2) / 2.4));
+    const endX = 568 + 86 * reveal;
+    for (const lane of [0, 7]) {
+      c.strokeStyle = "#17191a";
+      c.lineWidth = lane === 0 ? 3.2 : 2.6;
+      c.lineCap = "round";
+      c.beginPath();
+      c.moveTo(570, v08847VanY + 29 + lane);
+      c.lineTo(endX - 13, v08847VanY + 28.5 + lane);
+      c.lineTo(endX, v08847VanY + 30 + lane);
+      c.stroke();
+
+      // Pequenas falhas de borracha deixam o rastro menos geométrico.
+      c.fillStyle = "#17191a";
+      for (let i = 0; i < 5; i++) {
+        const px = 578 + i * 14;
+        if (px < endX - 5) {
+          rect(px, v08847VanY + 27 + lane, 4 + (i % 2), 1.5, "#17191a");
+        }
+      }
+    }
+    c.restore();
+  }
+
+  function v08847DrawVan(x, y, opacity = 1) {
+    c.save();
+    c.globalAlpha = opacity;
+
+    // Sombra e chassi.
+    rect(x + 5, y + 31, 80, 5, "rgba(0,0,0,0.34)");
+    rect(x + 2, y + 12, 86, 20, "#080a0c");
+    rect(x + 5, y + 7, 77, 23, "#111518");
+    rect(x + 9, y + 4, 62, 6, "#1b2023");
+    rect(x + 12, y + 2, 49, 3, "#252a2d");
+
+    // Frente e para-brisa voltados para a direita.
+    rect(x + 69, y + 8, 13, 17, "#20272b");
+    rect(x + 74, y + 10, 7, 11, "#46545a");
+    rect(x + 77, y + 10, 2, 9, "#657078");
+    rect(x + 83, y + 21, 5, 5, "#0b0d0f");
+    rect(x + 84, y + 13, 4, 4, "#c8b98c");
+    rect(x + 84, y + 25, 4, 3, "#9a4540");
+
+    // Janelas laterais escuras com reflexo frio.
+    rect(x + 12, y + 8, 17, 10, "#29363c");
+    rect(x + 14, y + 9, 13, 1, "#58656a");
+    rect(x + 32, y + 8, 16, 10, "#263238");
+    rect(x + 34, y + 9, 12, 1, "#526067");
+    rect(x + 51, y + 8, 15, 10, "#202b30");
+    rect(x + 53, y + 9, 11, 1, "#4a585e");
+
+    // Porta, maçaneta, friso e para-choques.
+    rect(x + 30, y + 19, 1, 10, "#050708");
+    rect(x + 49, y + 19, 1, 10, "#050708");
+    rect(x + 34, y + 20, 5, 1, "#697176");
+    rect(x + 4, y + 26, 77, 1, "#30383b");
+    rect(x + 1, y + 28, 5, 3, "#343a3c");
+    rect(x + 83, y + 28, 6, 3, "#303638");
+
+    // Rodas com aro e sombra de contato.
+    for (const wheelX of [x + 18, x + 69]) {
+      c.fillStyle = "#050607";
+      c.beginPath();
+      c.arc(wheelX, y + 31, 7, 0, Math.PI * 2);
+      c.fill();
+      c.fillStyle = "#333a3d";
+      c.beginPath();
+      c.arc(wheelX, y + 31, 3.6, 0, Math.PI * 2);
+      c.fill();
+      c.fillStyle = "#858783";
+      c.beginPath();
+      c.arc(wheelX, y + 31, 1.4, 0, Math.PI * 2);
+      c.fill();
+    }
+
+    // Reflexos discretos na lataria, sem logotipo identificável.
+    rect(x + 8, y + 5, 52, 1, "#343b3e");
+    rect(x + 10, y + 23, 18, 1, "#252d30");
+    c.restore();
+  }
+
+  const v08847DrawWorldBase = drawWorld;
+  drawWorld = function() {
+    v08847DrawWorldBase();
+
+    if (!state || state.room !== "village") return;
+
+    const age = elapsed - v08847VanStartedAt;
+    if (age < 0 || age > v08847TrackDuration) return;
+
+    c.save();
+    c.translate(-Math.floor(camera.x), -Math.floor(camera.y));
+
+    v08847DrawTireTracks(age);
+
+    if (age <= v08847VanDuration + v08847VanStay) {
+      const t = Math.min(1, age / v08847VanDuration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      const x = 365 + (v08847VanTargetX - 365) * eased;
+      const fadeOut = age <= v08847VanDuration + v08847VanStay
+        ? 1
+        : Math.max(0, 1 - (age - v08847VanDuration - v08847VanStay) / 1.4);
+
+      v08847DrawVan(x, v08847VanY, fadeOut);
+    }
+
+    c.restore();
+  };
+
+  // 0.8.47 — van redesenhada e animação de chegada/estacionamento.
+  $("version").textContent = "PROTÓTIPO · 0.8.47";
   
   requestAnimationFrame(frame);
   showBootSplash();
