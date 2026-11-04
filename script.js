@@ -11584,31 +11584,32 @@ function v0646DrawOldRoad() {
     );
   }
 
-  // Entrada externa da antiga mina, parcialmente soterrada.
-  // O interior continua inacessível nesta fase da história.
+  // Entrada redesenhada: estrutura limpa, escura e parcialmente soterrada.
   const mineX = 135;
   const mineY = 760;
 
-  rect(280, 780, 180, 30, "#5d4c3d");
-  rect(205, 770, 90, 38, "#5d4c3d");
-  rect(mineX - 24, mineY - 28, 210, 120, "#223329");
-  rect(mineX, mineY, 170, 88, "#3c413c");
-  rect(mineX + 18, mineY + 18, 134, 62, "#0b0d0e");
+  rect(mineX - 18, mineY - 25, 205, 117, "#26312b");
+  rect(mineX - 7, mineY - 13, 183, 98, "#45483f");
+  rect(mineX + 8, mineY + 3, 153, 78, "#342f28");
+  rect(mineX + 20, mineY + 16, 130, 65, "#080c0d");
+  rect(mineX + 7, mineY - 1, 11, 85, "#49392c");
+  rect(mineX + 11, mineY + 1, 3, 78, "#806044");
+  rect(mineX + 150, mineY + 1, 10, 83, "#3b3027");
+  rect(mineX + 153, mineY + 4, 3, 75, "#76583d");
+  rect(mineX + 4, mineY - 5, 162, 10, "#403126");
+  rect(mineX + 8, mineY - 3, 153, 3, "#8b6847");
 
-  // Estruturas e destroços do colapso.
-  rect(mineX + 9, mineY + 4, 9, 82, "#4a3c31");
-  rect(mineX + 151, mineY + 4, 9, 82, "#4a3c31");
-  rect(mineX + 6, mineY + 6, 157, 9, "#59483a");
-  rect(mineX + 46, mineY + 56, 82, 12, "#4b443b");
-  rect(mineX + 72, mineY + 35, 16, 47, "#51473d");
-
-  for (let i = 0; i < 10; i++) {
-    const rx = mineX - 10 + hash(i, 71) * 190;
-    const ry = mineY + 62 + hash(i, 72) * 35;
-    rect(rx, ry, 14 + hash(i, 73) * 18, 8 + hash(i, 74) * 10, "#57554a");
+  // Vigas partidas e pedras do desabamento antigo.
+  rect(mineX + 34, mineY + 52, 71, 7, "#4a4035");
+  rect(mineX + 48, mineY + 62, 53, 6, "#39342e");
+  rect(mineX + 81, mineY + 39, 8, 33, "#4b3c2d");
+  for (let i = 0; i < 7; i++) {
+    const rx = mineX - 8 + hash(i, 71) * 180;
+    const ry = mineY + 72 + hash(i, 72) * 25;
+    rect(rx, ry, 9 + hash(i, 73) * 13, 5 + hash(i, 74) * 6, "#555044");
   }
 
-  txt("MINA DESATIVADA", mineX + 18, mineY - 10, "#a69b80", 8);
+  txt("MINA ABANDONADA", mineX + 22, mineY - 33, "#b7a27e", 8);
   v08842DrawMineDetails(mineX, mineY);
 
   // Player.
@@ -40298,108 +40299,53 @@ v0826ParentsLeaveTransition =
   function v08842DrawMineDetails(mineX, mineY) {
     c.save();
 
-    // Talude de terra e cascalho empurrado para fora pela erosão.
-    rect(mineX - 29, mineY + 80, 226, 12, "#3b382f");
-    rect(mineX - 17, mineY + 86, 190, 8, "#51493b");
-    rect(mineX - 9, mineY + 91, 171, 5, "#292c27");
+    // Placa lateral antiga, inclinada e sustentada por um poste de madeira.
+    c.save();
+    c.translate(mineX - 66, mineY + 43);
+    c.rotate(-0.13);
+    rect(-3, 0, 6, 55, "#382d23");
+    rect(-2, 1, 2, 52, "#866544");
+    rect(-25, -27, 51, 29, "#30271f");
+    rect(-22, -24, 45, 23, "#756044");
+    rect(-20, -22, 41, 19, "#594936");
+    rect(-18, -20, 37, 15, "#766044");
+    txt("MINA", -14, -10, "#d0bd91", 8);
+    txt("ABANDONADA", -20, -2, "#c0aa7c", 4);
+    rect(-19, -18, 9, 1, "#40372b");
+    rect(12, -15, 5, 1, "#40372b");
+    rect(-6, -7, 2, 1, "#40372b");
+    rect(17, -5, 4, 1, "#40372b");
+    c.restore();
 
-    // Vigas partidas e escoramento empenado.
-    rect(mineX + 4, mineY - 2, 12, 10, "#59432e");
-    rect(mineX + 9, mineY + 9, 5, 72, "#392c24");
-    rect(mineX + 13, mineY + 10, 2, 62, "#95724c");
-    rect(mineX + 142, mineY + 3, 7, 67, "#3d2f27");
-    rect(mineX + 145, mineY + 6, 2, 55, "#8c6848");
-    rect(mineX - 2, mineY + 6, 173, 7, "#403126");
-    rect(mineX + 2, mineY + 7, 164, 2, "#98734c");
-    rect(mineX + 38, mineY + 23, 105, 6, "#3f3025");
-    rect(mineX + 42, mineY + 24, 94, 2, "#916d47");
-    rect(mineX + 86, mineY + 22, 5, 43, "#332920");
-    rect(mineX + 89, mineY + 24, 2, 34, "#9b7952");
-    // Lasca caída atravessada na boca, sem fechar visualmente o vão.
-    rect(mineX + 25, mineY + 44, 70, 5, "#3a2d25");
-    rect(mineX + 28, mineY + 45, 63, 2, "#8c6947");
-    rect(mineX + 31, mineY + 43, 13, 2, "#b18c5a");
+    rect(mineX - 18, mineY + 82, 205, 10, "#39372f");
+    rect(mineX - 5, mineY + 89, 174, 5, "#51483a");
 
-    // Trilhos enferrujados que desaparecem na escuridão.
-    for (let py = mineY + 83; py <= mineY + 119; py += 11) {
-      rect(mineX + 41, py, 91, 4, "#473b2d");
-      rect(mineX + 44, py + 1, 85, 1, "#8b7450");
+    // Trilhos antigos desaparecendo no interior.
+    for (let py = mineY + 83; py <= mineY + 119; py += 12) {
+      rect(mineX + 43, py, 84, 3, "#44392d");
+      rect(mineX + 46, py + 1, 78, 1, "#80694a");
     }
-    rect(mineX + 53, mineY + 78, 4, 48, "#754a37");
-    rect(mineX + 116, mineY + 78, 4, 48, "#754a37");
-    rect(mineX + 54, mineY + 80, 1, 44, "#c18b5a");
-    rect(mineX + 117, mineY + 80, 1, 44, "#c18b5a");
-    for (let py = mineY + 85; py < mineY + 120; py += 11) {
-      rect(mineX + 50, py, 11, 2, "#292b28");
-      rect(mineX + 113, py, 11, 2, "#292b28");
-    }
+    rect(mineX + 50, mineY + 81, 4, 43, "#684735");
+    rect(mineX + 116, mineY + 81, 4, 43, "#684735");
 
-    // Poça escura e marcas de umidade no chão.
-    c.fillStyle = "rgba(12,23,24,0.72)";
+    c.fillStyle = "rgba(9,18,19,0.72)";
     c.beginPath();
-    c.ellipse(mineX + 25, mineY + 103, 18, 5, -0.12, 0, Math.PI * 2);
+    c.ellipse(mineX + 23, mineY + 103, 17, 5, -0.12, 0, Math.PI * 2);
     c.fill();
-    c.strokeStyle = "rgba(131,154,145,0.35)";
+
+    c.strokeStyle = "rgba(145,158,145,0.3)";
     c.lineWidth = 1;
     c.beginPath();
-    c.ellipse(mineX + 25, mineY + 102, 13, 3, -0.12, 0, Math.PI * 2);
-    c.stroke();
-    rect(mineX + 13, mineY + 106, 8, 1, "#a9b1a044");
-
-    // Placa de perigo caída e desbotada.
-    rect(mineX + 169, mineY + 21, 28, 25, "#332c23");
-    rect(mineX + 172, mineY + 24, 22, 19, "#8b7655");
-    rect(mineX + 174, mineY + 26, 18, 15, "#493f31");
-    txt("PERIGO", mineX + 174, mineY + 32, "#d0b47b", 5);
-    rect(mineX + 177, mineY + 35, 12, 1, "#b29c6d");
-    rect(mineX + 170, mineY + 45, 3, 10, "#3c3228");
-    rect(mineX + 192, mineY + 44, 3, 12, "#3c3228");
-
-    // Corrente pendurada e teia nos cantos da entrada.
-    c.strokeStyle = "#45443b";
-    c.lineWidth = 2;
-    c.beginPath();
-    c.moveTo(mineX + 153, mineY + 5);
-    c.lineTo(mineX + 157, mineY + 13);
-    c.lineTo(mineX + 153, mineY + 22);
-    c.lineTo(mineX + 158, mineY + 31);
+    c.moveTo(mineX + 7, mineY + 16);
+    c.lineTo(mineX + 27, mineY + 36);
+    c.moveTo(mineX + 27, mineY + 16);
+    c.lineTo(mineX + 7, mineY + 36);
     c.stroke();
 
-    c.strokeStyle = "rgba(190,184,158,0.34)";
-    c.lineWidth = 1;
-    c.beginPath();
-    c.moveTo(mineX + 8, mineY + 17);
-    c.lineTo(mineX + 30, mineY + 38);
-    c.moveTo(mineX + 8, mineY + 38);
-    c.lineTo(mineX + 30, mineY + 17);
-    c.moveTo(mineX + 150, mineY + 18);
-    c.lineTo(mineX + 132, mineY + 38);
-    c.moveTo(mineX + 132, mineY + 18);
-    c.lineTo(mineX + 150, mineY + 38);
-    c.stroke();
-
-    // Pedras, raízes e mato avançando sobre a antiga entrada.
-    for (let i = 0; i < 18; i++) {
-      const px = mineX - 22 + hash(i + 11, 81) * 210;
-      const py = mineY + 72 + hash(i + 17, 82) * 48;
-      const rw = 4 + hash(i, 83) * 10;
-      const rh = 3 + hash(i + 7, 84) * 6;
-      rect(px, py, rw, rh, i % 2 ? "#555044" : "#343b32");
-      rect(px + 1, py, Math.max(2, rw - 3), 1, "#9d9376" + "55");
-    }
-    for (let i = 0; i < 8; i++) {
-      const px = mineX - 20 + i * 26;
-      rect(px, mineY + 77, 2, 7, "#354c32");
-      rect(px - 3, mineY + 78, 3, 4, "#5b7544");
-      rect(px + 2, mineY + 75, 3, 5, "#6e8048");
-    }
-
-    // Rachaduras e manchas úmidas nas paredes de pedra.
-    for (let i = 0; i < 7; i++) {
-      const px = mineX + 17 + hash(i + 4, 90) * 135;
-      const py = mineY + 13 + hash(i + 8, 92) * 50;
-      rect(px, py, 1, 5 + (i % 3) * 3, "#11181799");
-      rect(px + 2, py + 2, 4, 1, "#9c937455");
+    for (let i = 0; i < 6; i++) {
+      const gx = mineX - 12 + i * 31;
+      rect(gx, mineY + 79, 2, 7, "#354b32");
+      rect(gx + 2, mineY + 77, 3, 6, "#617447");
     }
 
     c.restore();
@@ -40530,6 +40476,14 @@ v0826ParentsLeaveTransition =
 
   const v08842SolidBase = solid;
   solid = function(x, y) {
+    if (
+      state?.room === "oldRoad" &&
+      x >= 112 && x <= 306 &&
+      y >= 744 && y <= 849
+    ) {
+      return true;
+    }
+
     if (state?.room === "oldRoad") {
       for (const tree of v08842GetOldRoadTrees()) {
         if (v08842TreeHit(x, y, tree, tree.y, tree.scale || 1)) {
@@ -40727,8 +40681,8 @@ v0826ParentsLeaveTransition =
   // FIM DO PASSE 0.8.42
   // =========================================================
 
-  // 0.8.44 — detalhes de asfalto/terra com coordenadas estáveis do mapa.
-  $("version").textContent = "PROTÓTIPO · 0.8.44";
+  // 0.8.45 — detalhes de asfalto/terra com coordenadas estáveis do mapa.
+  $("version").textContent = "PROTÓTIPO · 0.8.45";
   
   requestAnimationFrame(frame);
   showBootSplash();
