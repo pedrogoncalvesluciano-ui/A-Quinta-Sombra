@@ -13405,8 +13405,11 @@ update = function(dt) {
       108 * dt
     );
 
-    e.x += dx / distance * step;
-    e.y += dy / distance * step;
+    v0850MoveGarciaWithCollision(
+      e,
+      dx / distance * step,
+      dy / distance * step
+    );
   }
 };
 
@@ -41158,7 +41161,7 @@ function v0849EnsureOsmarAfterVisit() {
 
   if (
     !f.osmarAfterVisit &&
-    f.completed?.osmar &&
+    (f.completed?.osmar || f.osmarStage >= 3) &&
     !v0849HasLegacyWestProgress()
   ) {
     f.osmarAfterVisit = {
@@ -41467,6 +41470,16 @@ v0649Chapter4Unlocked = function() {
     !v0849HasLegacyWestProgress()
   ) {
     return false;
+  }
+
+  if (
+    flow?.nextDayReady &&
+    state?.stage !== "prologue" &&
+    state.storyFlags?.raimundoMet &&
+    state.storyFlags?.mineExteriorSeen &&
+    state.storyFlags?.observerFirstSeen
+  ) {
+    return true;
   }
 
   return v0849Chapter4UnlockedBase();
