@@ -33276,7 +33276,7 @@ function v0828TruthNarrative(round) {
     return [
       [
         "Observador",
-        "Você é filho único."
+        "Seu irmão nunca esteve aqui."
       ],
       "A voz do seu irmão some da sua percepção. O espaço ao lado da sua mãe parece vazio."
     ];
