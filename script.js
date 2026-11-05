@@ -7417,6 +7417,7 @@ function v06Sleep() {
         state.brotherFood = after;
         state.day += 1;
         state.minutes = 0;
+        v0849OnVoluntarySleepCompleted();
         state.foodClock = v06AbsoluteMinutes();
         state.forcedSleepDue = false;
 
@@ -21496,6 +21497,7 @@ function v079SleepUntilNextNight() {
               state.y = housePoint(235);
               state.facing = "down";
               state.walk = 0;
+              v0849OnVoluntarySleepCompleted();
 
               keys.clear();
               near = null;
@@ -28433,7 +28435,7 @@ v080TalkOsmar = function() {
       v0825UnlockWestFromOsmar();
 
       v06Toast(
-        "O caminho oeste está liberado.",
+        "Volte para casa e descanse. A investigação continua amanhã.",
         4.2
       );
     }
@@ -41103,10 +41105,592 @@ v0826ParentsLeaveTransition =
     }
   };
 
-  // 0.8.48 — versão e cache.
-  $("version").textContent = "PROTÓTIPO · 0.8.48";
 
-  $("version").textContent = "PROTÓTIPO · 0.8.48";
+// =========================================================
+// 0.8.49 — OSMAR → RETORNO PARA CASA → NOVO DIA → OESTE
+// Cena curta de rua, sprite existente e desbloqueio por sono confirmado.
+// =========================================================
+
+const V0849_HOME_INTERIOR_ROOMS = new Set([
+  "foyer",
+  "living",
+  "kitchen",
+  "bedroom",
+  "brother",
+  "parents",
+  "hall",
+  "attic"
+]);
+
+const V0849_OSMAR_STREET_END = {
+  x: 590,
+  y: 770
+};
+
+let v0849OsmarEncounterRuntime = false;
+
+function v0849HasLegacyWestProgress() {
+  if (!state) return false;
+
+  const phase = state.finalArc?.phase || "locked";
+
+  return Boolean(
+    state.room === "westRoad" ||
+    state.chapter4?.bodySeen ||
+    state.chapter4?.bodyReported ||
+    state.storyFlags?.chapter4Complete ||
+    state.garciaEvent?.phase === "chase" ||
+    state.garciaEvent?.phase === "escaped" ||
+    state.garciaEvent?.phase === "resolved" ||
+    state.finalArc?.claudiaTestimonyDone ||
+    state.finalArc?.culdesacUnlocked ||
+    (phase !== "locked" && phase !== "postWest")
+  );
+}
+
+function v0849EnsureOsmarAfterVisit() {
+  if (!state?.forgottenAlive) return null;
+
+  const f = state.forgottenAlive;
+  state.storyFlags = state.storyFlags || {};
+
+  if (
+    !f.osmarAfterVisit &&
+    f.completed?.osmar &&
+    !v0849HasLegacyWestProgress()
+  ) {
+    f.osmarAfterVisit = {
+      version: 1,
+      pending: true,
+      active: false,
+      done: false,
+      returnPending: false,
+      returnedHome: false,
+      sleepRequested: false,
+      sleepCompleted: false,
+      nextDayReady: false,
+      sleepDay: Number.isFinite(state.day) ? state.day : 0,
+      followupTalked: false,
+      time: 0,
+      x: 680,
+      y: 895
+    };
+    save();
+  }
+
+  const flow = f.osmarAfterVisit;
+  if (!flow || typeof flow !== "object") return null;
+
+  const defaults = {
+    version: 1,
+    pending: !flow.done,
+    active: false,
+    done: false,
+    returnPending: false,
+    returnedHome: false,
+    sleepRequested: false,
+    sleepCompleted: false,
+    nextDayReady: false,
+    sleepDay: Number.isFinite(state.day) ? state.day : 0,
+    followupTalked: false,
+    time: 0,
+    x: 680,
+    y: 895
+  };
+
+  for (const [key, value] of Object.entries(defaults)) {
+    if (typeof flow[key] === "undefined") {
+      flow[key] = value;
+    }
+  }
+
+  if (
+    flow.done &&
+    flow.returnPending &&
+    V0849_HOME_INTERIOR_ROOMS.has(state.room) &&
+    !flow.returnedHome
+  ) {
+    flow.returnedHome = true;
+    save();
+  }
+
+  return flow;
+}
+
+function v0849ApplyWestReadiness(flow) {
+  if (!state || !flow) return;
+
+  state.storyFlags = state.storyFlags || {};
+  const f = state.forgottenAlive;
+
+  if (!flow.nextDayReady) {
+    state.storyFlags.osmarWestUnlocked = false;
+    f.westPresenceSeen = false;
+    f.westPresenceArmed = false;
+    f.westHintShown = false;
+    return;
+  }
+
+  state.storyFlags.osmarWestUnlocked = true;
+  f.westPresenceSeen = true;
+  f.westPresenceArmed = false;
+  f.westHintShown = true;
+
+  if (!state.flashlight) state.flashlight = {};
+  state.flashlight.owned = true;
+  state.flashlight.source = "phone";
+  state.flashlight.on = false;
+
+  if (
+    !Number.isFinite(state.flashlight.battery) ||
+    state.flashlight.battery <= 0
+  ) {
+    state.flashlight.battery = 100;
+  }
+
+  state.flashlight.emptyWarned = false;
+}
+
+function v0849OnVoluntarySleepCompleted() {
+  const flow = state?.forgottenAlive?.osmarAfterVisit;
+
+  if (
+    !flow ||
+    !flow.done ||
+    !flow.returnedHome ||
+    !flow.sleepRequested ||
+    !Number.isFinite(state.day) ||
+    state.day <= flow.sleepDay ||
+    state.room !== "bedroom"
+  ) {
+    return;
+  }
+
+  flow.sleepCompleted = true;
+  flow.nextDayReady = true;
+  flow.returnPending = false;
+  flow.pending = false;
+
+  v0849ApplyWestReadiness(flow);
+  updateHud();
+  save();
+
+  v06Toast(
+    "Novo dia · a região Oeste agora pode ser investigada.",
+    3.2
+  );
+}
+
+function v0849StartOsmarStreetEncounter() {
+  const flow = v0849EnsureOsmarAfterVisit();
+
+  if (
+    !state ||
+    state.room !== "northRoad" ||
+    !flow ||
+    !flow.pending ||
+    flow.done ||
+    flow.active ||
+    v0849OsmarEncounterRuntime
+  ) {
+    return false;
+  }
+
+  v0849OsmarEncounterRuntime = true;
+  flow.active = true;
+  flow.time = 0;
+  flow.x = 680;
+  flow.y = 895;
+
+  transitionBusy = true;
+  keys.clear();
+  near = null;
+  state.walk = 0;
+  state.facing = "down";
+
+  save();
+  return true;
+}
+
+function v0849UpdateOsmarStreetEncounter(dt) {
+  const flow = state?.forgottenAlive?.osmarAfterVisit;
+  if (!flow?.active) return false;
+
+  flow.time += dt;
+
+  const progress = Math.min(1, flow.time / 1.65);
+  const eased = progress * progress * (3 - 2 * progress);
+
+  // Osmar corre pela própria rua; o jogador não é teleportado.
+  flow.x = 680 + (V0849_OSMAR_STREET_END.x - 680) * eased;
+  flow.y = 895 + (V0849_OSMAR_STREET_END.y - 895) * eased;
+
+  if (progress >= 1) {
+    flow.active = false;
+    flow.pending = true;
+    flow.x = V0849_OSMAR_STREET_END.x;
+    flow.y = V0849_OSMAR_STREET_END.y;
+
+    transitionBusy = false;
+    keys.clear();
+
+    say(
+      [
+        [
+          "Osmar",
+          "Ei, Estevão! Preciso voltar pra casa. Minha mãe vai acabar se perguntando onde eu fui parar."
+        ],
+        [
+          "Você",
+          "Tudo bem. Obrigado por ter conversado comigo."
+        ],
+        [
+          "Osmar",
+          "Tomara que você encontre seus pais. Até mais."
+        ]
+      ],
+      () => {
+        flow.done = true;
+        flow.pending = false;
+        flow.returnPending = true;
+        flow.returnedHome = false;
+        flow.sleepRequested = false;
+        flow.sleepCompleted = false;
+        flow.nextDayReady = false;
+        flow.sleepDay = Number.isFinite(state.day) ? state.day : 0;
+        flow.active = false;
+
+        v0849ApplyWestReadiness(flow);
+        updateHud();
+        save();
+      }
+    );
+  }
+
+  return true;
+}
+
+const v0849PrepareBase = prepareSystems;
+prepareSystems = function() {
+  v0849PrepareBase();
+
+  if (!state?.forgottenAlive) return;
+
+  const flow = v0849EnsureOsmarAfterVisit();
+  if (!flow) return;
+
+  // O save pode ter sido feito durante a animação. Após recarregar,
+  // a cena recomeça do início, sem deixar Estevão ou Osmar presos.
+  if (flow.active && !v0849OsmarEncounterRuntime) {
+    flow.active = false;
+    flow.time = 0;
+  }
+
+  if (
+    flow.done &&
+    flow.returnPending &&
+    V0849_HOME_INTERIOR_ROOMS.has(state.room) &&
+    !flow.returnedHome
+  ) {
+    flow.returnedHome = true;
+    save();
+  }
+
+  v0849ApplyWestReadiness(flow);
+};
+
+const v0849UnlockWestBase =
+  v0825UnlockWestFromOsmar;
+
+v0825UnlockWestFromOsmar = function() {
+  v0849UnlockWestBase();
+
+  const flow = v0849EnsureOsmarAfterVisit();
+  if (!flow || v0849HasLegacyWestProgress()) return;
+
+  flow.pending = true;
+  flow.active = false;
+  flow.done = false;
+  flow.returnPending = false;
+  flow.returnedHome = false;
+  flow.sleepRequested = false;
+  flow.sleepCompleted = false;
+  flow.nextDayReady = false;
+  flow.sleepDay = Number.isFinite(state.day) ? state.day : 0;
+  flow.time = 0;
+  flow.x = 680;
+  flow.y = 895;
+
+  v0849ApplyWestReadiness(flow);
+  v0849OsmarEncounterRuntime = false;
+
+  if (state.room === "northRoad") {
+    v0849StartOsmarStreetEncounter();
+  }
+
+  updateHud();
+  save();
+};
+
+// Preserva o acesso em saves que já começaram o caso. Nos demais,
+// Osmar só libera o Oeste depois de voltar para casa e dormir.
+const v0849Chapter4UnlockedBase =
+  v0649Chapter4Unlocked;
+
+v0649Chapter4Unlocked = function() {
+  const flow = v0849EnsureOsmarAfterVisit();
+
+  if (
+    flow &&
+    !flow.nextDayReady &&
+    !v0849HasLegacyWestProgress()
+  ) {
+    return false;
+  }
+
+  return v0849Chapter4UnlockedBase();
+};
+
+const v0849OsvaldoStartBase =
+  v0830StartOsvaldoStreetScene;
+
+v0830StartOsvaldoStreetScene = function() {
+  const flow = v0849EnsureOsmarAfterVisit();
+
+  if (
+    flow &&
+    !flow.nextDayReady &&
+    !v0849HasLegacyWestProgress()
+  ) {
+    return;
+  }
+
+  return v0849OsvaldoStartBase();
+};
+
+const v0849UpdateBase = update;
+update = function(dt) {
+  const flow = state?.forgottenAlive?.osmarAfterVisit;
+
+  if (flow?.active) {
+    elapsed += dt;
+    v0849UpdateOsmarStreetEncounter(dt);
+    return;
+  }
+
+  v0849UpdateBase(dt);
+
+  const current = v0849EnsureOsmarAfterVisit();
+  if (!state || !current) return;
+
+  if (
+    current.pending &&
+    !current.done &&
+    state.room === "northRoad" &&
+    !dialog &&
+    !transitionBusy
+  ) {
+    v0849StartOsmarStreetEncounter();
+  }
+
+  if (
+    current.done &&
+    current.returnPending &&
+    V0849_HOME_INTERIOR_ROOMS.has(state.room) &&
+    !current.returnedHome
+  ) {
+    current.returnedHome = true;
+    save();
+  }
+};
+
+const v0849DrawBase = drawWorld;
+drawWorld = function() {
+  v0849DrawBase();
+
+  const flow = state?.forgottenAlive?.osmarAfterVisit;
+  if (
+    !flow ||
+    state.room !== "northRoad" ||
+    state.finalArc?.epilogueActive
+  ) {
+    return;
+  }
+
+  const visible =
+    flow.active ||
+    (
+      flow.done &&
+      !flow.nextDayReady
+    );
+
+  if (!visible) return;
+
+  const x = flow.active
+    ? flow.x
+    : V0849_OSMAR_STREET_END.x;
+  const y = flow.active
+    ? flow.y
+    : V0849_OSMAR_STREET_END.y;
+
+  c.save();
+  c.translate(
+    -Math.floor(camera.x),
+    -Math.floor(camera.y)
+  );
+
+  if (flow.active) {
+    for (let i = 0; i < 3; i++) {
+      const fade = 0.5 - i * 0.12;
+      rect(
+        x + 17 + i * 8,
+        y + 7 + i * 3,
+        8,
+        2,
+        "rgba(190,184,165," + fade + ")"
+      );
+    }
+  }
+
+  person(
+    x,
+    y,
+    "npcMale",
+    flow.active ? flow.time * 11 : 0,
+    flow.active ? "left" : "down",
+    0.94
+  );
+
+  txt(
+    "OSMAR",
+    x - 18,
+    y - 36,
+    "#b8b09b",
+    7
+  );
+
+  c.restore();
+};
+
+const v0849GetNearBase = getNear;
+getNear = function() {
+  const flow = state?.forgottenAlive?.osmarAfterVisit;
+
+  if (
+    flow?.done &&
+    !state.finalArc?.epilogueActive &&
+    state.room === "northRoad" &&
+    Math.hypot(
+      state.x - V0849_OSMAR_STREET_END.x,
+      state.y - V0849_OSMAR_STREET_END.y
+    ) < 66
+  ) {
+    return {
+      label: "Falar com Osmar",
+      action: "v0849OsmarFollowup"
+    };
+  }
+
+  return v0849GetNearBase();
+};
+
+const v0849InteractBase = interact;
+interact = function(action) {
+  if (action === "v0849OsmarFollowup") {
+    const flow = state?.forgottenAlive?.osmarAfterVisit;
+    if (!flow?.done) return;
+
+    say(
+      flow.followupTalked
+        ? [
+            [
+              "Osmar",
+              "Ainda não lembrei de mais nada além do que te contei. Espero que encontre seus pais."
+            ]
+          ]
+        : [
+            [
+              "Estevão",
+              "Osmar, você lembrou de mais alguma coisa?"
+            ],
+            [
+              "Osmar",
+              "Não. Só preciso resolver umas coisas em casa. Boa sorte, Estevão."
+            ]
+          ],
+      () => {
+        flow.followupTalked = true;
+        save();
+      }
+    );
+    return;
+  }
+
+  v0849InteractBase(action);
+};
+
+// O desbloqueio é confirmado somente pelo botão "Dormir".
+// Cancelar o modal ou apenas atravessar o amanhecer não libera o Oeste.
+const v0849SleepBase =
+  v079SleepUntilNextNight;
+
+v079SleepUntilNextNight = function() {
+  const flow = state?.forgottenAlive?.osmarAfterVisit;
+
+  if (
+    flow?.done &&
+    flow.returnedHome &&
+    !flow.nextDayReady
+  ) {
+    flow.sleepRequested = true;
+    save();
+  }
+
+  return v0849SleepBase();
+};
+
+const v0849HudBase = updateHud;
+updateHud = function() {
+  v0849HudBase();
+
+  const flow = state?.forgottenAlive?.osmarAfterVisit;
+  if (!flow || !state || state.stage === "prologue") return;
+
+  if (flow.pending && !flow.done) {
+    $("objective").textContent =
+      flow.active
+        ? "Osmar está vindo pela rua."
+        : "Escute o que Osmar ainda quer dizer.";
+    return;
+  }
+
+  if (flow.done && flow.returnPending && !flow.returnedHome) {
+    $("objective").textContent =
+      "Volte para casa. Depois, descanse no seu quarto.";
+    return;
+  }
+
+  if (flow.done && flow.returnedHome && !flow.nextDayReady) {
+    $("objective").textContent =
+      "Conclua as atividades que desejar e durma para começar o próximo dia.";
+    return;
+  }
+
+  if (flow.nextDayReady && !state.chapter4?.bodySeen) {
+    $("objective").textContent =
+      "A região Oeste está disponível. Saia de casa e investigue o local.";
+  }
+};
+
+// =========================================================
+// FIM DO PASSE 0.8.49
+// =========================================================
+
+
+  // 0.8.48 — versão e cache.
+  $("version").textContent = "PROTÓTIPO · 0.8.49";
+
+  $("version").textContent = "PROTÓTIPO · 0.8.49";
   
   requestAnimationFrame(frame);
   showBootSplash();
