@@ -41701,9 +41701,9 @@ updateHud = function() {
 
 
   // 0.8.50 — versão e cache.
-  $("version").textContent = "PROTÓTIPO · 0.8.49";
+  $("version").textContent = "PROTÓTIPO · 0.8.50";
 
-  $("version").textContent = "PROTÓTIPO · 0.8.49";
+  $("version").textContent = "PROTÓTIPO · 0.8.50";
   
   requestAnimationFrame(frame);
   showBootSplash();
@@ -42163,4 +42163,116 @@ v0828DrawFinalFigureScene = function() {
       );
     }
   }
+};
+
+
+const v0850CanEnterFinalHomeBase =
+  v0828CanEnterFinalHome;
+
+v0828CanEnterFinalHome = function() {
+  const f = v0828EnsureFinalArc();
+  const otherNPCs = f.epilogueTalkedNPCs.filter(
+    id => id !== "raimundo"
+  ).length;
+
+  if (otherNPCs < 5) {
+    say([
+      "Ainda preciso conversar com mais pessoas que ajudaram durante a busca."
+    ]);
+    return false;
+  }
+
+  if (!f.raimundoEpilogueDone) {
+    say([
+      "Ainda não... preciso falar com o Raimundo antes de voltar."
+    ]);
+    return false;
+  }
+
+  return true;
+};
+
+const v0850EpilogueDialogueBase =
+  v0828EpilogueDialogue;
+
+v0828EpilogueDialogue = function(id) {
+  const f = v0828EnsureFinalArc();
+
+  if (f.epilogueTalkedNPCs.includes(id)) {
+    const repeats = {
+      raimundo: ["Raimundo", "É tudo o que consigo lembrar, garoto. Sobre o que aconteceu exatamente, eu não sei."],
+      claudia: ["Cláudia", "Espero que sua mãe continue melhorando. Se cuida, Estevão."],
+      norberto: ["Norberto", "Qualquer notícia do meu irmão, eu aviso vocês."],
+      florinda: ["Florinda", "Cuidem um do outro. E não esqueçam de descansar também."],
+      anisio: ["Anísio", "Se aparecer alguma informação sobre seu pai, vou avisar."],
+      garcia: ["Garcia", "Ainda me assusto quando lembro daquele dia. Mas fico feliz que vocês estejam bem."],
+      market: ["Funcionário", "Espero que seu pai apareça. Boa sorte para vocês."],
+      osmar: ["Osmar", "Tomara que as coisas melhorem por aí. Até mais."]
+    };
+
+    const repeat = repeats[id] || ["Morador", "Espero que tudo fique bem com sua família."];
+    say([[repeat[0], repeat[1]]]);
+    return;
+  }
+
+  return v0850EpilogueDialogueBase(id);
+};
+
+const v0850ThanksAndFinalFigureBase =
+  v0828ThanksAndFinalFigure;
+
+v0828ThanksAndFinalFigure = function() {
+  const f = v0828EnsureFinalArc();
+
+  if (!f.homeMotherDone || f.finalFigureStarted) return;
+
+  f.epilogueTvOn = true;
+  f.finalFigureStarted = true;
+  f.phase = "finalFigure";
+
+  say([
+    ["Estevão", "Mãe... irmão..."],
+    ["Mãe", "Oi, filho?"],
+    ["Estevão", "Eu queria agradecer. Por vocês estarem aqui e por não desistirem um do outro."],
+    ["Irmão", "A gente passou por tudo junto."],
+    ["Estevão", "E não foi só a gente. A Florinda, o Raimundo, o Anísio... muita gente ajudou."],
+    ["Mãe", "Você não precisava ter carregado tudo sozinho."],
+    ["Estevão", "Eu sei. Mas eu não queria perder vocês."],
+    ["Irmão", "Agora estamos juntos. Isso que importa."],
+    ["Mãe", "Estamos, meus filhos."]
+  ], () => {
+    $("hud").hidden = true;
+    $("prompt").hidden = true;
+    keys.clear();
+
+    transitionBusy = true;
+
+    v0828FinalScene.active = true;
+    v0828FinalScene.time = 0;
+    v0828FinalScene.creditsOpened = false;
+
+    save();
+  });
+};
+
+const v0850HudFinalBase =
+  updateHud;
+
+updateHud = function() {
+  v0850HudFinalBase();
+
+  const f = state ? v0828EnsureFinalArc() : null;
+  if (!f?.epilogueActive) return;
+
+  const otherNPCs = f.epilogueTalkedNPCs.filter(
+    id => id !== "raimundo"
+  ).length;
+
+  $("objective").textContent =
+    "Converse com quem ajudou · " +
+    otherNPCs +
+    "/5" +
+    (f.raimundoEpilogueDone
+      ? " · RAIMUNDO ✓"
+      : " · FALE COM RAIMUNDO");
 };
