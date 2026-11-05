@@ -42276,3 +42276,93 @@ updateHud = function() {
       ? " · RAIMUNDO ✓"
       : " · FALE COM RAIMUNDO");
 };
+
+
+function v0850DrawBasementPrototypeDetails() {
+  if (
+    !state ||
+    state.room !== "basement" ||
+    !state.finalArc?.useCanonicalLateArc ||
+    !["cellarExplore", "cellarPush"].includes(state.finalArc.phase)
+  ) {
+    return;
+  }
+
+  c.save();
+  c.translate(
+    -Math.floor(camera.x),
+    -Math.floor(camera.y)
+  );
+
+  const hp = value => housePoint(value);
+
+  // Vigas antigas sustentando o teto. São desenhos adicionais,
+  // sem alterar as colisões ou o piso original do cômodo.
+  rect(hp(25), hp(28), hp(590), hp(9), "#282b28");
+  rect(hp(28), hp(30), hp(584), hp(3), "#76634a");
+  rect(hp(35), hp(35), hp(8), hp(30), "#43392c");
+  rect(hp(596), hp(35), hp(8), hp(30), "#43392c");
+  rect(hp(42), hp(54), hp(530), hp(4), "#4a4032");
+  rect(hp(42), hp(55), hp(530), hp(1), "#937a55");
+
+  // Tubulação antiga na parede superior e descida lateral.
+  rect(hp(38), hp(68), hp(530), hp(5), "#343d3b");
+  rect(hp(38), hp(68), hp(530), hp(2), "#849087");
+  rect(hp(548), hp(68), hp(6), hp(105), "#343d3b");
+  rect(hp(549), hp(69), hp(2), hp(101), "#849087");
+  rect(hp(525), hp(82), hp(28), hp(4), "#4b5550");
+  rect(hp(525), hp(80), hp(5), hp(8), "#292f2c");
+
+  // Ferramentas sobre a caixa existente: martelo, chave e pé de cabra.
+  const tx = hp(82);
+  const ty = hp(90);
+  rect(tx + hp(13), ty + hp(2), hp(3), hp(30), "#72563a");
+  rect(tx + hp(5), ty + hp(4), hp(20), hp(4), "#92958a");
+  rect(tx + hp(27), ty + hp(10), hp(3), hp(19), "#686d68");
+  rect(tx + hp(22), ty + hp(9), hp(13), hp(3), "#9b9a88");
+  rect(tx + hp(38), ty + hp(5), hp(3), hp(26), "#604c37");
+  rect(tx + hp(35), ty + hp(4), hp(10), hp(3), "#898d85");
+
+  // Documento antigo preso a uma prancheta na parede.
+  const dx = hp(286);
+  const dy = hp(83);
+  rect(dx - hp(4), dy - hp(4), hp(66), hp(48), "#40372e");
+  rect(dx, dy, hp(58), hp(40), "#b4a27d");
+  rect(dx + hp(3), dy + hp(3), hp(52), hp(34), "#d4c7a4");
+  rect(dx + hp(8), dy + hp(8), hp(39), hp(2), "#5e5545");
+  rect(dx + hp(8), dy + hp(14), hp(43), hp(1), "#81765f");
+  rect(dx + hp(8), dy + hp(19), hp(35), hp(1), "#81765f");
+  rect(dx + hp(8), dy + hp(24), hp(40), hp(1), "#81765f");
+  txt("SPLIT", dx + hp(9), dy + hp(33), "#594a38", 5);
+
+  // Equipamento de mineração junto ao armário antigo.
+  const mx = hp(472);
+  const my = hp(208);
+  rect(mx, my + hp(21), hp(60), hp(5), "#343b39");
+  rect(mx + hp(5), my + hp(26), hp(4), hp(12), "#4d4639");
+  rect(mx + hp(48), my + hp(26), hp(4), hp(12), "#4d4639");
+  c.strokeStyle = "#7d725d";
+  c.lineWidth = 2;
+  c.beginPath();
+  c.arc(mx + hp(29), my + hp(19), hp(14), Math.PI, Math.PI * 2);
+  c.stroke();
+  rect(mx + hp(15), my + hp(9), hp(29), hp(4), "#72674f");
+  rect(mx + hp(26), my + hp(2), hp(5), hp(8), "#9a885e");
+  rect(mx + hp(7), my + hp(15), hp(5), hp(11), "#777d76");
+
+  // Marcas de infiltração e rachaduras discretas.
+  rect(hp(58), hp(158), hp(44), hp(2), "#343b35");
+  rect(hp(68), hp(161), hp(2), hp(13), "#343b35");
+  rect(hp(555), hp(244), hp(35), hp(2), "#343b35");
+  rect(hp(576), hp(246), hp(2), hp(9), "#343b35");
+  rect(hp(182), hp(300), hp(72), hp(2), "#4a4438");
+  rect(hp(201), hp(302), hp(2), hp(8), "#4a4438");
+
+  c.restore();
+}
+
+const v0850DrawBasementBase = drawWorld;
+drawWorld = function() {
+  v0850DrawBasementBase();
+  v0850DrawBasementPrototypeDetails();
+};
