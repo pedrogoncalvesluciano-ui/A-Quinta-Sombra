@@ -41751,3 +41751,329 @@ function v0850MoveGarciaWithCollision(entity, dx, dy) {
     }
   }
 }
+
+
+function v0850EnsureStreetWitnesses() {
+  const f = v0828EnsureFinalArc();
+  if (!f) return null;
+
+  if (!f.streetWitnesses || typeof f.streetWitnesses !== "object") {
+    const alreadyAdvanced = Boolean(
+      f.plazaLinkUnlocked ||
+      f.raimundoCoupleRumorDone ||
+      f.residentA ||
+      f.residentB ||
+      f.falseParentsFound ||
+      f.falseParentsHome
+    );
+
+    f.streetWitnesses = {
+      leftWoman: alreadyAdvanced,
+      rightResidentA: alreadyAdvanced,
+      rightResidentB: alreadyAdvanced,
+      legacyBypass: alreadyAdvanced
+    };
+  }
+
+  const w = f.streetWitnesses;
+  for (const key of ["leftWoman", "rightResidentA", "rightResidentB", "legacyBypass"]) {
+    if (typeof w[key] !== "boolean") w[key] = false;
+  }
+
+  return w;
+}
+
+function v0850StreetInvestigationActive() {
+  const f = state ? v0828EnsureFinalArc() : null;
+  const w = f ? v0850EnsureStreetWitnesses() : null;
+
+  return Boolean(
+    state &&
+    state.room === "village" &&
+    state.chapter4?.bodyReported &&
+    f?.useCanonicalLateArc &&
+    w &&
+    !w.legacyBypass &&
+    !f.epilogueActive
+  );
+}
+
+function v0850AllStreetWitnessesHeard(w) {
+  return Boolean(w && w.leftWoman && w.rightResidentA && w.rightResidentB);
+}
+
+const V0850_HOME_STREET_NPCS = [
+  {
+    id: "leftWoman",
+    action: "v0850StreetLeftWoman",
+    x: 300,
+    y: 794,
+    kind: "npcFemale",
+    label: "MORADORA",
+    prompt: "Falar com a moradora"
+  },
+  {
+    id: "rightResidentA",
+    action: "v0850StreetRightA",
+    x: 820,
+    y: 794,
+    kind: "npcMale",
+    label: "MORADOR",
+    prompt: "Falar com o morador"
+  },
+  {
+    id: "rightResidentB",
+    action: "v0850StreetRightB",
+    x: 1040,
+    y: 794,
+    kind: "npcFemale",
+    label: "MORADORA",
+    prompt: "Falar com a moradora"
+  }
+];
+
+function v0850TalkStreetWitness(id) {
+  const f = v0828EnsureFinalArc();
+  const w = v0850EnsureStreetWitnesses();
+
+  if (!f || !w || !v0850StreetInvestigationActive()) return;
+
+  if (id === "leftWoman") {
+    if (w.leftWoman) {
+      say([["Moradora", "Só lembro que aquele casal seguiu pela rua principal. Depois não vi mais os dois."]]);
+      return;
+    }
+
+    say([
+      ["Estevão", "Você viu um homem e uma mulher passando por aqui no dia em que meus pais desapareceram?"],
+      ["Moradora", "Vi, sim. Eles estavam a pé e seguiram na direção da rua principal, para o lado do mercado."],
+      ["Estevão", "Pareciam perdidos?"],
+      ["Moradora", "Não. Pareciam saber para onde estavam indo."]
+    ], () => {
+      w.leftWoman = true;
+      updateHud();
+      save();
+    });
+    return;
+  }
+
+  if (id === "rightResidentA") {
+    if (w.rightResidentA) {
+      say([["Morador", "Foi pouco depois das duas. Não consigo precisar mais do que isso."]]);
+      return;
+    }
+
+    say([
+      ["Estevão", "Você se lembra de alguém passando por esta rua naquela tarde?"],
+      ["Morador", "Um homem e uma mulher. Foi pouco depois das duas, eu lembro porque tinha acabado de guardar as coisas do almoço."],
+      ["Estevão", "Você viu para onde foram?"],
+      ["Morador", "Seguiram pela rua. Não consegui acompanhar depois."]
+    ], () => {
+      w.rightResidentA = true;
+      updateHud();
+      save();
+    });
+    return;
+  }
+
+  if (id === "rightResidentB") {
+    if (w.rightResidentB) {
+      say([["Moradora", "Eles pareciam conhecer Forgotten. Foi essa a impressão que tive."]]);
+      return;
+    }
+
+    say([
+      ["Estevão", "Um homem e uma mulher passaram por aqui naquele dia?"],
+      ["Moradora", "Passaram. Não pararam para pedir informação, nem ficaram olhando as casas."],
+      ["Estevão", "Então pareciam conhecer a cidade?"],
+      ["Moradora", "Foi o que pensei. Mas só vi os dois por alguns segundos."]
+    ], () => {
+      w.rightResidentB = true;
+      updateHud();
+      save();
+    });
+  }
+}
+
+const v0850DrawStreetBase = drawWorld;
+drawWorld = function() {
+  v0850DrawStreetBase();
+
+  if (v0850StreetInvestigationActive()) {
+    c.save();
+    c.translate(-Math.floor(camera.x), -Math.floor(camera.y));
+
+    for (const npc of V0850_HOME_STREET_NPCS) {
+      person(
+        npc.x,
+        npc.y,
+        npc.kind,
+        Math.sin(elapsed * 1.8) * 0.18,
+        "down",
+        0.92
+      );
+
+      txt(npc.label, npc.x - 25, npc.y - 36, "#c4b99f", 7);
+    }
+
+    c.restore();
+  }
+
+  const f = state?.finalArc;
+  if (
+    state?.room === "coupleRoad" &&
+    f?.useCanonicalLateArc &&
+    f.plazaLinkUnlocked &&
+    !f.epilogueActive
+  ) {
+    c.save();
+    c.translate(-Math.floor(camera.x), -Math.floor(camera.y));
+
+    person(380, 260, "npcFemale", Math.sin(elapsed * 1.7) * 0.15, "down", 0.92);
+    txt("MORADORA", 350, 226, "#c4b99f", 7);
+
+    person(810, 260, "npcMale", Math.sin(elapsed * 1.9) * 0.15, "down", 0.92);
+    txt("MORADOR", 786, 226, "#c4b99f", 7);
+
+    c.restore();
+  }
+};
+
+const v0850GetNearBase = getNear;
+getNear = function() {
+  if (v0850StreetInvestigationActive()) {
+    let nearestNpc = null;
+    let nearestDistance = 58;
+
+    for (const npc of V0850_HOME_STREET_NPCS) {
+      const distance = Math.hypot(state.x - npc.x, state.y - npc.y);
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestNpc = npc;
+      }
+    }
+
+    if (nearestNpc) {
+      return { label: nearestNpc.prompt, action: nearestNpc.action };
+    }
+  }
+
+  return v0850GetNearBase();
+};
+
+const v0850InteractBase = interact;
+interact = function(action) {
+  if (action === "v0850StreetLeftWoman") {
+    v0850TalkStreetWitness("leftWoman");
+    return;
+  }
+  if (action === "v0850StreetRightA") {
+    v0850TalkStreetWitness("rightResidentA");
+    return;
+  }
+  if (action === "v0850StreetRightB") {
+    v0850TalkStreetWitness("rightResidentB");
+    return;
+  }
+
+  v0850InteractBase(action);
+};
+
+const v0850HudBase = updateHud;
+updateHud = function() {
+  v0850HudBase();
+
+  if (!v0850StreetInvestigationActive()) return;
+
+  const w = v0850EnsureStreetWitnesses();
+  if (!w) return;
+
+  $("objective").textContent =
+    !w.leftWoman
+      ? "Converse com a mulher na rua à esquerda da casa."
+      : !w.rightResidentA || !w.rightResidentB
+        ? "Procure os moradores na rua à direita da casa."
+        : "Volte a Raimundo e conte o que descobriu.";
+};
+
+const v0850RaimundoTalkBase = v0828TalkRaimundoCoupleRumor;
+v0828TalkRaimundoCoupleRumor = function() {
+  const f = v0828EnsureFinalArc();
+  const w = v0850EnsureStreetWitnesses();
+
+  if (!f || !w || !f.useCanonicalLateArc) {
+    return v0850RaimundoTalkBase();
+  }
+
+  if (f.plazaLinkUnlocked || f.raimundoCoupleRumorDone || w.legacyBypass) {
+    if (f.raimundoCoupleRumorDone) f.plazaLinkUnlocked = true;
+    return v0850RaimundoTalkBase();
+  }
+
+  if (!v0850AllStreetWitnessesHeard(w)) {
+    say([["Raimundo", "Antes de seguir por outra rua, converse com os moradores perto da sua casa. Talvez eles tenham visto o casal naquela tarde."]]);
+    return;
+  }
+
+  say([
+    ["Raimundo", "Olá, garoto. Já houve algum resultado na sua busca?"],
+    ["Estevão", "Conversei com alguns moradores. Eles se lembram de um homem e uma mulher passando pela região naquela tarde."],
+    ["Raimundo", "Também ouvi falar de um casal. Quem sabe não são seus pais."],
+    ["Estevão", "Pode ser, mas ainda não sei se eram eles."],
+    ["Raimundo", "Tente seguir pela rua que liga o bairro à Praça. Talvez encontre alguém que tenha visto os dois mais de perto."]
+  ], () => {
+    f.raimundoCoupleRumorDone = true;
+    f.plazaLinkUnlocked = true;
+    f.phase = "coupleSearch";
+    v06Toast("Nova rota · rua de ligação à Praça", 3);
+    updateHud();
+    save();
+  });
+};
+
+const v0850CoupleTalkBase = v0828TalkCoupleResident;
+v0828TalkCoupleResident = function(id) {
+  const f = v0828EnsureFinalArc();
+
+  if (!f || !f.useCanonicalLateArc) {
+    return v0850CoupleTalkBase(id);
+  }
+
+  const key = id === "a" ? "residentA" : "residentB";
+  const direction = v0828DirectionLine();
+
+  if (id === "a") {
+    if (f[key]) {
+      say([["Moradora", "Tenho certeza de que vi os dois seguindo nessa direção. Não consegui ouvir o que conversavam."]]);
+      return;
+    }
+
+    say([
+      ["Estevão", "Você viu um homem e uma mulher passando por aqui?"],
+      ["Moradora", direction],
+      ["Moradora", "Eles caminhavam juntos. Foi rápido, mas lembro dos dois."]
+    ], () => {
+      f[key] = true;
+      v0828MaybeFindFalseParents();
+      updateHud();
+      save();
+    });
+    return;
+  }
+
+  if (f[key]) {
+    say([["Morador", "Eles pareciam conhecer o caminho. Foi só essa a impressão que tive."]]);
+    return;
+  }
+
+  say([
+    ["Estevão", "Você se lembra de um casal que passou por esta rua?"],
+    ["Morador", direction],
+    ["Morador", "Não pararam para pedir informação. Pareciam conhecer a região."]
+  ], () => {
+    f[key] = true;
+    v0828MaybeFindFalseParents();
+    updateHud();
+    save();
+  });
+};
