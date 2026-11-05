@@ -33538,7 +33538,7 @@ function v0828BadEnding() {
 
   modal(
     "FINAL RUIM",
-    "Você acreditou nas ilusões e mentiras do Observador.\n\nO OBSERVADOR TE DOMINOU",
+    "Você acreditou nas ilusões e mentiras do Observador.",
     [
       [
         "Voltar ao menu",
@@ -41700,7 +41700,7 @@ updateHud = function() {
 // =========================================================
 
 
-  // 0.8.49 — versão e cache.
+  // 0.8.50 — versão e cache.
   $("version").textContent = "PROTÓTIPO · 0.8.49";
 
   $("version").textContent = "PROTÓTIPO · 0.8.49";
@@ -42076,4 +42076,91 @@ v0828TalkCoupleResident = function(id) {
     updateHud();
     save();
   });
+};
+
+
+const v0850TruthDrawBase =
+  v0828DrawTruthGame;
+
+v0828DrawTruthGame = function() {
+  v0850TruthDrawBase();
+
+  if (!v0828TruthGame.active || v0828TruthGame.round !== 6) return;
+
+  // Interferência intensa somente na tentativa final do Observador.
+  for (let i = 0; i < 28; i++) {
+    const y = (i * 11 + Math.floor(elapsed * 700) % H) % H;
+    rect(
+      (i % 5) * -7,
+      y,
+      W + 14,
+      i % 4 === 0 ? 3 : 1,
+      "rgba(235,238,232,0.13)"
+    );
+  }
+};
+
+v0828DrawFinalFigureScene = function() {
+  const t = v0828FinalScene.time;
+  rect(0, 0, W, H, "#030405");
+
+  if (t < 2.5) {
+    txt("Obrigado por tudo.", 173, 139, "#e5dfd2", 12);
+    return;
+  }
+
+  if (t >= 8.8) {
+    txt("A QUINTA SOMBRA", 151, 138, "#e7e0d2", 14);
+    return;
+  }
+
+  // Cenário provisório: o caminho vem da região Sul até a casa.
+  rect(0, 0, W, H, "#718069");
+  rect(206, 64, 170, 115, "#665746");
+  rect(220, 78, 142, 87, "#85705a");
+  rect(278, 126, 34, 53, "#312a25");
+  rect(0, 192, W, 78, "#5d5b54");
+  rect(0, 190, W, 3, "#777269");
+
+  const progress = Math.max(
+    0,
+    Math.min(1, (t - 2.5) / 5.6)
+  );
+
+  // O sprite não confirma a identidade da figura.
+  person(
+    295,
+    266 - 92 * progress,
+    "father",
+    progress < 1 ? elapsed * 8 : 0,
+    "up",
+    0.95
+  );
+
+  // A estática aparece apenas no instante em que a figura chega à porta.
+  if (t >= 7.65) {
+    const strength = Math.min(0.28, 0.10 + (t - 7.65) * 0.26);
+
+    for (let i = 0; i < 25; i++) {
+      const y = (i * 13 + Math.floor(elapsed * 510) % H) % H;
+      rect(
+        (i % 4) * -6,
+        y,
+        W + 12,
+        i % 3 === 0 ? 2 : 1,
+        "rgba(235,238,232," + strength + ")"
+      );
+    }
+
+    for (let i = 0; i < 7; i++) {
+      const x = (i * 59 + Math.floor(elapsed * 190)) % W;
+      rect(
+        x,
+        65 + (i * 23) % 150,
+        12 + (i % 3) * 7,
+        2,
+        "rgba(9,11,12,0.24)"
+      );
+    }
+  }
 };
