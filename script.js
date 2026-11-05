@@ -8196,18 +8196,6 @@ getNear = function () {
   if (state.room === "village" && state.finished) {
     if (
       Math.hypot(
-        state.x - V061_GARDEN.x,
-        state.y - V061_GARDEN.y
-      ) < 42
-    ) {
-      return {
-        label: "Colher legumes",
-        action: "food:garden"
-      };
-    }
-
-    if (
-      Math.hypot(
         state.x - V061_ORCHARD.x,
         state.y - V061_ORCHARD.y
       ) < 42
@@ -8258,14 +8246,6 @@ getNear = function () {
 
 interact = function (action) {
   prepareSystems();
-
-  if (action === "food:garden") {
-    v061TakeFood(
-      "gardenFoodCycle",
-      "Horta"
-    );
-    return;
-  }
 
   if (action === "food:orchard") {
     v061TakeFood(
@@ -8386,25 +8366,6 @@ drawWorld = function () {
     -Math.floor(camera.x),
     -Math.floor(camera.y)
   );
-
-  // Horta simples — fonte extra de uma porção por ciclo.
-  rect(
-    V061_GARDEN.x - 34,
-    V061_GARDEN.y - 20,
-    68,
-    40,
-    "#4b3b2d"
-  );
-
-  for (let i = -24; i <= 24; i += 12) {
-    rect(
-      V061_GARDEN.x + i,
-      V061_GARDEN.y - 12,
-      5,
-      24,
-      "#567a47"
-    );
-  }
 
   // Pomar simples — segunda fonte extra.
   rect(
@@ -41700,10 +41661,10 @@ updateHud = function() {
 // =========================================================
 
 
-  // 0.8.50 — versão e cache.
-  $("version").textContent = "PROTÓTIPO · 0.8.50";
+  // 0.8.51 — versão e cache.
+  $("version").textContent = "PROTÓTIPO · 0.8.51";
 
-  $("version").textContent = "PROTÓTIPO · 0.8.50";
+  $("version").textContent = "PROTÓTIPO · 0.8.51";
   
   requestAnimationFrame(frame);
   showBootSplash();
