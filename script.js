@@ -7409,6 +7409,7 @@ function v06Sleep() {
 
   const sleepNow = () => {
     closeModal();
+    v0849OnVoluntarySleepRequested();
 
     fade(
       forced ? "Você não aguenta mais" : "Enquanto você dorme",
@@ -21445,6 +21446,7 @@ function v079SleepUntilNextNight() {
         "Dormir",
         () => {
           closeModal();
+          v0849OnVoluntarySleepRequested();
 
           fade(
             "Você decide descansar",
@@ -41237,9 +41239,12 @@ function v0849ApplyWestReadiness(flow) {
   f.westHintShown = true;
 
   if (!state.flashlight) state.flashlight = {};
+  const firstPhoneLight = !state.flashlight.owned;
   state.flashlight.owned = true;
   state.flashlight.source = "phone";
-  state.flashlight.on = false;
+  if (typeof state.flashlight.on !== "boolean" || firstPhoneLight) {
+    state.flashlight.on = false;
+  }
 
   if (
     !Number.isFinite(state.flashlight.battery) ||
@@ -41249,6 +41254,22 @@ function v0849ApplyWestReadiness(flow) {
   }
 
   state.flashlight.emptyWarned = false;
+}
+
+function v0849OnVoluntarySleepRequested() {
+  const flow = state?.forgottenAlive?.osmarAfterVisit;
+
+  if (
+    !flow ||
+    !flow.done ||
+    !flow.returnedHome ||
+    flow.nextDayReady
+  ) {
+    return;
+  }
+
+  flow.sleepRequested = true;
+  save();
 }
 
 function v0849OnVoluntarySleepCompleted() {
@@ -41519,10 +41540,7 @@ drawWorld = function() {
 
   const visible =
     flow.active ||
-    (
-      flow.done &&
-      !flow.nextDayReady
-    );
+    flow.done;
 
   if (!visible) return;
 
@@ -41631,24 +41649,6 @@ interact = function(action) {
 
 // O desbloqueio é confirmado somente pelo botão "Dormir".
 // Cancelar o modal ou apenas atravessar o amanhecer não libera o Oeste.
-const v0849SleepBase =
-  v079SleepUntilNextNight;
-
-v079SleepUntilNextNight = function() {
-  const flow = state?.forgottenAlive?.osmarAfterVisit;
-
-  if (
-    flow?.done &&
-    flow.returnedHome &&
-    !flow.nextDayReady
-  ) {
-    flow.sleepRequested = true;
-    save();
-  }
-
-  return v0849SleepBase();
-};
-
 const v0849HudBase = updateHud;
 updateHud = function() {
   v0849HudBase();
@@ -41687,7 +41687,7 @@ updateHud = function() {
 // =========================================================
 
 
-  // 0.8.48 — versão e cache.
+  // 0.8.49 — versão e cache.
   $("version").textContent = "PROTÓTIPO · 0.8.49";
 
   $("version").textContent = "PROTÓTIPO · 0.8.49";
