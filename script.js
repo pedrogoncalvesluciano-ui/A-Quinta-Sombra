@@ -41710,3 +41710,44 @@ updateHud = function() {
 })();
 
 
+
+
+const v0850OsvaldoTriggerBase =
+  v0828TriggerOsvaldoWestScene;
+
+v0828TriggerOsvaldoWestScene = function() {
+  const flow = v0849EnsureOsmarAfterVisit();
+
+  if (
+    flow &&
+    !flow.nextDayReady &&
+    !v0849HasLegacyWestProgress()
+  ) {
+    return;
+  }
+
+  return v0850OsvaldoTriggerBase();
+};
+
+function v0850MoveGarciaWithCollision(entity, dx, dy) {
+  if (!entity || !state || state.room !== "westRoad") return;
+
+  const distance = Math.hypot(dx, dy);
+  const steps = Math.max(1, Math.ceil(distance / 3));
+  const sx = dx / steps;
+  const sy = dy / steps;
+
+  for (let i = 0; i < steps; i++) {
+    const canX = !solid(entity.x + sx, entity.y);
+    const canY = !solid(entity.x, entity.y + sy);
+
+    if (canX && canY) {
+      entity.x += sx;
+      entity.y += sy;
+    } else if (canX) {
+      entity.x += sx;
+    } else if (canY) {
+      entity.y += sy;
+    }
+  }
+}
