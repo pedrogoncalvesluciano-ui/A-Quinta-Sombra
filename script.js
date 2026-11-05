@@ -41661,10 +41661,193 @@ updateHud = function() {
 // =========================================================
 
 
-  // 0.8.51 — versão e cache.
-  $("version").textContent = "PROTÓTIPO · 0.8.51";
+  // =========================================================
+  // 0.8.52 — PASSE VISUAL: ATMOSFERA, POSTES E CICLO DE LUZ
+  // Camada aditiva: preserva sprites, mapas, colisões e Canvas base.
+  // =========================================================
 
-  $("version").textContent = "PROTÓTIPO · 0.8.51";
+  const V0852_LAMP_POSITIONS = {
+    village: [
+      [575, 330], [705, 520], [575, 690],
+      [705, 900], [270, 475], [990, 475]
+    ],
+    westRoad: [
+      [150, 245], [390, 245], [640, 245],
+      [880, 245], [1130, 245], [1320, 245]
+    ]
+  };
+
+  function v0852LampIntensity(index) {
+    return 0.94
+      + Math.sin(elapsed * 2.1 + index * 2.7) * 0.035
+      + Math.sin(elapsed * 9.4 + index * 1.9) * 0.012;
+  }
+
+  function v0852DrawLampFixtures() {
+    if (!state || !V0852_LAMP_POSITIONS[state.room]) return;
+
+    const night = v084NightStrength();
+    const lit = night > 0.12;
+    const positions = V0852_LAMP_POSITIONS[state.room];
+
+    c.save();
+    c.translate(-Math.floor(camera.x), -Math.floor(camera.y));
+
+    positions.forEach(([x, y], index) => {
+      const isWest = state.room === "westRoad";
+      const top = isWest ? y - 7 : y - 7;
+
+      // Reforço visual sobre os postes já existentes; não altera hitboxes.
+      rect(x - 8, top, 20, 6, "#252c2d");
+      rect(x - 6, top - 2, 16, 2, "#59615d");
+      rect(x - 5, top + 1, 14, 3, lit ? "#c6a66c" : "#65716c");
+      rect(x - 4, top + 1, 11, 1, lit ? "#fff0bf" : "#a5aa9c");
+      rect(x - 7, top + 4, 18, 1, "#171d1e");
+      rect(x - 1, top - 3, 5, 2, "#303737");
+
+      if (lit) {
+        const pulse = v0852LampIntensity(index);
+        rect(x - 3, top + 1, 10, 2,
+          "rgba(255,224,164," + (0.28 * night * pulse) + ")");
+      }
+    });
+
+    c.restore();
+  }
+
+  function v0852DrawLampIllumination() {
+    if (!state || !V0852_LAMP_POSITIONS[state.room]) return;
+
+    const night = v084NightStrength();
+    if (night < 0.08) return;
+
+    c.save();
+    c.globalCompositeOperation = "screen";
+
+    V0852_LAMP_POSITIONS[state.room].forEach(([wx, wy], index) => {
+      const sx = wx - camera.x;
+      const sy = wy - camera.y - 8;
+
+      if (sx < -110 || sy < -110 || sx > W + 110 || sy > H + 110) return;
+
+      const pulse = v0852LampIntensity(index);
+      const strength = night * pulse;
+
+      const halo = c.createRadialGradient(
+        sx, sy, 1,
+        sx, sy, 92
+      );
+      halo.addColorStop(0, "rgba(255,224,163," + (0.30 * strength) + ")");
+      halo.addColorStop(0.20, "rgba(247,196,116," + (0.17 * strength) + ")");
+      halo.addColorStop(0.58, "rgba(205,157,91," + (0.065 * strength) + ")");
+      halo.addColorStop(1, "rgba(205,157,91,0)");
+
+      c.fillStyle = halo;
+      c.fillRect(sx - 94, sy - 94, 188, 188);
+
+      // Luz espalhada no piso, mais larga e menos intensa que o halo.
+      const pool = c.createRadialGradient(
+        sx, sy + 34, 2,
+        sx, sy + 34, 72
+      );
+      pool.addColorStop(0, "rgba(255,211,137," + (0.12 * strength) + ")");
+      pool.addColorStop(0.55, "rgba(225,177,107," + (0.055 * strength) + ")");
+      pool.addColorStop(1, "rgba(225,177,107,0)");
+
+      c.fillStyle = pool;
+      c.fillRect(sx - 74, sy - 40, 148, 148);
+    });
+
+    c.restore();
+  }
+
+  function v0852DrawAtmosphereGrade() {
+    if (!state || mode !== "game") return;
+    if (state.dawnCollapse?.active || state.wakeUp?.active || transitionBusy) return;
+
+    const outdoor = V084_OUTDOOR_ROOMS.has(state.room);
+    if (!outdoor) return;
+
+    const minutes = state.stage === "prologue"
+      ? 14 * 60
+      : ((state.minutes % 1440) + 1440) % 1440;
+
+    const night = state.stage === "prologue" ? 0 : v084NightStrength();
+    const dawn = Math.max(0, 1 - Math.abs(minutes - 390) / 95);
+    const dusk = Math.max(0, 1 - Math.abs(minutes - 1090) / 125);
+    const twilight = Math.max(dawn, dusk);
+
+    c.save();
+
+    // Correção de cor leve: azul frio na madrugada, calor suave nas transições.
+    if (night > 0.05) {
+      rect(0, 0, W, H,
+        "rgba(7,14,29," + (0.035 * night) + ")");
+    }
+
+    if (twilight > 0.05) {
+      rect(0, 0, W, H,
+        "rgba(194,119,76," + (0.045 * twilight) + ")");
+    } else if (night < 0.05) {
+      rect(0, 0, W, H, "rgba(210,194,151,0.018)");
+    }
+
+    // Névoa baixa e lenta: dá profundidade sem esconder o cenário.
+    if (night > 0.48) {
+      c.globalCompositeOperation = "screen";
+
+      for (let i = 0; i < 2; i++) {
+        const drift = (elapsed * (4 + i * 2.2) + i * 245) % (W + 300);
+        const x = drift - 150;
+        const y = H * (0.66 + i * 0.13)
+          + Math.sin(elapsed * 0.16 + i * 2) * 7;
+
+        const mist = c.createRadialGradient(x, y, 5, x, y, 118);
+        mist.addColorStop(0, "rgba(163,179,179," + (0.025 * night) + ")");
+        mist.addColorStop(1, "rgba(163,179,179,0)");
+
+        c.fillStyle = mist;
+        c.fillRect(x - 120, y - 38, 240, 76);
+      }
+
+      // Poucos pontos de poeira iluminados; movimento lento e discreto.
+      c.globalCompositeOperation = "source-over";
+      for (let i = 0; i < 9; i++) {
+        const x = (i * 59 + elapsed * (2.2 + (i % 3))) % W;
+        const y = 35 + ((i * 31 + Math.sin(elapsed * 0.32 + i) * 13) % (H - 55));
+        const alpha = 0.10 + (Math.sin(elapsed * 1.4 + i * 2) + 1) * 0.035;
+
+        c.fillStyle = "rgba(218,205,169," + (alpha * night) + ")";
+        c.fillRect(x, y, 1, 1);
+      }
+    }
+
+    c.restore();
+  }
+
+  const v0852DrawWorldBase = drawWorld;
+  drawWorld = function() {
+    v0852DrawWorldBase();
+
+    if (
+      !state ||
+      mode !== "game" ||
+      state.dawnCollapse?.active ||
+      state.wakeUp?.active ||
+      transitionBusy
+    ) {
+      return;
+    }
+
+    v0852DrawLampFixtures();
+    v0852DrawLampIllumination();
+    v0852DrawAtmosphereGrade();
+  };
+
+  // 0.8.51 — versão e cache.
+  $("version").textContent = "PROTÓTIPO · 0.8.52";
+
+  $("version").textContent = "PROTÓTIPO · 0.8.52";
   
   requestAnimationFrame(frame);
   showBootSplash();
