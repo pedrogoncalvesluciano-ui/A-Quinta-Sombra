@@ -2,7 +2,7 @@
 "use strict";
 
 /*
-  A QUINTA SOMBRA — 0.8.54
+  A QUINTA SOMBRA — 0.8.55
 
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
@@ -41662,7 +41662,7 @@ updateHud = function() {
 
 
   // 0.8.53 — versão e cache.
-  $("version").textContent = "PROTÓTIPO · 0.8.54";
+  $("version").textContent = "PROTÓTIPO · 0.8.55";
   
   requestAnimationFrame(frame);
   showBootSplash();
