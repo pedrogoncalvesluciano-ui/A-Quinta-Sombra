@@ -33480,8 +33480,9 @@ function v0828ResolveTruthEnding() {
   }
 }
 
-function v0828RetryObserverFinal() {
+function v0828RetryObserverFinal(checkpointOverride) {
   const checkpoint =
+    checkpointOverride ||
     state?.finalArcPreObserverCheckpoint;
 
   if (!checkpoint) {
@@ -34424,7 +34425,9 @@ function v0828OpenEndingsMenu() {
     buttons.push([
       "VOLTAR PARA ANTES DO FINAL",
       () => {
-        v0828RetryObserverFinal();
+        v0828RetryObserverFinal(
+          sourceState?.finalArcPreObserverCheckpoint
+        );
       }
     ]);
   }
