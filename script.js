@@ -2,7 +2,7 @@
 "use strict";
 
 /*
-  A QUINTA SOMBRA — 0.8.26
+  A QUINTA SOMBRA — 0.8.57
 
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
@@ -33480,6 +33480,58 @@ function v0828ResolveTruthEnding() {
   }
 }
 
+function v0828RetryObserverFinal(checkpointOverride) {
+  const checkpoint =
+    checkpointOverride ||
+    state?.finalArcPreObserverCheckpoint;
+
+  if (!checkpoint) {
+    return false;
+  }
+
+  const endingMeta =
+    v0828LoadEndingMeta();
+
+  state =
+    JSON.parse(
+      JSON.stringify(checkpoint)
+    );
+
+  const f =
+    v0828EnsureFinalArc();
+
+  f.badEndingUnlocked =
+    Boolean(endingMeta.bad || f.badEndingUnlocked);
+  f.goodEndingUnlocked =
+    Boolean(endingMeta.good || f.goodEndingUnlocked);
+
+  // O checkpoint é anterior ao confronto. Reinicia a entrada do Observador
+  // para que o diálogo e as seis rodadas sejam executados novamente.
+  f.observerFinalStarted = false;
+  f.phase = "mine";
+  f.realScore = 0;
+  f.lieScore = 0;
+  f.round = 0;
+
+  delete state.ending;
+  state.gameOver = false;
+
+  v0828TruthGame.active = false;
+  v0828TruthGame.round = 0;
+  v0828TruthGame.fatherPhase = null;
+  transitionBusy = false;
+  dialog = null;
+  keys.clear();
+
+  closeModal();
+  enterGame();
+  updateHud();
+  v0828StartObserverFinal();
+  save();
+
+  return true;
+}
+
 function v0828BadEnding() {
   const f =
     v0828EnsureFinalArc();
@@ -33497,22 +33549,40 @@ function v0828BadEnding() {
   v0828RefreshEndingsButton();
   save();
 
+  const explanation =
+    "Você acreditou no Observador mais vezes do que duvidou dele. " +
+    "A cada rodada, ele encontrou espaço para distorcer suas lembranças " +
+    "e enfraquecer sua confiança nas pessoas que tentaram alertá-lo. " +
+    "Quando chegou a hora de enfrentar a verdade sobre seu pai, " +
+    "Estevão já não conseguia separar o que viveu daquilo que foi " +
+    "construído para enganá-lo. O Observador venceu porque conseguiu " +
+    "fazer você acreditar.";
+
+  const buttons = [];
+
+  if (state.finalArcPreObserverCheckpoint) {
+    buttons.push([
+      "Tentar novamente",
+      v0828RetryObserverFinal
+    ]);
+  }
+
+  buttons.push([
+    "Voltar ao menu",
+    () => {
+      closeModal();
+      mode = "menu";
+      $("menu").hidden = false;
+      $("hud").hidden = true;
+      $("prompt").hidden = true;
+      v0828RefreshEndingsButton();
+    }
+  ]);
+
   modal(
     "FINAL RUIM",
-    "Você acreditou nas ilusões e mentiras do Observador.",
-    [
-      [
-        "Voltar ao menu",
-        () => {
-          closeModal();
-          mode = "menu";
-          $("menu").hidden = false;
-          $("hud").hidden = true;
-          $("prompt").hidden = true;
-          v0828RefreshEndingsButton();
-        }
-      ]
-    ]
+    "O OBSERVADOR TE DOMINOU\n\n" + explanation,
+    buttons
   );
 }
 
@@ -34355,32 +34425,9 @@ function v0828OpenEndingsMenu() {
     buttons.push([
       "VOLTAR PARA ANTES DO FINAL",
       () => {
-        const unlocked =
-          v0828LoadEndingMeta();
-
-        state =
-          JSON.parse(
-            JSON.stringify(
-              sourceState
-                .finalArcPreObserverCheckpoint
-            )
-          );
-
-        v0828EnsureFinalArc();
-
-        state.finalArc
-          .badEndingUnlocked =
-          unlocked.bad;
-        state.finalArc
-          .goodEndingUnlocked =
-          unlocked.good;
-
-        state.gameOver = false;
-
-        closeModal();
-        enterGame();
-        updateHud();
-        save();
+        v0828RetryObserverFinal(
+          sourceState?.finalArcPreObserverCheckpoint
+        );
       }
     ]);
   }
@@ -41661,10 +41708,192 @@ updateHud = function() {
 // =========================================================
 
 
-  // 0.8.51 — versão e cache.
-  $("version").textContent = "PROTÓTIPO · 0.8.51";
+  // =========================================================
+  // 0.8.52 — PASSE VISUAL: ATMOSFERA, POSTES E CICLO DE LUZ
+  // Camada aditiva: preserva sprites, mapas, colisões e Canvas base.
+  // =========================================================
 
-  $("version").textContent = "PROTÓTIPO · 0.8.51";
+  const V0852_LAMP_POSITIONS = {
+    village: [
+      [575, 330], [705, 520], [575, 690],
+      [705, 900], [270, 475], [990, 475]
+    ],
+    westRoad: [
+      [150, 245], [390, 245], [640, 245],
+      [880, 245], [1130, 245], [1320, 245]
+    ]
+  };
+
+  function v0852LampIntensity(index) {
+    return 0.94
+      + Math.sin(elapsed * 2.1 + index * 2.7) * 0.035
+      + Math.sin(elapsed * 9.4 + index * 1.9) * 0.012;
+  }
+
+  function v0852DrawLampFixtures() {
+    if (!state || !V0852_LAMP_POSITIONS[state.room]) return;
+
+    const night = v084NightStrength();
+    const lit = night > 0.12;
+    const positions = V0852_LAMP_POSITIONS[state.room];
+
+    c.save();
+    c.translate(-Math.floor(camera.x), -Math.floor(camera.y));
+
+    positions.forEach(([x, y], index) => {
+      const isWest = state.room === "westRoad";
+      const top = isWest ? y - 7 : y - 7;
+
+      // Reforço visual sobre os postes já existentes; não altera hitboxes.
+      rect(x - 8, top, 20, 6, "#252c2d");
+      rect(x - 6, top - 2, 16, 2, "#59615d");
+      rect(x - 5, top + 1, 14, 3, lit ? "#c6a66c" : "#65716c");
+      rect(x - 4, top + 1, 11, 1, lit ? "#fff0bf" : "#a5aa9c");
+      rect(x - 7, top + 4, 18, 1, "#171d1e");
+      rect(x - 1, top - 3, 5, 2, "#303737");
+
+      if (lit) {
+        const pulse = v0852LampIntensity(index);
+        rect(x - 3, top + 1, 10, 2,
+          "rgba(255,224,164," + (0.28 * night * pulse) + ")");
+      }
+    });
+
+    c.restore();
+  }
+
+  function v0852DrawLampIllumination() {
+    if (!state || !V0852_LAMP_POSITIONS[state.room]) return;
+
+    const night = v084NightStrength();
+    if (night < 0.08) return;
+
+    c.save();
+    c.globalCompositeOperation = "screen";
+
+    V0852_LAMP_POSITIONS[state.room].forEach(([wx, wy], index) => {
+      const sx = wx - camera.x;
+      const sy = wy - camera.y - 8;
+
+      if (sx < -110 || sy < -110 || sx > W + 110 || sy > H + 110) return;
+
+      const pulse = v0852LampIntensity(index);
+      const strength = night * pulse;
+
+      const halo = c.createRadialGradient(
+        sx, sy, 1,
+        sx, sy, 92
+      );
+      halo.addColorStop(0, "rgba(255,224,163," + (0.30 * strength) + ")");
+      halo.addColorStop(0.20, "rgba(247,196,116," + (0.17 * strength) + ")");
+      halo.addColorStop(0.58, "rgba(205,157,91," + (0.065 * strength) + ")");
+      halo.addColorStop(1, "rgba(205,157,91,0)");
+
+      c.fillStyle = halo;
+      c.fillRect(sx - 94, sy - 94, 188, 188);
+
+      // Luz espalhada no piso, mais larga e menos intensa que o halo.
+      const pool = c.createRadialGradient(
+        sx, sy + 34, 2,
+        sx, sy + 34, 72
+      );
+      pool.addColorStop(0, "rgba(255,211,137," + (0.12 * strength) + ")");
+      pool.addColorStop(0.55, "rgba(225,177,107," + (0.055 * strength) + ")");
+      pool.addColorStop(1, "rgba(225,177,107,0)");
+
+      c.fillStyle = pool;
+      c.fillRect(sx - 74, sy - 40, 148, 148);
+    });
+
+    c.restore();
+  }
+
+  function v0852DrawAtmosphereGrade() {
+    if (!state || mode !== "game") return;
+    if (state.dawnCollapse?.active || state.wakeUp?.active || transitionBusy) return;
+
+    const outdoor = V084_OUTDOOR_ROOMS.has(state.room);
+    if (!outdoor) return;
+
+    const minutes = state.stage === "prologue"
+      ? 14 * 60
+      : ((state.minutes % 1440) + 1440) % 1440;
+
+    const night = state.stage === "prologue" ? 0 : v084NightStrength();
+    const dawn = Math.max(0, 1 - Math.abs(minutes - 390) / 95);
+    const dusk = Math.max(0, 1 - Math.abs(minutes - 1090) / 125);
+    const twilight = Math.max(dawn, dusk);
+
+    c.save();
+
+    // Correção de cor leve: azul frio na madrugada, calor suave nas transições.
+    if (night > 0.05) {
+      rect(0, 0, W, H,
+        "rgba(7,14,29," + (0.035 * night) + ")");
+    }
+
+    if (twilight > 0.05) {
+      rect(0, 0, W, H,
+        "rgba(194,119,76," + (0.045 * twilight) + ")");
+    } else if (night < 0.05) {
+      rect(0, 0, W, H, "rgba(210,194,151,0.018)");
+    }
+
+    // Névoa baixa e lenta: dá profundidade sem esconder o cenário.
+    if (night > 0.48) {
+      c.globalCompositeOperation = "screen";
+
+      for (let i = 0; i < 2; i++) {
+        const drift = (elapsed * (4 + i * 2.2) + i * 245) % (W + 300);
+        const x = drift - 150;
+        const y = H * (0.66 + i * 0.13)
+          + Math.sin(elapsed * 0.16 + i * 2) * 7;
+
+        const mist = c.createRadialGradient(x, y, 5, x, y, 118);
+        mist.addColorStop(0, "rgba(163,179,179," + (0.025 * night) + ")");
+        mist.addColorStop(1, "rgba(163,179,179,0)");
+
+        c.fillStyle = mist;
+        c.fillRect(x - 120, y - 38, 240, 76);
+      }
+
+      // Poucos pontos de poeira iluminados; movimento lento e discreto.
+      c.globalCompositeOperation = "source-over";
+      for (let i = 0; i < 9; i++) {
+        const x = (i * 59 + elapsed * (2.2 + (i % 3))) % W;
+        const y = 35 + ((i * 31 + Math.sin(elapsed * 0.32 + i) * 13) % (H - 55));
+        const alpha = 0.10 + (Math.sin(elapsed * 1.4 + i * 2) + 1) * 0.035;
+
+        c.fillStyle = "rgba(218,205,169," + (alpha * night) + ")";
+        c.fillRect(x, y, 1, 1);
+      }
+    }
+
+    c.restore();
+  }
+
+  const v0852DrawWorldBase = drawWorld;
+  drawWorld = function() {
+    v0852DrawWorldBase();
+
+    if (
+      !state ||
+      mode !== "game" ||
+      state.dawnCollapse?.active ||
+      state.wakeUp?.active ||
+      transitionBusy
+    ) {
+      return;
+    }
+
+    v0852DrawLampFixtures();
+    v0852DrawLampIllumination();
+    v0852DrawAtmosphereGrade();
+  };
+
+
+  // 0.8.57 — versão e cache.
+  $("version").textContent = "PROTÓTIPO · 0.8.57";
   
   requestAnimationFrame(frame);
   showBootSplash();
@@ -42098,7 +42327,7 @@ v0828DrawFinalFigureScene = function() {
     0.95
   );
 
-  // A estática aparece apenas no instante em que a figura chega à porta.
+  // A estática aparece quando a figura chega à porta.
   if (t >= 7.65) {
     const strength = Math.min(0.28, 0.10 + (t - 7.65) * 0.26);
 
@@ -42124,6 +42353,7 @@ v0828DrawFinalFigureScene = function() {
       );
     }
   }
+
 };
 
 
@@ -42327,3 +42557,539 @@ drawWorld = function() {
   v0850DrawBasementBase();
   v0850DrawBasementPrototypeDetails();
 };
+
+
+// =========================================================
+// 0.8.54 — CASA DA MEMÓRIA: CADÁVER + RESISTÊNCIA FINAL
+// Mantém as cinco primeiras rodadas e substitui apenas a
+// apresentação/entrada da sexta rodada. Não remove sistemas antigos.
+// =========================================================
+
+const v0854TruthNarrativeBase = v0828TruthNarrative;
+
+v0828TruthNarrative = function(round) {
+  if (round === 4) {
+    return [
+      ["Observador", "Não havia corpo."],
+      ["Observador", "Não houve perseguição."],
+      ["Observador", "E aquele corpo encontrado, será que não era o seu pai?"],
+      ["Observador", "Você nem conseguiu confirmar quem estava ali."],
+      ["Estevão", "Não... aquele homem não era meu pai."]
+    ];
+  }
+
+  if (round === 6) {
+    return [
+      "Uma figura aparece no fundo do corredor e começa a caminhar na sua direção.",
+      "Visualmente, é seu pai.",
+      ["Observador", "E o seu pai?"],
+      ["Estevão", "Meu... pai??"]
+    ];
+  }
+
+  return v0854TruthNarrativeBase(round);
+};
+
+const v0854BeginTruthInputBase = v0828BeginTruthInput;
+
+v0828BeginTruthInput = function(round) {
+  if (round !== 6) {
+    return v0854BeginTruthInputBase(round);
+  }
+
+  v0828TruthGame.active = true;
+  v0828TruthGame.round = 6;
+  v0828TruthGame.time = 0;
+  v0828TruthGame.duration = 5;
+  v0828TruthGame.progress = 0.72;
+  v0828TruthGame.specialFather = true;
+  v0828TruthGame.prompt = "PRESSIONE F";
+  v0828TruthGame.fatherPhase = "countdown";
+  v0828TruthGame.fatherCountdown = 5;
+  v0828TruthGame.fatherPresses = 0;
+  v0828TruthGame.fatherResistance = 0;
+
+  // lastOutcome é preservado para manter o desempate antigo
+  // enquanto o criador ainda não define uma regra nova.
+  transitionBusy = true;
+  keys.clear();
+  $("hud").hidden = true;
+  $("prompt").hidden = true;
+};
+
+const v0854TruthPressBase = v0828TruthPress;
+
+v0828TruthPress = function() {
+  if (!v0828TruthGame.active) return;
+
+  if (v0828TruthGame.round === 6) {
+    const phase = v0828TruthGame.fatherPhase;
+
+    if (phase === "game") {
+      // Cada toque ajuda Estevão a puxar a disputa para a VERDADE.
+      v0828TruthGame.progress = Math.max(
+        0.04,
+        v0828TruthGame.progress - 0.085
+      );
+      v0828TruthGame.fatherPresses += 1;
+      return;
+    }
+
+    if (phase === "resistance") {
+      v0828TruthGame.fatherResistance = Math.min(
+        3,
+        v0828TruthGame.fatherResistance + 1
+      );
+
+      if (v0828TruthGame.fatherResistance >= 3) {
+        v0828TruthGame.fatherPhase = "barFade";
+        v0828TruthGame.time = 0;
+      }
+      return;
+    }
+
+    if (
+      ["badDrain", "badSpeech", "badWalk", "badFade"].includes(phase)
+    ) {
+      return;
+    }
+
+    return;
+  }
+
+  v0854TruthPressBase();
+};
+
+const v0854DrawTruthGameBase = v0828DrawTruthGame;
+
+v0828DrawTruthGame = function() {
+  if (!v0828TruthGame.active || v0828TruthGame.round !== 6) {
+    v0854DrawTruthGameBase();
+    return;
+  }
+
+  const phase = v0828TruthGame.fatherPhase;
+  const center = W / 2;
+
+  if (phase === "countdown") {
+    rect(0, 0, W, H, "rgba(3,4,6,0.92)");
+    txt("VOCÊ ACREDITA QUE ELE ESTÁ...", 70, 78, "#d8d2c5", 9);
+    txt("VIVO?", center - 22, 105, "#eee9dc", 12);
+    const remaining = Math.max(
+      0,
+      Math.ceil(5 - v0828TruthGame.time)
+    );
+    txt(String(remaining), center - 5, 165, "#eee9dc", 27);
+    return;
+  }
+
+  if (phase === "game") {
+    rect(0, 0, W, H, "rgba(3,4,6,0.88)");
+    txt("REAL × MENTIRA", center - 62, 58, "#eee9dc", 12);
+    txt("VERDADE", 58, 132, "#d8d2c5", 9);
+    txt("MENTIRA", W - 116, 132, "#c6c9b7", 9);
+    rect(48, 146, W - 96, 13, "#252526");
+    const px = 48 + (W - 96) * v0828TruthGame.progress;
+    rect(px - 4, 140, 8, 25, "#eee9dc");
+    txt("PRESSIONE F", center - 43, 198, "#ded8c9", 9);
+    return;
+  }
+
+  if (phase === "flashback") {
+    rect(0, 0, W, H, "#020303");
+    const edge = c.createRadialGradient(
+      center, H / 2, 24,
+      center, H / 2, Math.max(W, H) * 0.72
+    );
+    edge.addColorStop(0, "rgba(0,0,0,1)");
+    edge.addColorStop(0.72, "rgba(0,0,0,0.96)");
+    edge.addColorStop(1, "rgba(232,234,228,0.30)");
+    c.fillStyle = edge;
+    c.fillRect(0, 0, W, H);
+    txt("Toma cuidado, por favor.", center - 91, H / 2 - 8, "#e7e5df", 10);
+    txt("Eu só tenho você.", center - 70, H / 2 + 12, "#e7e5df", 10);
+    return;
+  }
+
+  if (phase === "resistance") {
+    rect(0, 0, W, H, "rgba(2,3,4,0.90)");
+    const count = v0828TruthGame.fatherResistance;
+    const amount = [0, 0.30, 0.66, 1][count];
+    txt("RESISTA", center - 29, 70, "#eee9dc", 10);
+    rect(48, 112, W - 96, 13, "#252526");
+    rect(48, 112, (W - 96) * amount, 13, "#ded8c9");
+
+    if (count === 1) {
+      for (let i = 0; i < 9; i++) {
+        const y = 88 + ((i * 19 + Math.floor(elapsed * 37)) % 110);
+        rect((i * 47) % W, y, 18 + (i % 3) * 8, 2, "rgba(230,235,230,0.28)");
+      }
+    }
+
+    if (count === 2) {
+      for (let i = 0; i < 16; i++) {
+        const y = 75 + ((i * 13 + Math.floor(elapsed * 53)) % 135);
+        rect((i * 31) % W, y, 24 + (i % 4) * 9, 2, "rgba(235,238,232,0.36)");
+      }
+      txt("ISSO É...", center - 37, 169, "#eee9dc", 12);
+    } else if (count >= 3) {
+      txt("MENTIRA!!!", center - 56, 174, "#f1eee7", 16);
+    } else {
+      txt("PRESSIONE F", center - 43, 174, "#ded8c9", 9);
+    }
+    return;
+  }
+
+  if (phase === "barFade") {
+    const alpha = Math.max(0, 1 - v0828TruthGame.time / 0.9);
+    rect(0, 0, W, H, "rgba(2,3,4,0.90)");
+    c.save();
+    c.globalAlpha = alpha;
+    rect(48, 112, W - 96, 13, "#252526");
+    rect(48, 112, W - 96, 13, "#ded8c9");
+    txt("MENTIRA!!!", center - 56, 174, "#f1eee7", 16);
+    c.restore();
+    return;
+  }
+
+  if (phase === "dissolve") {
+    const p = Math.min(1, v0828TruthGame.time / 3.6);
+    rect(0, 0, W, H, "rgba(0,0,0,0.24)");
+    for (let i = 0; i < 34; i++) {
+      const x = (i * 37 + Math.sin(elapsed * 2 + i) * 13) % W;
+      const rise = (i * 17 + elapsed * (35 + (i % 5) * 8)) % (H + 40);
+      const y = H - rise;
+      const width = 18 + (i % 5) * 12;
+      const alpha = Math.min(0.88, 0.20 + p * 0.70);
+      rect(x, y, width, 20 + (i % 4) * 9, "rgba(0,0,0," + alpha + ")");
+    }
+    txt("Não...", center - 20, H - 46, "#d8d2c5", 11);
+    return;
+  }
+
+  if (phase === "reveal") {
+    const p = Math.min(1, v0828TruthGame.time / 2.8);
+    rect(0, 0, W, H, "rgba(225,229,222," + (0.06 + p * 0.12) + ")");
+    for (let i = 0; i < 24; i++) {
+      const x = (i * 43 + Math.sin(elapsed + i) * 10) % W;
+      const y = 72 + ((i * 23) % (H - 100));
+      rect(x, y, 20 + (i % 4) * 12, 12 + (i % 3) * 8, "rgba(238,240,234," + (0.08 + p * 0.12) + ")");
+    }
+    return;
+  }
+
+  if (phase === "badDrain") {
+    const p = Math.min(1, v0828TruthGame.time / 1.8);
+    const remaining = 1 - p;
+    rect(0, 0, W, H, "rgba(3,4,6,0.92)");
+    txt("VERDADE", 48, 104, "#ded8c9", 9);
+    txt("MENTIRA", W - 112, 104, "#c6c9b7", 9);
+    rect(48, 118, W - 96, 13, "#252526");
+    rect(48, 118, (W - 96) * remaining, 13, "#ded8c9");
+    txt("...", center - 5, 176, "#ded8c9", 12);
+    return;
+  }
+
+  if (
+    phase === "badSpeech" ||
+    phase === "badWalk" ||
+    phase === "badFade"
+  ) {
+    const walkProgress = phase === "badSpeech"
+      ? 0
+      : phase === "badWalk"
+        ? Math.min(1, v0828TruthGame.time / 4.2)
+        : 1;
+
+    // Plano da galeria e do túnel de entrada pelo qual Estevão chegou.
+    rect(0, 0, W, H, "#090b0c");
+    rect(0, H * 0.28, W, H * 0.48, "#242321");
+    rect(0, H * 0.72, W, H * 0.28, "#171817");
+    rect(18, H * 0.30, 10, H * 0.42, "#40372e");
+    rect(18, H * 0.30, 145, 8, "#40372e");
+    rect(W - 150, H * 0.30, 10, H * 0.42, "#40372e");
+    rect(W - 160, H * 0.30, 145, 8, "#40372e");
+
+    // Boca escura do túnel à esquerda, direção de onde Estevão veio.
+    rect(0, H * 0.34, 105, H * 0.36, "#020303");
+    rect(0, H * 0.31, 112, 8, "#39332d");
+    rect(0, H * 0.70, 112, 8, "#39332d");
+
+    // Trilhos conduzem o olhar até a entrada do túnel.
+    rect(0, H * 0.61, W, 3, "#514b43");
+    rect(0, H * 0.66, W, 3, "#514b43");
+    for (let x = 12; x < W; x += 32) {
+      rect(x, H * 0.59, 17, 22, "#332d27");
+    }
+
+    const observerX = W * 0.72 - walkProgress * W * 0.59;
+    const observerY = H * 0.56;
+    const scale = 1 - walkProgress * 0.48;
+    const sw = 1;
+
+    c.save();
+    c.translate(observerX, observerY);
+    c.scale(scale, scale);
+    const jitter = Math.sin(elapsed * 31) * 1.8;
+    rect(-23 + jitter, -28, 42, 17, "#010203");
+    rect(-13 - jitter, -46, 28, 22, "#010203");
+    rect(-31, -18, 17, 10, "#010203");
+    rect(12, -20, 21, 10, "#010203");
+    rect(-17, -12, 9, 25, "#010203");
+    rect(8, -12, 10, 25, "#010203");
+    rect(-17, 10, 8, 18 + Math.sin(elapsed * 13) * 3, "#010203");
+    rect(8, 10, 9, 18 - Math.sin(elapsed * 13) * 3, "#010203");
+    c.restore();
+
+    // Escurecimento cresce durante a caminhada e termina em tela preta.
+    const darkness = phase === "badSpeech"
+      ? 0.10
+      : phase === "badWalk"
+        ? 0.10 + walkProgress * 0.48
+        : 0.58 + Math.min(0.42, v0828TruthGame.time / 2.2 * 0.42);
+    rect(0, 0, W, H, "rgba(0,0,0," + darkness + ")");
+
+    if (phase === "badSpeech") {
+      txt("VOCÊ É FRACO.", center - 54, H * 0.84, "#e5dfd2", 12);
+    }
+    return;
+  }
+};
+
+const v0854DrawCompanionsBase = v0828DrawMineCompanions;
+
+v0828DrawMineCompanions = function() {
+  v0854DrawCompanionsBase();
+
+  const phase = v0828TruthGame.fatherPhase;
+  if (
+    state?.room !== "mineDeep" ||
+    !["reveal", "goodEnding"].includes(phase)
+  ) {
+    return;
+  }
+
+  const revealTime = v0828TruthGame.time;
+  const brotherAlpha = phase === "goodEnding"
+    ? 1
+    : Math.min(1, revealTime / 1.3);
+  const motherAlpha = phase === "goodEnding"
+    ? 1
+    : Math.max(0, Math.min(1, (revealTime - 1.3) / 1.5));
+
+  c.save();
+  c.translate(-Math.floor(camera.x), -Math.floor(camera.y));
+
+  const bx = V070_MOTHER_POS.x - 38;
+  const by = V070_MOTHER_POS.y + 26;
+  const mx = V070_MOTHER_POS.x;
+  const my = V070_MOTHER_POS.y;
+
+  if (brotherAlpha > 0) {
+    c.save();
+    c.globalAlpha = brotherAlpha;
+    const brotherMist = c.createRadialGradient(bx, by, 2, bx, by, 48);
+    brotherMist.addColorStop(0, "rgba(239,243,236,0.20)");
+    brotherMist.addColorStop(1, "rgba(239,243,236,0)");
+    c.fillStyle = brotherMist;
+    c.fillRect(bx - 52, by - 52, 104, 104);
+    rect(bx - 35, by - 35, 70, 72, "rgba(235,240,232,0.10)");
+    person(bx, by, "brother", 0, "right", 0.82);
+    c.restore();
+  }
+
+  if (motherAlpha > 0) {
+    c.save();
+    c.globalAlpha = motherAlpha;
+    const motherMist = c.createRadialGradient(mx, my, 2, mx, my, 48);
+    motherMist.addColorStop(0, "rgba(239,243,236,0.20)");
+    motherMist.addColorStop(1, "rgba(239,243,236,0)");
+    c.fillStyle = motherMist;
+    c.fillRect(mx - 52, my - 52, 104, 104);
+    rect(mx - 35, my - 35, 70, 72, "rgba(235,240,232,0.10)");
+    person(mx, my, "mother", 0, "left", 0.96);
+    c.restore();
+  }
+
+  c.restore();
+};
+
+function v0854ResolveFatherScore() {
+  const f = v0828EnsureFinalArc();
+
+  v0828TruthGame.time = 0;
+
+  if (f.realScore > f.lieScore) {
+    // A maioria REAL vence a disputa: Estevão não recebe o flashback
+    // e não pode iniciar a resistência final.
+    v0828TruthGame.fatherPhase = "badDrain";
+    v0828TruthGame.fatherBadDrainStart =
+      v0828TruthGame.progress;
+    v0828TruthGame.active = true;
+    transitionBusy = true;
+    $("hud").hidden = true;
+    $("prompt").hidden = true;
+    keys.clear();
+    return;
+  }
+
+  if (f.lieScore > f.realScore) {
+    // A maioria MENTIRA abre a lembrança do irmão e a resistência.
+    v0828TruthGame.fatherPhase = "flashback";
+    return;
+  }
+
+  // Empate: mantém o comportamento legado, ainda não decidido pelo criador.
+  v0828TruthGame.active = false;
+  transitionBusy = false;
+  $("hud").hidden = false;
+  v0828ResolveTruthEnding();
+}
+
+const v0854UpdateBase = update;
+
+update = function(dt) {
+  if (
+    v0828TruthGame.active &&
+    v0828TruthGame.round === 6
+  ) {
+    const game = v0828TruthGame;
+    elapsed += dt;
+    game.time += dt;
+
+    if (game.fatherPhase === "countdown") {
+      if (game.time >= 5) {
+        game.fatherPhase = "game";
+        game.time = 0;
+      }
+      return;
+    }
+
+    if (game.fatherPhase === "game") {
+      // A pressão do Observador empurra lentamente para a MENTIRA;
+      // a resistência do jogador e a lembrança factual puxam para a VERDADE.
+      game.progress = Math.max(0.04, game.progress - dt * 0.12);
+      if (game.time >= 5) {
+        v0854ResolveFatherScore();
+      }
+      return;
+    }
+
+    if (game.fatherPhase === "flashback") {
+      if (game.time >= 3.2) {
+        game.fatherPhase = "resistance";
+        game.time = 0;
+        game.fatherResistance = 0;
+      }
+      return;
+    }
+
+    if (game.fatherPhase === "barFade") {
+      if (game.time >= 0.9) {
+        game.fatherPhase = "dissolve";
+        game.time = 0;
+      }
+      return;
+    }
+
+    if (game.fatherPhase === "dissolve") {
+      if (game.time >= 3.6) {
+        game.fatherPhase = "reveal";
+        game.time = 0;
+        const f = v0828EnsureFinalArc();
+        // Interrompe a renderização do Observador sem alterar o mapa.
+        f.phase = "epilogue";
+      }
+      return;
+    }
+
+    if (game.fatherPhase === "reveal") {
+      if (game.time >= 2.8) {
+        v0828GoodEnding();
+      }
+      return;
+    }
+
+    if (game.fatherPhase === "badDrain") {
+      if (game.time >= 1.8) {
+        game.fatherPhase = "badSpeech";
+        game.time = 0;
+      }
+      return;
+    }
+
+    if (game.fatherPhase === "badSpeech") {
+      if (game.time >= 2.4) {
+        game.fatherPhase = "badWalk";
+        game.time = 0;
+      }
+      return;
+    }
+
+    if (game.fatherPhase === "badWalk") {
+      if (game.time >= 4.2) {
+        game.fatherPhase = "badFade";
+        game.time = 0;
+      }
+      return;
+    }
+
+    if (game.fatherPhase === "badFade") {
+      if (game.time >= 2.2) {
+        game.active = false;
+        game.fatherPhase = "done";
+        transitionBusy = false;
+        keys.clear();
+        v0828BadEnding();
+      }
+      return;
+    }
+
+    return;
+  }
+
+  v0854UpdateBase(dt);
+};
+
+const v0854GoodEndingBase = v0828GoodEnding;
+
+v0828GoodEnding = function() {
+  const f = v0828EnsureFinalArc();
+
+  f.goodEndingUnlocked = true;
+  f.phase = "epilogue";
+
+  state.ending = state.ending || {};
+  state.ending.id = "good";
+  state.ending.complete = true;
+
+  state.storyFlags = state.storyFlags || {};
+  state.storyFlags.wheelchairGone = true;
+  state.storyFlags.motherRescued = true;
+
+  v0828SaveEndingMeta();
+  v0828RefreshEndingsButton();
+  save();
+
+  v0828TruthGame.active = false;
+  v0828TruthGame.fatherPhase = "goodEnding";
+  transitionBusy = false;
+  $("hud").hidden = false;
+  $("prompt").hidden = true;
+  keys.clear();
+
+  say(
+    [
+      ["Estevão", "Irmão!!"],
+      ["Irmão", "Estevão!!"],
+      ["Estevão", "M-mãe!!"],
+      ["Mãe", "Estou aqui, filho."]
+    ],
+    () => {
+      v0828StartEpilogue();
+    }
+  );
+};
+
+// Restaura a interferência visual da cena final: ela acompanha a figura
+// misteriosa quando chega perto da porta, sem alterar o sprite ou o trajeto.
