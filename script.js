@@ -2,7 +2,7 @@
 "use strict";
 
 /*
-  A QUINTA SOMBRA — 0.8.55
+  A QUINTA SOMBRA — 0.8.56
 
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
@@ -33480,6 +33480,57 @@ function v0828ResolveTruthEnding() {
   }
 }
 
+function v0828RetryObserverFinal() {
+  const checkpoint =
+    state?.finalArcPreObserverCheckpoint;
+
+  if (!checkpoint) {
+    return false;
+  }
+
+  const endingMeta =
+    v0828LoadEndingMeta();
+
+  state =
+    JSON.parse(
+      JSON.stringify(checkpoint)
+    );
+
+  const f =
+    v0828EnsureFinalArc();
+
+  f.badEndingUnlocked =
+    Boolean(endingMeta.bad || f.badEndingUnlocked);
+  f.goodEndingUnlocked =
+    Boolean(endingMeta.good || f.goodEndingUnlocked);
+
+  // O checkpoint é anterior ao confronto. Reinicia a entrada do Observador
+  // para que o diálogo e as seis rodadas sejam executados novamente.
+  f.observerFinalStarted = false;
+  f.phase = "mine";
+  f.realScore = 0;
+  f.lieScore = 0;
+  f.round = 0;
+
+  delete state.ending;
+  state.gameOver = false;
+
+  v0828TruthGame.active = false;
+  v0828TruthGame.round = 0;
+  v0828TruthGame.fatherPhase = null;
+  transitionBusy = false;
+  dialog = null;
+  keys.clear();
+
+  closeModal();
+  enterGame();
+  updateHud();
+  v0828StartObserverFinal();
+  save();
+
+  return true;
+}
+
 function v0828BadEnding() {
   const f =
     v0828EnsureFinalArc();
@@ -33497,22 +33548,40 @@ function v0828BadEnding() {
   v0828RefreshEndingsButton();
   save();
 
+  const explanation =
+    "Você acreditou no Observador mais vezes do que duvidou dele. " +
+    "A cada rodada, ele encontrou espaço para distorcer suas lembranças " +
+    "e enfraquecer sua confiança nas pessoas que tentaram alertá-lo. " +
+    "Quando chegou a hora de enfrentar a verdade sobre seu pai, " +
+    "Estevão já não conseguia separar o que viveu daquilo que foi " +
+    "construído para enganá-lo. O Observador venceu porque conseguiu " +
+    "fazer você acreditar.";
+
+  const buttons = [];
+
+  if (state.finalArcPreObserverCheckpoint) {
+    buttons.push([
+      "Tentar novamente",
+      v0828RetryObserverFinal
+    ]);
+  }
+
+  buttons.push([
+    "Voltar ao menu",
+    () => {
+      closeModal();
+      mode = "menu";
+      $("menu").hidden = false;
+      $("hud").hidden = true;
+      $("prompt").hidden = true;
+      v0828RefreshEndingsButton();
+    }
+  ]);
+
   modal(
     "FINAL RUIM",
-    "O OBSERVADOR TE DOMINOU",
-    [
-      [
-        "Voltar ao menu",
-        () => {
-          closeModal();
-          mode = "menu";
-          $("menu").hidden = false;
-          $("hud").hidden = true;
-          $("prompt").hidden = true;
-          v0828RefreshEndingsButton();
-        }
-      ]
-    ]
+    "O OBSERVADOR TE DOMINOU\n\n" + explanation,
+    buttons
   );
 }
 
@@ -34355,32 +34424,7 @@ function v0828OpenEndingsMenu() {
     buttons.push([
       "VOLTAR PARA ANTES DO FINAL",
       () => {
-        const unlocked =
-          v0828LoadEndingMeta();
-
-        state =
-          JSON.parse(
-            JSON.stringify(
-              sourceState
-                .finalArcPreObserverCheckpoint
-            )
-          );
-
-        v0828EnsureFinalArc();
-
-        state.finalArc
-          .badEndingUnlocked =
-          unlocked.bad;
-        state.finalArc
-          .goodEndingUnlocked =
-          unlocked.good;
-
-        state.gameOver = false;
-
-        closeModal();
-        enterGame();
-        updateHud();
-        save();
+        v0828RetryObserverFinal();
       }
     ]);
   }
@@ -41662,7 +41706,7 @@ updateHud = function() {
 
 
   // 0.8.53 — versão e cache.
-  $("version").textContent = "PROTÓTIPO · 0.8.55";
+  $("version").textContent = "PROTÓTIPO · 0.8.56";
   
   requestAnimationFrame(frame);
   showBootSplash();
