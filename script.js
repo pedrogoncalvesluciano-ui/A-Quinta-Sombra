@@ -42549,16 +42549,12 @@ v0828DrawTruthGame = function() {
 
   if (phase === "badDrain") {
     const p = Math.min(1, v0828TruthGame.time / 1.8);
-    const marker = Math.min(
-      1,
-      (v0828TruthGame.fatherBadDrainStart || 0.04) +
-      (1 - (v0828TruthGame.fatherBadDrainStart || 0.04)) * p
-    );
+    const remaining = 1 - p;
     rect(0, 0, W, H, "rgba(3,4,6,0.92)");
     txt("VERDADE", 48, 104, "#ded8c9", 9);
     txt("MENTIRA", W - 112, 104, "#c6c9b7", 9);
     rect(48, 118, W - 96, 13, "#252526");
-    rect(48, 118, (W - 96) * marker, 13, "#ded8c9");
+    rect(48, 118, (W - 96) * remaining, 13, "#ded8c9");
     txt("...", center - 5, 176, "#ded8c9", 12);
     return;
   }
