@@ -2,7 +2,7 @@
 "use strict";
 
 /*
-  A QUINTA SOMBRA — 0.8.57
+  A QUINTA SOMBRA — 0.8.58
 
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
@@ -41892,12 +41892,13 @@ updateHud = function() {
   };
 
 
-  // 0.8.57 — versão e cache.
-  $("version").textContent = "PROTÓTIPO · 0.8.57";
+  // 0.8.58 — versão e cache.
+  $("version").textContent = "PROTÓTIPO · 0.8.58";
   
   requestAnimationFrame(frame);
   showBootSplash();
-})();
+
+
 
 
 
@@ -43093,3 +43094,4 @@ v0828GoodEnding = function() {
 
 // Restaura a interferência visual da cena final: ela acompanha a figura
 // misteriosa quando chega perto da porta, sem alterar o sprite ou o trajeto.
+})();
