@@ -42597,6 +42597,7 @@ update = function(dt) {
     v0828TruthGame.round === 6
   ) {
     const game = v0828TruthGame;
+    elapsed += dt;
     game.time += dt;
 
     if (game.fatherPhase === "countdown") {
