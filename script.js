@@ -2,7 +2,7 @@
 "use strict";
 
 /*
-  A QUINTA SOMBRA — 0.8.53
+  A QUINTA SOMBRA — 0.8.54
 
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
@@ -42554,30 +42554,47 @@ v0828DrawMineCompanions = function() {
     return;
   }
 
-  const p = phase === "goodEnding"
+  const revealTime = v0828TruthGame.time;
+  const brotherAlpha = phase === "goodEnding"
     ? 1
-    : Math.min(1, v0828TruthGame.time / 2.8);
+    : Math.min(1, revealTime / 1.3);
+  const motherAlpha = phase === "goodEnding"
+    ? 1
+    : Math.max(0, Math.min(1, (revealTime - 1.3) / 1.5));
 
   c.save();
   c.translate(-Math.floor(camera.x), -Math.floor(camera.y));
-  c.globalAlpha = p;
 
   const bx = V070_MOTHER_POS.x - 38;
   const by = V070_MOTHER_POS.y + 26;
   const mx = V070_MOTHER_POS.x;
   const my = V070_MOTHER_POS.y;
 
-  for (const [cx, cy] of [[bx, by], [mx, my]]) {
-    const mist = c.createRadialGradient(cx, cy, 2, cx, cy, 48);
-    mist.addColorStop(0, "rgba(239,243,236,0.20)");
-    mist.addColorStop(1, "rgba(239,243,236,0)");
-    c.fillStyle = mist;
-    c.fillRect(cx - 52, cy - 52, 104, 104);
+  if (brotherAlpha > 0) {
+    c.save();
+    c.globalAlpha = brotherAlpha;
+    const brotherMist = c.createRadialGradient(bx, by, 2, bx, by, 48);
+    brotherMist.addColorStop(0, "rgba(239,243,236,0.20)");
+    brotherMist.addColorStop(1, "rgba(239,243,236,0)");
+    c.fillStyle = brotherMist;
+    c.fillRect(bx - 52, by - 52, 104, 104);
+    rect(bx - 35, by - 35, 70, 72, "rgba(235,240,232,0.10)");
+    person(bx, by, "brother", 0, "right", 0.82);
+    c.restore();
   }
-  rect(bx - 35, by - 35, 70, 72, "rgba(235,240,232,0.10)");
-  rect(mx - 35, my - 35, 70, 72, "rgba(235,240,232,0.10)");
-  person(bx, by, "brother", 0, "right", 0.82);
-  person(mx, my, "mother", 0, "left", 0.96);
+
+  if (motherAlpha > 0) {
+    c.save();
+    c.globalAlpha = motherAlpha;
+    const motherMist = c.createRadialGradient(mx, my, 2, mx, my, 48);
+    motherMist.addColorStop(0, "rgba(239,243,236,0.20)");
+    motherMist.addColorStop(1, "rgba(239,243,236,0)");
+    c.fillStyle = motherMist;
+    c.fillRect(mx - 52, my - 52, 104, 104);
+    rect(mx - 35, my - 35, 70, 72, "rgba(235,240,232,0.10)");
+    person(mx, my, "mother", 0, "left", 0.96);
+    c.restore();
+  }
 
   c.restore();
 };
