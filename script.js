@@ -41662,7 +41662,7 @@ updateHud = function() {
 
 
   // 0.8.53 — versão e cache.
-  $("version").textContent = "PROTÓTIPO · 0.8.53";
+  $("version").textContent = "PROTÓTIPO · 0.8.54";
   
   requestAnimationFrame(frame);
   showBootSplash();
@@ -42096,6 +42096,33 @@ v0828DrawFinalFigureScene = function() {
     0.95
   );
 
+  // A estática aparece quando a figura chega à porta.
+  if (t >= 7.65) {
+    const strength = Math.min(0.28, 0.10 + (t - 7.65) * 0.26);
+
+    for (let i = 0; i < 25; i++) {
+      const y = (i * 13 + Math.floor(elapsed * 510) % H) % H;
+      rect(
+        (i % 4) * -6,
+        y,
+        W + 12,
+        i % 3 === 0 ? 2 : 1,
+        "rgba(235,238,232," + strength + ")"
+      );
+    }
+
+    for (let i = 0; i < 7; i++) {
+      const x = (i * 59 + Math.floor(elapsed * 190)) % W;
+      rect(
+        x,
+        65 + (i * 23) % 150,
+        12 + (i % 3) * 7,
+        2,
+        "rgba(9,11,12,0.24)"
+      );
+    }
+  }
+
 };
 
 
@@ -42299,3 +42326,369 @@ drawWorld = function() {
   v0850DrawBasementBase();
   v0850DrawBasementPrototypeDetails();
 };
+
+
+// =========================================================
+// 0.8.54 — CASA DA MEMÓRIA: CADÁVER + RESISTÊNCIA FINAL
+// Mantém as cinco primeiras rodadas e substitui apenas a
+// apresentação/entrada da sexta rodada. Não remove sistemas antigos.
+// =========================================================
+
+const v0854TruthNarrativeBase = v0828TruthNarrative;
+
+v0828TruthNarrative = function(round) {
+  if (round === 4) {
+    return [
+      ["Observador", "Não havia corpo."],
+      ["Observador", "Não houve perseguição."],
+      ["Observador", "E aquele corpo encontrado, será que não era o seu pai?"],
+      ["Observador", "Você nem conseguiu confirmar quem estava ali."],
+      ["Estevão", "Não... aquele homem não era meu pai."]
+    ];
+  }
+
+  if (round === 6) {
+    return [
+      "Uma figura aparece no fundo do corredor e começa a caminhar na sua direção.",
+      "Visualmente, é seu pai.",
+      ["Observador", "E o seu pai?"],
+      ["Estevão", "Meu... pai??"]
+    ];
+  }
+
+  return v0854TruthNarrativeBase(round);
+};
+
+const v0854BeginTruthInputBase = v0828BeginTruthInput;
+
+v0828BeginTruthInput = function(round) {
+  if (round !== 6) {
+    return v0854BeginTruthInputBase(round);
+  }
+
+  v0828TruthGame.active = true;
+  v0828TruthGame.round = 6;
+  v0828TruthGame.time = 0;
+  v0828TruthGame.duration = 5;
+  v0828TruthGame.progress = 0.72;
+  v0828TruthGame.specialFather = true;
+  v0828TruthGame.prompt = "PRESSIONE F";
+  v0828TruthGame.fatherPhase = "countdown";
+  v0828TruthGame.fatherCountdown = 5;
+  v0828TruthGame.fatherPresses = 0;
+  v0828TruthGame.fatherResistance = 0;
+
+  // lastOutcome é preservado para manter o desempate antigo
+  // enquanto o criador ainda não define uma regra nova.
+  transitionBusy = true;
+  keys.clear();
+  $("hud").hidden = true;
+  $("prompt").hidden = true;
+};
+
+const v0854TruthPressBase = v0828TruthPress;
+
+v0828TruthPress = function() {
+  if (!v0828TruthGame.active) return;
+
+  if (v0828TruthGame.round === 6) {
+    const phase = v0828TruthGame.fatherPhase;
+
+    if (phase === "game") {
+      // Cada toque ajuda Estevão a puxar a disputa para a VERDADE.
+      v0828TruthGame.progress = Math.max(
+        0.04,
+        v0828TruthGame.progress - 0.085
+      );
+      v0828TruthGame.fatherPresses += 1;
+      return;
+    }
+
+    if (phase === "resistance") {
+      v0828TruthGame.fatherResistance = Math.min(
+        3,
+        v0828TruthGame.fatherResistance + 1
+      );
+
+      if (v0828TruthGame.fatherResistance >= 3) {
+        v0828TruthGame.fatherPhase = "dissolve";
+        v0828TruthGame.time = 0;
+      }
+      return;
+    }
+
+    return;
+  }
+
+  v0854TruthPressBase();
+};
+
+const v0854DrawTruthGameBase = v0828DrawTruthGame;
+
+v0828DrawTruthGame = function() {
+  if (!v0828TruthGame.active || v0828TruthGame.round !== 6) {
+    v0854DrawTruthGameBase();
+    return;
+  }
+
+  const phase = v0828TruthGame.fatherPhase;
+  const center = W / 2;
+
+  if (phase === "countdown") {
+    rect(0, 0, W, H, "rgba(3,4,6,0.92)");
+    txt("VOCÊ ACREDITA QUE ELE ESTÁ...", 70, 78, "#d8d2c5", 9);
+    txt("VIVO?", center - 22, 105, "#eee9dc", 12);
+    const remaining = Math.max(
+      0,
+      Math.ceil(5 - v0828TruthGame.time)
+    );
+    txt(String(remaining), center - 5, 165, "#eee9dc", 27);
+    return;
+  }
+
+  if (phase === "game") {
+    rect(0, 0, W, H, "rgba(3,4,6,0.88)");
+    txt("REAL × MENTIRA", center - 62, 58, "#eee9dc", 12);
+    txt("VERDADE", 58, 132, "#d8d2c5", 9);
+    txt("MENTIRA", W - 116, 132, "#c6c9b7", 9);
+    rect(48, 146, W - 96, 13, "#252526");
+    const px = 48 + (W - 96) * v0828TruthGame.progress;
+    rect(px - 4, 140, 8, 25, "#eee9dc");
+    txt("PRESSIONE F", center - 43, 198, "#ded8c9", 9);
+    return;
+  }
+
+  if (phase === "flashback") {
+    rect(0, 0, W, H, "#020303");
+    const edge = c.createRadialGradient(
+      center, H / 2, 24,
+      center, H / 2, Math.max(W, H) * 0.72
+    );
+    edge.addColorStop(0, "rgba(0,0,0,1)");
+    edge.addColorStop(0.72, "rgba(0,0,0,0.96)");
+    edge.addColorStop(1, "rgba(232,234,228,0.30)");
+    c.fillStyle = edge;
+    c.fillRect(0, 0, W, H);
+    txt("Toma cuidado, por favor.", center - 91, H / 2 - 8, "#e7e5df", 10);
+    txt("Eu só tenho você.", center - 70, H / 2 + 12, "#e7e5df", 10);
+    return;
+  }
+
+  if (phase === "resistance") {
+    rect(0, 0, W, H, "rgba(2,3,4,0.90)");
+    const count = v0828TruthGame.fatherResistance;
+    const amount = [0, 0.30, 0.66, 1][count];
+    txt("RESISTA", center - 29, 70, "#eee9dc", 10);
+    rect(48, 112, W - 96, 13, "#252526");
+    rect(48, 112, (W - 96) * amount, 13, "#ded8c9");
+
+    if (count === 1) {
+      for (let i = 0; i < 9; i++) {
+        const y = 88 + ((i * 19 + Math.floor(elapsed * 37)) % 110);
+        rect((i * 47) % W, y, 18 + (i % 3) * 8, 2, "rgba(230,235,230,0.28)");
+      }
+    }
+
+    if (count === 2) {
+      for (let i = 0; i < 16; i++) {
+        const y = 75 + ((i * 13 + Math.floor(elapsed * 53)) % 135);
+        rect((i * 31) % W, y, 24 + (i % 4) * 9, 2, "rgba(235,238,232,0.36)");
+      }
+      txt("ISSO É...", center - 37, 169, "#eee9dc", 12);
+    } else if (count >= 3) {
+      txt("MENTIRA!!!", center - 56, 174, "#f1eee7", 16);
+    } else {
+      txt("PRESSIONE F", center - 43, 174, "#ded8c9", 9);
+    }
+    return;
+  }
+
+  if (phase === "dissolve") {
+    const p = Math.min(1, v0828TruthGame.time / 3.6);
+    rect(0, 0, W, H, "rgba(0,0,0,0.24)");
+    for (let i = 0; i < 34; i++) {
+      const x = (i * 37 + Math.sin(elapsed * 2 + i) * 13) % W;
+      const rise = (i * 17 + elapsed * (35 + (i % 5) * 8)) % (H + 40);
+      const y = H - rise;
+      const width = 18 + (i % 5) * 12;
+      const alpha = Math.min(0.88, 0.20 + p * 0.70);
+      rect(x, y, width, 20 + (i % 4) * 9, "rgba(0,0,0," + alpha + ")");
+    }
+    txt("Não...", center - 20, H - 46, "#d8d2c5", 11);
+    return;
+  }
+
+  if (phase === "reveal") {
+    const p = Math.min(1, v0828TruthGame.time / 2.8);
+    rect(0, 0, W, H, "rgba(225,229,222," + (0.06 + p * 0.12) + ")");
+    for (let i = 0; i < 24; i++) {
+      const x = (i * 43 + Math.sin(elapsed + i) * 10) % W;
+      const y = 72 + ((i * 23) % (H - 100));
+      rect(x, y, 20 + (i % 4) * 12, 12 + (i % 3) * 8, "rgba(238,240,234," + (0.08 + p * 0.12) + ")");
+    }
+  }
+};
+
+const v0854DrawCompanionsBase = v0828DrawMineCompanions;
+
+v0828DrawMineCompanions = function() {
+  v0854DrawCompanionsBase();
+
+  const phase = v0828TruthGame.fatherPhase;
+  if (
+    state?.room !== "mineDeep" ||
+    !["reveal", "goodEnding"].includes(phase)
+  ) {
+    return;
+  }
+
+  const p = phase === "goodEnding"
+    ? 1
+    : Math.min(1, v0828TruthGame.time / 2.8);
+
+  c.save();
+  c.translate(-Math.floor(camera.x), -Math.floor(camera.y));
+  c.globalAlpha = p;
+
+  const bx = V070_MOTHER_POS.x - 38;
+  const by = V070_MOTHER_POS.y + 26;
+  const mx = V070_MOTHER_POS.x;
+  const my = V070_MOTHER_POS.y;
+
+  rect(bx - 35, by - 35, 70, 72, "rgba(235,240,232,0.10)");
+  rect(mx - 35, my - 35, 70, 72, "rgba(235,240,232,0.10)");
+  person(bx, by, "brother", 0, "right", 0.82);
+  person(mx, my, "mother", 0, "left", 0.96);
+
+  c.restore();
+};
+
+function v0854ResolveFatherScore() {
+  const f = v0828EnsureFinalArc();
+
+  v0828TruthGame.time = 0;
+
+  if (f.realScore > f.lieScore) {
+    v0828TruthGame.active = false;
+    v0828TruthGame.fatherPhase = "done";
+    transitionBusy = false;
+    $("hud").hidden = false;
+    v0828BadEnding();
+    return;
+  }
+
+  if (f.lieScore > f.realScore) {
+    v0828TruthGame.fatherPhase = "flashback";
+    return;
+  }
+
+  // Empate: mantém o comportamento legado, ainda não decidido pelo criador.
+  v0828TruthGame.active = false;
+  transitionBusy = false;
+  $("hud").hidden = false;
+  v0828ResolveTruthEnding();
+}
+
+const v0854UpdateBase = update;
+
+update = function(dt) {
+  if (
+    v0828TruthGame.active &&
+    v0828TruthGame.round === 6
+  ) {
+    const game = v0828TruthGame;
+    game.time += dt;
+
+    if (game.fatherPhase === "countdown") {
+      if (game.time >= 5) {
+        game.fatherPhase = "game";
+        game.time = 0;
+      }
+      return;
+    }
+
+    if (game.fatherPhase === "game") {
+      // A pressão do Observador empurra lentamente para a MENTIRA;
+      // a resistência do jogador e a lembrança factual puxam para a VERDADE.
+      game.progress = Math.max(0.04, game.progress - dt * 0.12);
+      if (game.time >= 5) {
+        v0854ResolveFatherScore();
+      }
+      return;
+    }
+
+    if (game.fatherPhase === "flashback") {
+      if (game.time >= 3.2) {
+        game.fatherPhase = "resistance";
+        game.time = 0;
+        game.fatherResistance = 0;
+      }
+      return;
+    }
+
+    if (game.fatherPhase === "dissolve") {
+      if (game.time >= 3.6) {
+        game.fatherPhase = "reveal";
+        game.time = 0;
+        const f = v0828EnsureFinalArc();
+        // Interrompe a renderização do Observador sem alterar o mapa.
+        f.phase = "epilogue";
+      }
+      return;
+    }
+
+    if (game.fatherPhase === "reveal") {
+      if (game.time >= 2.8) {
+        v0828GoodEnding();
+      }
+      return;
+    }
+
+    return;
+  }
+
+  v0854UpdateBase(dt);
+};
+
+const v0854GoodEndingBase = v0828GoodEnding;
+
+v0828GoodEnding = function() {
+  const f = v0828EnsureFinalArc();
+
+  f.goodEndingUnlocked = true;
+  f.phase = "epilogue";
+
+  state.ending = state.ending || {};
+  state.ending.id = "good";
+  state.ending.complete = true;
+
+  state.storyFlags = state.storyFlags || {};
+  state.storyFlags.wheelchairGone = true;
+  state.storyFlags.motherRescued = true;
+
+  v0828SaveEndingMeta();
+  v0828RefreshEndingsButton();
+  save();
+
+  v0828TruthGame.active = false;
+  v0828TruthGame.fatherPhase = "goodEnding";
+  transitionBusy = false;
+  $("hud").hidden = false;
+  $("prompt").hidden = true;
+  keys.clear();
+
+  say(
+    [
+      ["Estevão", "Irmão!!"],
+      ["Irmão", "Estevão!!"],
+      ["Estevão", "M-mãe!!"],
+      ["Mãe", "Estou aqui, filho."]
+    ],
+    () => {
+      v0828StartEpilogue();
+    }
+  );
+};
+
+// Restaura a interferência visual da cena final: ela acompanha a figura
+// misteriosa quando chega perto da porta, sem alterar o sprite ou o trajeto.
