@@ -42411,7 +42411,7 @@ v0828TruthPress = function() {
       );
 
       if (v0828TruthGame.fatherResistance >= 3) {
-        v0828TruthGame.fatherPhase = "dissolve";
+        v0828TruthGame.fatherPhase = "barFade";
         v0828TruthGame.time = 0;
       }
       return;
@@ -42503,6 +42503,18 @@ v0828DrawTruthGame = function() {
     return;
   }
 
+  if (phase === "barFade") {
+    const alpha = Math.max(0, 1 - v0828TruthGame.time / 0.9);
+    rect(0, 0, W, H, "rgba(2,3,4,0.90)");
+    c.save();
+    c.globalAlpha = alpha;
+    rect(48, 112, W - 96, 13, "#252526");
+    rect(48, 112, W - 96, 13, "#ded8c9");
+    txt("MENTIRA!!!", center - 56, 174, "#f1eee7", 16);
+    c.restore();
+    return;
+  }
+
   if (phase === "dissolve") {
     const p = Math.min(1, v0828TruthGame.time / 3.6);
     rect(0, 0, W, H, "rgba(0,0,0,0.24)");
@@ -42555,6 +42567,13 @@ v0828DrawMineCompanions = function() {
   const mx = V070_MOTHER_POS.x;
   const my = V070_MOTHER_POS.y;
 
+  for (const [cx, cy] of [[bx, by], [mx, my]]) {
+    const mist = c.createRadialGradient(cx, cy, 2, cx, cy, 48);
+    mist.addColorStop(0, "rgba(239,243,236,0.20)");
+    mist.addColorStop(1, "rgba(239,243,236,0)");
+    c.fillStyle = mist;
+    c.fillRect(cx - 52, cy - 52, 104, 104);
+  }
   rect(bx - 35, by - 35, 70, 72, "rgba(235,240,232,0.10)");
   rect(mx - 35, my - 35, 70, 72, "rgba(235,240,232,0.10)");
   person(bx, by, "brother", 0, "right", 0.82);
@@ -42623,6 +42642,14 @@ update = function(dt) {
         game.fatherPhase = "resistance";
         game.time = 0;
         game.fatherResistance = 0;
+      }
+      return;
+    }
+
+    if (game.fatherPhase === "barFade") {
+      if (game.time >= 0.9) {
+        game.fatherPhase = "dissolve";
+        game.time = 0;
       }
       return;
     }
