@@ -42417,6 +42417,12 @@ v0828TruthPress = function() {
       return;
     }
 
+    if (
+      ["badDrain", "badSpeech", "badWalk", "badFade"].includes(phase)
+    ) {
+      return;
+    }
+
     return;
   }
 
@@ -42538,6 +42544,88 @@ v0828DrawTruthGame = function() {
       const y = 72 + ((i * 23) % (H - 100));
       rect(x, y, 20 + (i % 4) * 12, 12 + (i % 3) * 8, "rgba(238,240,234," + (0.08 + p * 0.12) + ")");
     }
+    return;
+  }
+
+  if (phase === "badDrain") {
+    const p = Math.min(1, v0828TruthGame.time / 1.8);
+    const marker = Math.min(
+      1,
+      (v0828TruthGame.fatherBadDrainStart || 0.04) +
+      (1 - (v0828TruthGame.fatherBadDrainStart || 0.04)) * p
+    );
+    rect(0, 0, W, H, "rgba(3,4,6,0.92)");
+    txt("VERDADE", 48, 104, "#ded8c9", 9);
+    txt("MENTIRA", W - 112, 104, "#c6c9b7", 9);
+    rect(48, 118, W - 96, 13, "#252526");
+    rect(48, 118, (W - 96) * marker, 13, "#ded8c9");
+    txt("...", center - 5, 176, "#ded8c9", 12);
+    return;
+  }
+
+  if (
+    phase === "badSpeech" ||
+    phase === "badWalk" ||
+    phase === "badFade"
+  ) {
+    const walkProgress = phase === "badSpeech"
+      ? 0
+      : phase === "badWalk"
+        ? Math.min(1, v0828TruthGame.time / 4.2)
+        : 1;
+
+    // Plano da galeria e do túnel de entrada pelo qual Estevão chegou.
+    rect(0, 0, W, H, "#090b0c");
+    rect(0, H * 0.28, W, H * 0.48, "#242321");
+    rect(0, H * 0.72, W, H * 0.28, "#171817");
+    rect(18, H * 0.30, 10, H * 0.42, "#40372e");
+    rect(18, H * 0.30, 145, 8, "#40372e");
+    rect(W - 150, H * 0.30, 10, H * 0.42, "#40372e");
+    rect(W - 160, H * 0.30, 145, 8, "#40372e");
+
+    // Boca escura do túnel à esquerda, direção de onde Estevão veio.
+    rect(0, H * 0.34, 105, H * 0.36, "#020303");
+    rect(0, H * 0.31, 112, 8, "#39332d");
+    rect(0, H * 0.70, 112, 8, "#39332d");
+
+    // Trilhos conduzem o olhar até a entrada do túnel.
+    rect(0, H * 0.61, W, 3, "#514b43");
+    rect(0, H * 0.66, W, 3, "#514b43");
+    for (let x = 12; x < W; x += 32) {
+      rect(x, H * 0.59, 17, 22, "#332d27");
+    }
+
+    const observerX = W * 0.72 - walkProgress * W * 0.59;
+    const observerY = H * 0.56;
+    const scale = 1 - walkProgress * 0.48;
+    const sw = 1;
+
+    c.save();
+    c.translate(observerX, observerY);
+    c.scale(scale, scale);
+    const jitter = Math.sin(elapsed * 31) * 1.8;
+    rect(-23 + jitter, -28, 42, 17, "#010203");
+    rect(-13 - jitter, -46, 28, 22, "#010203");
+    rect(-31, -18, 17, 10, "#010203");
+    rect(12, -20, 21, 10, "#010203");
+    rect(-17, -12, 9, 25, "#010203");
+    rect(8, -12, 10, 25, "#010203");
+    rect(-17, 10, 8, 18 + Math.sin(elapsed * 13) * 3, "#010203");
+    rect(8, 10, 9, 18 - Math.sin(elapsed * 13) * 3, "#010203");
+    c.restore();
+
+    // Escurecimento cresce durante a caminhada e termina em tela preta.
+    const darkness = phase === "badSpeech"
+      ? 0.10
+      : phase === "badWalk"
+        ? 0.10 + walkProgress * 0.48
+        : 0.58 + Math.min(0.42, v0828TruthGame.time / 2.2 * 0.42);
+    rect(0, 0, W, H, "rgba(0,0,0," + darkness + ")");
+
+    if (phase === "badSpeech") {
+      txt("VOCÊ É FRACO.", center - 54, H * 0.84, "#e5dfd2", 12);
+    }
+    return;
   }
 };
 
@@ -42605,15 +42693,21 @@ function v0854ResolveFatherScore() {
   v0828TruthGame.time = 0;
 
   if (f.realScore > f.lieScore) {
-    v0828TruthGame.active = false;
-    v0828TruthGame.fatherPhase = "done";
-    transitionBusy = false;
-    $("hud").hidden = false;
-    v0828BadEnding();
+    // A maioria REAL vence a disputa: Estevão não recebe o flashback
+    // e não pode iniciar a resistência final.
+    v0828TruthGame.fatherPhase = "badDrain";
+    v0828TruthGame.fatherBadDrainStart =
+      v0828TruthGame.progress;
+    v0828TruthGame.active = true;
+    transitionBusy = true;
+    $("hud").hidden = true;
+    $("prompt").hidden = true;
+    keys.clear();
     return;
   }
 
   if (f.lieScore > f.realScore) {
+    // A maioria MENTIRA abre a lembrança do irmão e a resistência.
     v0828TruthGame.fatherPhase = "flashback";
     return;
   }
@@ -42685,6 +42779,41 @@ update = function(dt) {
     if (game.fatherPhase === "reveal") {
       if (game.time >= 2.8) {
         v0828GoodEnding();
+      }
+      return;
+    }
+
+    if (game.fatherPhase === "badDrain") {
+      if (game.time >= 1.8) {
+        game.fatherPhase = "badSpeech";
+        game.time = 0;
+      }
+      return;
+    }
+
+    if (game.fatherPhase === "badSpeech") {
+      if (game.time >= 2.4) {
+        game.fatherPhase = "badWalk";
+        game.time = 0;
+      }
+      return;
+    }
+
+    if (game.fatherPhase === "badWalk") {
+      if (game.time >= 4.2) {
+        game.fatherPhase = "badFade";
+        game.time = 0;
+      }
+      return;
+    }
+
+    if (game.fatherPhase === "badFade") {
+      if (game.time >= 2.2) {
+        game.active = false;
+        game.fatherPhase = "done";
+        transitionBusy = false;
+        keys.clear();
+        v0828BadEnding();
       }
       return;
     }
