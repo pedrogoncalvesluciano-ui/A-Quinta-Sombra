@@ -41897,7 +41897,8 @@ updateHud = function() {
   
   requestAnimationFrame(frame);
   showBootSplash();
-})();
+
+
 
 
 
@@ -43093,3 +43094,4 @@ v0828GoodEnding = function() {
 
 // Restaura a interferência visual da cena final: ela acompanha a figura
 // misteriosa quando chega perto da porta, sem alterar o sprite ou o trajeto.
+})();
