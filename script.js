@@ -2,7 +2,7 @@
 "use strict";
 
 /*
-  A QUINTA SOMBRA — 0.8.26
+  A QUINTA SOMBRA — 0.8.53
 
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
@@ -33499,7 +33499,7 @@ function v0828BadEnding() {
 
   modal(
     "FINAL RUIM",
-    "Você acreditou nas ilusões e mentiras do Observador.",
+    "O OBSERVADOR TE DOMINOU",
     [
       [
         "Voltar ao menu",
@@ -41661,10 +41661,8 @@ updateHud = function() {
 // =========================================================
 
 
-  // 0.8.51 — versão e cache.
-  $("version").textContent = "PROTÓTIPO · 0.8.51";
-
-  $("version").textContent = "PROTÓTIPO · 0.8.51";
+  // 0.8.53 — versão e cache.
+  $("version").textContent = "PROTÓTIPO · 0.8.53";
   
   requestAnimationFrame(frame);
   showBootSplash();
@@ -42098,32 +42096,6 @@ v0828DrawFinalFigureScene = function() {
     0.95
   );
 
-  // A estática aparece apenas no instante em que a figura chega à porta.
-  if (t >= 7.65) {
-    const strength = Math.min(0.28, 0.10 + (t - 7.65) * 0.26);
-
-    for (let i = 0; i < 25; i++) {
-      const y = (i * 13 + Math.floor(elapsed * 510) % H) % H;
-      rect(
-        (i % 4) * -6,
-        y,
-        W + 12,
-        i % 3 === 0 ? 2 : 1,
-        "rgba(235,238,232," + strength + ")"
-      );
-    }
-
-    for (let i = 0; i < 7; i++) {
-      const x = (i * 59 + Math.floor(elapsed * 190)) % W;
-      rect(
-        x,
-        65 + (i * 23) % 150,
-        12 + (i % 3) * 7,
-        2,
-        "rgba(9,11,12,0.24)"
-      );
-    }
-  }
 };
 
 
