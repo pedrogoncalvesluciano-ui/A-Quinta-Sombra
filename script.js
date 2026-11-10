@@ -2,7 +2,7 @@
 "use strict";
 
 /*
-  A QUINTA SOMBRA — 0.8.59
+  A QUINTA SOMBRA — 0.8.60
 
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
@@ -40683,11 +40683,15 @@ v0826ParentsLeaveTransition =
 
   // 0.8.46 — papéis e pistas visuais espalhados pelos cômodos.
   // São desenhos de cenário: não alteram colisões, diálogos ou progressão.
-  function v08846DrawPaperClue(x, y, w, h, variant = "scribble", angle = 0) {
+  function v08846DrawPaperClue(x, y, w, h, variant = "scribble", angle = 0, cardScale = 1) {
+    // Reduz a arte inteira proporcionalmente, preservando texto e detalhes.
+    const safeCardScale = Number.isFinite(cardScale)
+      ? Math.max(0.5, Math.min(1, cardScale))
+      : 1;
     c.save();
     c.translate(housePoint(x), housePoint(y));
     c.rotate(angle);
-    const scale = HOUSE_SCALE;
+    const scale = HOUSE_SCALE * safeCardScale;
     c.scale(scale, scale);
 
     // Sombra curta para destacar a folha do piso.
@@ -40780,9 +40784,25 @@ v0826ParentsLeaveTransition =
   drawWorld = function() {
     v08846DrawWorldBase();
     if (!state || mode !== "game") return;
+
     c.save();
     c.translate(-Math.floor(camera.x), -Math.floor(camera.y));
+
+    // Primeiro desenha as cartas no piso; depois redesenha o protagonista
+    // para garantir que o sprite fique visualmente à frente delas.
     v08846DrawRoomClues();
+
+    const q = chapter();
+    if (state.room === "parents" && q && q.phase === "clues") {
+      person(
+        state.x,
+        state.y,
+        "player",
+        state.walk,
+        state.facing
+      );
+    }
+
     c.restore();
   };
 
@@ -40962,6 +40982,7 @@ v0826ParentsLeaveTransition =
     const q = chapter();
     if (!q || q.phase !== "clues") return;
 
+    const cardScale = 0.78;
     const cards = [
       {
         id: "list",
@@ -40995,13 +41016,18 @@ v0826ParentsLeaveTransition =
     for (const card of cards) {
       if (q.clues.includes(card.id)) continue;
 
+      // Centraliza a carta reduzida exatamente no ponto de coleta.
+      const scaledW = card.w * cardScale;
+      const scaledH = card.h * cardScale;
+
       v08846DrawPaperClue(
-        card.x - card.w / 2,
-        card.y - card.h / 2,
+        card.x - scaledW / 2,
+        card.y - scaledH / 2,
         card.w,
         card.h,
         card.variant,
-        card.angle
+        card.angle,
+        cardScale
       );
     }
   };
