@@ -43157,7 +43157,7 @@ v0828GoodEnding = function() {
       danger.punch = 0;
       danger.cooldown = Math.max(
         45,
-        Number.isFinite(danger.cooldown) ? danger.cooldown : 0
+        Math.min(180, Number.isFinite(danger.cooldown) ? danger.cooldown : 0)
       );
     }
 
@@ -43174,6 +43174,10 @@ v0828GoodEnding = function() {
   }
 
   function v0860ShowWakeDialogue() {
+    if (state?.dawnWakeDialoguePending) {
+      v0640RecoverInputLock();
+    }
+
     if (
       !state ||
       mode !== "game" ||
@@ -43273,6 +43277,7 @@ v0828GoodEnding = function() {
       keys.clear();
       near = null;
       $("prompt").hidden = true;
+      updateHud();
 
       elapsed += dt;
       collapse.time = Math.max(0, Number(collapse.time) || 0) + dt;
