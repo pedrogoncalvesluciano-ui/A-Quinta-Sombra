@@ -2,7 +2,7 @@
 "use strict";
 
 /*
-  A QUINTA SOMBRA — 0.8.58
+  A QUINTA SOMBRA — 0.8.59
 
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
@@ -6774,36 +6774,21 @@ drawWorld = function () {
     -Math.floor(camera.y)
   );
 
-  // Marcadores provisórios das pistas.
+  // Os antigos quadrados foram removidos. As cartas são desenhadas
+  // pela camada visual 0.8.59 nos mesmos pontos usados para coletá-las.
   if (
     q &&
-    !["waiting", "brother"].includes(q.phase)
+    q.phase === "clues" &&
+    state.room === "parents"
   ) {
-    for (const [room, x, y, id] of clueSpots) {
-      if (state.room !== room) continue;
-
-      if (q.clues.includes(id)) continue;
-
-      rect(
-        x - 5,
-        y - 7,
-        10,
-        7,
-        "#dfc997"
-      );
-    }
-
-    // Os marcadores das pistas ficam no chão. Recoloca o personagem
-    // por último para que nenhum marcador atravesse o sprite.
-    if (state.room === "parents") {
-      person(
-        state.x,
-        state.y,
-        "player",
-        state.walk,
-        state.facing
-      );
-    }
+    // Mantém o personagem acima do piso e abaixo das cartas da pista.
+    person(
+      state.x,
+      state.y,
+      "player",
+      state.walk,
+      state.facing
+    );
   }
 
   // A figura deixa de existir no cenário após a foto.
@@ -40968,17 +40953,56 @@ v0826ParentsLeaveTransition =
   // Os papéis deixam de aparecer espalhados pelos outros cômodos.
   // Três folhas ficam agrupadas no chão do quarto dos pais,
   // ocupando a área dos antigos quadrados claros.
+  // 0.8.59 — CARTAS DE PISTAS NO QUARTO DOS PAIS
+  // Cada carta ocupa exatamente o ponto de interação correspondente.
+  // As dimensões menores evitam que os papéis dominem o cenário.
   v08846DrawRoomClues = function() {
     if (!state || state.room !== "parents") return;
 
-    const clues = [
-      [334, 238, 46, 34, "supplies", -0.08],
-      [390, 242, 30, 22, "scribble", 0.06],
-      [438, 220, 25, 18, "marked", -0.10]
+    const q = chapter();
+    if (!q || q.phase !== "clues") return;
+
+    const cards = [
+      {
+        id: "list",
+        x: 125,
+        y: 165,
+        w: 30,
+        h: 22,
+        variant: "supplies",
+        angle: -0.06
+      },
+      {
+        id: "photo",
+        x: 440,
+        y: 170,
+        w: 25,
+        h: 19,
+        variant: "marked",
+        angle: 0.07
+      },
+      {
+        id: "note",
+        x: 320,
+        y: 250,
+        w: 25,
+        h: 19,
+        variant: "scribble",
+        angle: -0.05
+      }
     ];
 
-    for (const clue of clues) {
-      v08846DrawPaperClue(...clue);
+    for (const card of cards) {
+      if (q.clues.includes(card.id)) continue;
+
+      v08846DrawPaperClue(
+        card.x - card.w / 2,
+        card.y - card.h / 2,
+        card.w,
+        card.h,
+        card.variant,
+        card.angle
+      );
     }
   };
 
