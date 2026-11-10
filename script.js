@@ -6775,7 +6775,7 @@ drawWorld = function () {
   );
 
   // Os antigos quadrados foram removidos. As cartas são desenhadas
-  // pela camada visual 0.8.59 nos mesmos pontos usados para coletá-las.
+  // pela camada visual 0.8.60 nos mesmos pontos usados para coletá-las.
   if (
     q &&
     q.phase === "clues" &&
@@ -40973,7 +40973,7 @@ v0826ParentsLeaveTransition =
   // Os papéis deixam de aparecer espalhados pelos outros cômodos.
   // Três folhas ficam agrupadas no chão do quarto dos pais,
   // ocupando a área dos antigos quadrados claros.
-  // 0.8.59 — CARTAS DE PISTAS NO QUARTO DOS PAIS
+  // 0.8.60 — CARTAS DE PISTAS NO QUARTO DOS PAIS
   // Cada carta ocupa exatamente o ponto de interação correspondente.
   // As dimensões menores evitam que os papéis dominem o cenário.
   v08846DrawRoomClues = function() {
