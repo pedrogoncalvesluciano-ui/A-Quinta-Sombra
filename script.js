@@ -2,7 +2,7 @@
 "use strict";
 
 /*
-  A QUINTA SOMBRA — 0.8.59
+  A QUINTA SOMBRA — 0.8.60
 
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
@@ -43118,4 +43118,225 @@ v0828GoodEnding = function() {
 
 // Restaura a interferência visual da cena final: ela acompanha a figura
 // misteriosa quando chega perto da porta, sem alterar o sprite ou o trajeto.
+
+  // =========================================================
+  // 0.8.60 — RECUPERAÇÃO DO AMANHECER E ENCERRAMENTO DA AMEAÇA NOTURNA
+  // Garante o retorno ao jogo após as 07:00 e evita instruções de combate
+  // presas quando a invasão da noite anterior termina com o desmaio.
+  // =========================================================
+
+  function v0860RestoreMorningInterface() {
+    transitionBusy = false;
+    areaLoadingOverlay = false;
+    dialog = null;
+
+    $("dialog").hidden = true;
+    $("choiceScene").hidden = true;
+    $("overlay").hidden = true;
+    $("menu").hidden = true;
+    $("hud").hidden = false;
+    $("prompt").hidden = true;
+    $("eventToast").hidden = true;
+
+    const transition = $("transition");
+    transition.classList.remove("active");
+    transition.style.opacity = "";
+
+    keys.clear();
+    near = null;
+    mode = "game";
+  }
+
+  function v0860EndNightThreats() {
+    if (state?.danger) {
+      const danger = state.danger;
+      danger.phase = "safe";
+      danger.time = 0;
+      danger.countdown = 60;
+      danger.enemy = null;
+      danger.punch = 0;
+      danger.cooldown = Math.max(
+        45,
+        Number.isFinite(danger.cooldown) ? danger.cooldown : 0
+      );
+    }
+
+    if (state?.randomEventState) {
+      state.randomEventState.pending = false;
+      state.randomEventState.timer = 0;
+      state.randomEventState.type = null;
+    }
+
+    if (state?.smallEventState) {
+      state.smallEventState.pending = false;
+      state.smallEventState.timer = 0;
+    }
+  }
+
+  function v0860ShowWakeDialogue() {
+    if (
+      !state ||
+      mode !== "game" ||
+      !state.dawnWakeDialoguePending ||
+      state.dawnCollapse?.active ||
+      state.wakeUp?.active ||
+      dialog ||
+      !$("overlay").hidden ||
+      !$("choiceScene").hidden ||
+      transitionBusy
+    ) {
+      return false;
+    }
+
+    v0860RestoreMorningInterface();
+    updateHud();
+
+    const line =
+      state.dawnCollapseCount === 1
+        ? "Parece que eu desmaiei... e vim parar aqui no meu quarto."
+        : "Aconteceu de novo... o que está acontecendo?";
+
+    say(
+      [["Você", line]],
+      () => {
+        state.dawnWakeDialoguePending = false;
+        updateHud();
+        save();
+      }
+    );
+
+    return true;
+  }
+
+  const v0860UpdateHudBase = updateHud;
+  updateHud = function() {
+    v0860UpdateHudBase();
+
+    if (!state || state.stage === "prologue") return;
+
+    const objective = $("objective");
+    const timeNote = $("timeNote");
+
+    if (state.dawnCollapse?.active) {
+      objective.textContent = "Estevão está perdendo os sentidos...";
+      timeNote.textContent = "DESMAIO · 07:00";
+      return;
+    }
+
+    if (state.wakeUp?.active) {
+      objective.textContent = "Estevão está acordando...";
+      timeNote.textContent = "INÍCIO DE UM NOVO DIA";
+      return;
+    }
+
+    if (
+      state.dawnWakeDialoguePending ||
+      (state.dawnCollapseCount || 0) >
+        (state.brotherDawnTalkCount || 0)
+    ) {
+      objective.textContent =
+        "Converse com seu irmão sobre o que aconteceu durante a noite.";
+      return;
+    }
+
+    // Remove a instrução antiga de soco quando ela já não corresponde
+    // ao objetivo do novo dia. Objetivos específicos de capítulos são mantidos.
+    if (
+      (state.dawnCollapseCount || 0) > 0 &&
+      /soco|invasor/i.test(objective.textContent)
+    ) {
+      objective.textContent =
+        "Seu irmão está seguro. Explore Forgotten e acompanhe os sinais.";
+    }
+  };
+
+  const v0860DawnUpdateBase = update;
+  update = function(dt) {
+    prepareSystems();
+
+    if (!state || mode !== "game") {
+      v0860DawnUpdateBase(dt);
+      return;
+    }
+
+    // Este passe externo assume o controle do desmaio e do despertar.
+    // Assim nenhum wrapper antigo pode deixar o ciclo preso entre fases.
+    if (state.dawnCollapse?.active) {
+      const collapse = state.dawnCollapse;
+      const phases = ["dizzy", "black", "dayCard"];
+
+      if (!phases.includes(collapse.phase)) {
+        collapse.phase = "dizzy";
+        collapse.time = 0;
+      }
+
+      keys.clear();
+      near = null;
+      $("prompt").hidden = true;
+
+      elapsed += dt;
+      collapse.time = Math.max(0, Number(collapse.time) || 0) + dt;
+
+      if (collapse.phase === "dizzy" && collapse.time >= 2.2) {
+        collapse.phase = "black";
+        collapse.time = 0;
+      } else if (collapse.phase === "black" && collapse.time >= 1.35) {
+        collapse.phase = "dayCard";
+        collapse.time = 0;
+      } else if (collapse.phase === "dayCard" && collapse.time >= 3.4) {
+        v0632WakeNextDay();
+        v0860EndNightThreats();
+        state.dawnWakeDialoguePending = false;
+        v0860RestoreMorningInterface();
+        updateHud();
+        save();
+      }
+
+      return;
+    }
+
+    if (state.wakeUp?.active) {
+      keys.clear();
+      near = null;
+      $("prompt").hidden = true;
+
+      elapsed += dt;
+      state.wakeUp.time =
+        Math.max(0, Number(state.wakeUp.time) || 0) + dt;
+
+      if (state.wakeUp.time >= 2.3) {
+        state.wakeUp.active = false;
+        state.wakeUp.time = 0;
+
+        v0860EndNightThreats();
+        state.dawnWakeDialoguePending = true;
+
+        v0860RestoreMorningInterface();
+        updateHud();
+        save();
+        v0860ShowWakeDialogue();
+      }
+
+      return;
+    }
+
+    // Se o navegador recarregou durante a fala da manhã, reapresenta-a
+    // antes de devolver o controle normal ao jogador.
+    if (v0860ShowWakeDialogue()) return;
+
+    v0860DawnUpdateBase(dt);
+
+    // Se a lógica antiga acabou de iniciar o desmaio neste frame,
+    // bloqueia imediatamente o restante da entrada do jogador.
+    if (state?.dawnCollapse?.active) {
+      keys.clear();
+      near = null;
+      $("prompt").hidden = true;
+    }
+  };
+
+  // =========================================================
+  // FIM DA CORREÇÃO 0.8.60 — AMANHECER
+  // =========================================================
+
 })();
