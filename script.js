@@ -43385,12 +43385,36 @@ v0828GoodEnding = function() {
     prepareSystems();
 
     state.storyFlags = state.storyFlags || {};
+    Object.assign(state.storyFlags, {
+      marketParentsConfirmed: false,
+      squareVisited: false,
+      squareVendorTalked: false,
+      squareEarlyResidentTalked: false,
+      squareCardsTalked: false,
+      squareObserverSeen: false,
+      squareObserverReported: false,
+      squareObserverArmed: false,
+      raimundoMet: false,
+      mineExteriorSeen: false,
+      observerFirstSeen: false,
+      osmarWestUnlocked: false,
+      chapter4Complete: false,
+      florindaChapter4Concern: false,
+      florindaChapter4ConcernSeen: false
+    });
+
+    state.squareManFirstSpeechDone = false;
     state.forgottenAlive = state.forgottenAlive || {};
     state.forgottenAlive.completed =
       state.forgottenAlive.completed || {};
+    state.forgottenAlive.completed.osmar = false;
+    state.forgottenAlive.osmarStage = 0;
+    state.forgottenAlive.started = false;
+    state.forgottenAlive.westPresenceSeen = false;
+    state.forgottenAlive.westPresenceArmed = false;
+    state.forgottenAlive.westHintShown = false;
+    delete state.forgottenAlive.osmarAfterVisit;
 
-    // Os checkpoints iniciais não concluem Osmar nem antecipam o Oeste.
-    // Esse progresso só é construído pelo atalho do Capítulo 4 em diante.
     state.flashlight = state.flashlight || {};
     state.flashlight.owned = false;
     state.flashlight.source = null;
@@ -43440,6 +43464,52 @@ v0828GoodEnding = function() {
 
     const finalArc = v0828EnsureFinalArc();
     finalArc.useCanonicalLateArc = true;
+    Object.assign(finalArc, {
+      phase: "locked",
+      culdesacUnlocked: false,
+      claudiaTestimonyDone: false,
+      garciaCleared: false,
+      osvaldoKnown: false,
+      osvaldoWestSeen: false,
+      westCaseResolved: false,
+      raimundoCoupleRumorDone: false,
+      plazaLinkUnlocked: false,
+      coupleEntry: "village",
+      residentA: false,
+      residentB: false,
+      falseParentsFound: false,
+      falseParentsHome: false,
+      cameraRevealDone: false,
+      kitchenHideDone: false,
+      platesObtained: false,
+      plateSceneDone: false,
+      cellarKeyObtained: false,
+      brotherWithPlayer: false,
+      houseEscaped: false,
+      florindaFinalTalkDone: false,
+      secondChaseActive: false,
+      secondChaseTimer: 0,
+      cellarEntered: false,
+      cellarToolsSeen: false,
+      cellarSplitSeen: false,
+      cellarMiningSeen: false,
+      secretPassageOpened: false,
+      epilogueActive: false,
+      completed: false,
+      pursuersActive: false,
+      pursuers: []
+    });
+    const debugOsvaldoScene = v0830EnsureOsvaldoScene();
+    debugOsvaldoScene.active = false;
+    debugOsvaldoScene.phase = "waiting";
+    debugOsvaldoScene.time = 0;
+
+    if (state.sideQuests?.westCase) {
+      state.sideQuests.westCase.resolved = false;
+      state.sideQuests.westCase.garciaStatement = false;
+      state.sideQuests.westCase.osvaldoNamed = false;
+    }
+
     return finalArc;
   }
 
