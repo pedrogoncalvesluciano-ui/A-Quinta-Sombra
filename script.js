@@ -43602,7 +43602,7 @@ v0828GoodEnding = function() {
       v0861SetCommonDebugProgress(1, 0);
       state.firstExit = false;
       state.room = "foyer";
-      state.x = 535;
+      state.x = 570;
       state.y = 305;
       state.facing = "right";
       enterGame();
@@ -43683,6 +43683,7 @@ v0828GoodEnding = function() {
       state.garciaEvent.y = 350;
       state.storyFlags.florindaChapter4Concern = false;
       state.storyFlags.florindaChapter4ConcernSeen = false;
+      state.storyFlags.chapter4Complete = false;
       finalArc.phase = "postWest";
       v0861FinishDebugTeleport(
         "westRoad", 1335, 390, 6, 22 * 60,
@@ -43724,7 +43725,7 @@ v0828GoodEnding = function() {
       finalArc.falseParentsFound = false;
       finalArc.falseParentsHome = false;
       v0861FinishDebugTeleport(
-        "coupleRoad", 90, 365, 8, 15 * 60,
+        "coupleRoad", 640, 365, 8, 15 * 60,
         "TESTE: rua de ligação à Praça · testemunhas do casal"
       );
       return true;
@@ -43773,7 +43774,7 @@ v0828GoodEnding = function() {
       state.storyFlags.sysHunger = false;
       state.storyFlags.sysDanger = false;
       v0861FinishDebugTeleport(
-        "village", 335, 620, 10, 23 * 60,
+        "village", 610, 520, 10, 23 * 60,
         "TESTE: segunda perseguição · falsos pais"
       );
       return true;
