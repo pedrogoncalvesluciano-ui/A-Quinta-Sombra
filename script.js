@@ -44601,6 +44601,22 @@ v0828GoodEnding = function() {
     }
   }
 
+  // A função go() converte coordenadas legadas pela HOUSE_SCALE.
+  // Compensa essa conversão para posicionar corretamente entradas no porão já compactado.
+  const v0862GoBase = go;
+  go = function(nextRoom, x, y) {
+    if (nextRoom === "basement") {
+      const targetX = v0862BasementMapCoordinate(x, "x");
+      const targetY = v0862BasementMapCoordinate(y, "y");
+      return v0862GoBase(
+        nextRoom,
+        targetX / HOUSE_SCALE,
+        targetY / HOUSE_SCALE
+      );
+    }
+    return v0862GoBase(nextRoom, x, y);
+  };
+
   const v0862EnterTunnelBase = v0828EnterTunnel;
   v0828EnterTunnel = function() {
     const finalArc = v0828EnsureFinalArc();
