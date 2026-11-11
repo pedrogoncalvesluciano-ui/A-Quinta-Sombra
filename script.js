@@ -44011,7 +44011,7 @@ v0828GoodEnding = function() {
     fade("", "", () => {
       state.room = "village";
       state.x = 649;
-      state.y = 424;
+      state.y = 510;
       state.facing = "down";
       state.walk = 0;
 
@@ -44019,11 +44019,12 @@ v0828GoodEnding = function() {
       scene.phase = "approach";
       scene.time = 0;
       scene.x = 649;
-      scene.startY = 612;
-      scene.targetY = 505;
+      scene.startY = 700;
+      scene.targetY = 565;
       scene.y = scene.startY;
       scene.startX = 649;
       scene.targetX = 34;
+      scene.exitY = 424;
 
       keys.clear();
       near = null;
@@ -44106,13 +44107,31 @@ v0828GoodEnding = function() {
     }
 
     if (scene.phase === "leave") {
-      const p = Math.min(1, scene.time / 2.45);
+      // Primeiro alcança a transversal; depois segue pela via oeste.
+      const p = Math.min(1, scene.time / 1.25);
+      const eased = p * p * (3 - 2 * p);
+      scene.y =
+        scene.startY +
+        (scene.exitY - scene.startY) * eased;
+
+      if (p >= 1) {
+        scene.phase = "leaveWest";
+        scene.time = 0;
+        scene.startX = scene.x;
+        scene.startY = scene.exitY;
+      }
+
+      return true;
+    }
+
+    if (scene.phase === "leaveWest") {
+      const p = Math.min(1, scene.time / 2.4);
       const eased = p * p * (3 - 2 * p);
 
       scene.x =
         scene.startX +
         (scene.targetX - scene.startX) * eased;
-      scene.y = scene.startY;
+      scene.y = scene.exitY;
 
       if (p >= 1) {
         scene.active = false;
@@ -44123,8 +44142,10 @@ v0828GoodEnding = function() {
         finalArc.osvaldoKnown = true;
         finalArc.osvaldoWestSeen = true;
 
-        state.forgottenAlive.osmarAfterVisit.followupTalked = true;
-        state.forgottenAlive.osmarAfterVisit.returnPending = true;
+        if (state.forgottenAlive?.osmarAfterVisit) {
+          state.forgottenAlive.osmarAfterVisit.followupTalked = true;
+          state.forgottenAlive.osmarAfterVisit.returnPending = true;
+        }
 
         transitionBusy = false;
         keys.clear();
@@ -44161,9 +44182,9 @@ v0828GoodEnding = function() {
     );
 
     const running = scene.phase === "approach";
-    const facing = running
+    const facing = running || scene.phase === "leave"
       ? "up"
-      : scene.phase === "leave"
+      : scene.phase === "leaveWest"
         ? "left"
         : "down";
 
@@ -44259,9 +44280,9 @@ v0828GoodEnding = function() {
       !finalArc.osvaldoWestSeen &&
       !scene.active &&
       scene.phase === "waiting" &&
-      state.x >= 560 &&
-      state.x <= 740 &&
-      state.y >= 424
+      state.x >= 585 &&
+      state.x <= 713 &&
+      state.y >= 560
     ) {
       v0861StartOsvaldoVillageScene();
     }
