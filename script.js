@@ -43376,6 +43376,18 @@ v0828GoodEnding = function() {
     state.day1Progress.policeVisited = true;
     state.day1Progress.completed = true;
 
+    state.day1Extra = state.day1Extra || {};
+    Object.assign(state.day1Extra, {
+      firstNotePrompted: true,
+      firstNoteSaved: true,
+      brotherBedtime: true,
+      tvChecked: true,
+      doorChecked: false,
+      doorLocked: false,
+      doorLockedDay: -1,
+      vanWitnessed: false
+    });
+
     const q = chapter();
     if (q) {
       q.phase = "complete";
@@ -43544,10 +43556,21 @@ v0828GoodEnding = function() {
     state.garciaEvent.caught = false;
 
     finalArc.useCanonicalLateArc = true;
+    // O encontro anterior com Osvaldo ocorreu após Osmar; o caso do corpo
+    // continua aberto até a testemunha Cláudia e a conclusão na delegacia.
     finalArc.osvaldoKnown = true;
     finalArc.osvaldoWestSeen = true;
-    finalArc.garciaCleared = true;
-    finalArc.westCaseResolved = true;
+    finalArc.garciaCleared = false;
+    finalArc.claudiaTestimonyDone = false;
+    finalArc.westCaseResolved = false;
+
+    state.sideQuests = state.sideQuests || {};
+    state.sideQuests.westCase = state.sideQuests.westCase || {};
+    Object.assign(state.sideQuests.westCase, {
+      resolved: false,
+      garciaStatement: false,
+      osvaldoNamed: false
+    });
 
     const forgotten = state.forgottenAlive;
     forgotten.completed = forgotten.completed || {};
@@ -43758,6 +43781,14 @@ v0828GoodEnding = function() {
     if (command === "corrida pais" || command === "corrida2" || command === "perseguicao") {
       const finalArc = v0861SetCommonDebugProgress(10, 23 * 60);
       v0861SetWestCasePrerequisites(finalArc);
+      finalArc.claudiaTestimonyDone = true;
+      finalArc.garciaCleared = true;
+      finalArc.westCaseResolved = true;
+      Object.assign(state.sideQuests.westCase, {
+        resolved: true,
+        garciaStatement: true,
+        osvaldoNamed: true
+      });
       finalArc.phase = "secondChase";
       finalArc.houseEscaped = true;
       finalArc.florindaFinalTalkDone = true;
@@ -43784,6 +43815,13 @@ v0828GoodEnding = function() {
       const finalArc = v0861SetCommonDebugProgress(9, 19 * 60);
       v0861SetWestCasePrerequisites(finalArc);
       finalArc.claudiaTestimonyDone = true;
+      finalArc.garciaCleared = true;
+      finalArc.westCaseResolved = true;
+      Object.assign(state.sideQuests.westCase, {
+        resolved: true,
+        garciaStatement: true,
+        osvaldoNamed: true
+      });
       finalArc.garciaCleared = true;
       finalArc.westCaseResolved = true;
       finalArc.raimundoCoupleRumorDone = true;
