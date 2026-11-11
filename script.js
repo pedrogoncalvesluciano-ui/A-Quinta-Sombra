@@ -14232,7 +14232,7 @@ function v0862BasementMapCoordinate(value, axis = "x") {
   const offset = axis === "y"
     ? V0862_BASEMENT_OFFSET.y
     : V0862_BASEMENT_OFFSET.x;
-  return Number(value) * V0862_BASEMENT_SCALE + offset;
+  return housePoint(value) * V0862_BASEMENT_SCALE + offset;
 }
 
 function v0862BasementSize(value) {
@@ -14311,7 +14311,7 @@ function v0650OpenBasement() {
     "O porão",
     "A fechadura antiga cede depois de alguns minutos.",
     () => {
-      go("basement", v0862BasementMapCoordinate(310, "x"), v0862BasementMapCoordinate(330, "y"));
+      go("basement", 310, 330);
       save();
     }
   );
@@ -31494,8 +31494,8 @@ function v0828EnterCellar() {
     () => {
       go(
         "basement",
-        v0862BasementMapCoordinate(310, "x"),
-        v0862BasementMapCoordinate(330, "y")
+        310,
+        330
       );
 
       setTimeout(
