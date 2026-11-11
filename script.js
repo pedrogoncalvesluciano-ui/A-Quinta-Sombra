@@ -1012,7 +1012,15 @@
       }
 
       if (Array.isArray(enemy.path)) {
-        enemy.path = enemy.path.map(point => point.map(value => value * enemyScale));
+        enemy.path = enemy.path.map(point => {
+          const scaled = point.map(value => value * enemyScale);
+          return enemy.room === "basement"
+            ? [
+                scaled[0] * V0862_BASEMENT_SCALE + V0862_BASEMENT_OFFSET.x,
+                scaled[1] * V0862_BASEMENT_SCALE + V0862_BASEMENT_OFFSET.y
+              ]
+            : scaled;
+        });
       }
     }
 
@@ -29989,19 +29997,7 @@ function v0828DrawBrotherCompanion() {
     return;
   }
 
-  const offsetX =
-    state.facing === "left"
-      ? 28
-      : state.facing === "right"
-        ? -28
-        : -18;
-
-  const offsetY =
-    state.facing === "up"
-      ? 28
-      : state.facing === "down"
-        ? -28
-        : 18;
+  const companion = v0862EnsureBrotherFollower();
 
   c.save();
   c.translate(
@@ -30010,11 +30006,11 @@ function v0828DrawBrotherCompanion() {
   );
 
   person(
-    state.x + offsetX,
-    state.y + offsetY,
+    companion.x,
+    companion.y,
     "brother",
-    state.walk * 0.82,
-    state.facing,
+    companion.walk,
+    companion.facing,
     0.82
   );
 
@@ -44520,15 +44516,18 @@ v0828GoodEnding = function() {
     if (
       !state ||
       mode !== "game" ||
-      state.room !== "undergroundPassage"
+      !["basement", "undergroundPassage"].includes(state.room)
     ) {
       return;
     }
 
     const finalArc = v0828EnsureFinalArc();
+    const roomPhaseAllowed = state.room === "basement"
+      ? ["cellarExplore", "cellarPush"].includes(finalArc.phase)
+      : finalArc.phase === "tunnel";
     if (
       !finalArc.useCanonicalLateArc ||
-      finalArc.phase !== "tunnel" ||
+      !roomPhaseAllowed ||
       !finalArc.brotherWithPlayer ||
       dialog ||
       transitionBusy ||
