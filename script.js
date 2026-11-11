@@ -982,7 +982,11 @@
   let openingStaticUntil = 0;
 
   function migrateHouseSave(saved) {
-    if (!saved || saved.houseLayout >= 2) return;
+    if (!saved) return;
+    if (saved.houseLayout >= 2) {
+      migrateHouseSave(saved.rescueCheckpoint);
+      return;
+    }
 
     // Saves antigos usavam coordenadas sem escala ou a escala 0.8.
     // A versão 0.8.62 aplica a escala compacta uma única vez.
@@ -43958,6 +43962,7 @@ v0828GoodEnding = function() {
 
     if (command === "porao" || command === "porão") {
       const finalArc = v0861SetCommonDebugProgress(11, 0);
+      state.houseLayout = 2;
       v0861SetWestCasePrerequisites(finalArc);
       Object.assign(finalArc, {
         phase: "cellarExplore",
@@ -44603,6 +44608,13 @@ v0828GoodEnding = function() {
 
   // A função go() converte coordenadas legadas pela HOUSE_SCALE.
   // Compensa essa conversão para posicionar corretamente entradas no porão já compactado.
+  const v0862EnterCellarBase = v0828EnterCellar;
+  v0828EnterCellar = function() {
+    const finalArc = v0828EnsureFinalArc();
+    finalArc.brotherFollower = null;
+    return v0862EnterCellarBase();
+  };
+
   const v0862GoBase = go;
   go = function(nextRoom, x, y) {
     if (nextRoom === "basement") {
