@@ -43388,45 +43388,12 @@ v0828GoodEnding = function() {
     state.forgottenAlive = state.forgottenAlive || {};
     state.forgottenAlive.completed =
       state.forgottenAlive.completed || {};
-    state.forgottenAlive.completed.osmar = true;
-    state.forgottenAlive.osmarStage = 3;
 
-    if (!state.forgottenAlive.osmarAfterVisit) {
-      state.forgottenAlive.osmarAfterVisit = {
-        version: 1,
-        pending: false,
-        active: false,
-        done: true,
-        returnPending: false,
-        returnedHome: true,
-        sleepRequested: true,
-        sleepCompleted: true,
-        nextDayReady: true,
-        sleepDay: Math.max(0, day - 1),
-        followupTalked: true,
-        time: 0,
-        x: 590,
-        y: 770
-      };
-    }
-
-    const flow = state.forgottenAlive.osmarAfterVisit;
-    Object.assign(flow, {
-      pending: false,
-      active: false,
-      done: true,
-      returnPending: false,
-      returnedHome: true,
-      sleepRequested: true,
-      sleepCompleted: true,
-      nextDayReady: true,
-      sleepDay: Math.max(0, day - 1),
-      time: 0
-    });
-
+    // Os checkpoints iniciais não concluem Osmar nem antecipam o Oeste.
+    // Esse progresso só é construído pelo atalho do Capítulo 4 em diante.
     state.flashlight = state.flashlight || {};
-    state.flashlight.owned = true;
-    state.flashlight.source = "phone";
+    state.flashlight.owned = false;
+    state.flashlight.source = null;
     state.flashlight.on = false;
     state.flashlight.battery = 100;
     state.flashlight.emptyWarned = false;
@@ -43479,8 +43446,6 @@ v0828GoodEnding = function() {
   }
 
   function v0861FinishDebugTeleport(room, x, y, day, minutes, message) {
-    v0861SetCommonDebugProgress(day, minutes);
-
     state.room = room;
     state.x = x;
     state.y = y;
@@ -43516,12 +43481,36 @@ v0828GoodEnding = function() {
     finalArc.garciaCleared = true;
     finalArc.westCaseResolved = true;
 
+    const forgotten = state.forgottenAlive;
+    forgotten.completed = forgotten.completed || {};
+    forgotten.completed.osmar = true;
+    forgotten.osmarStage = Math.max(3, forgotten.osmarStage || 0);
+
+    if (!forgotten.osmarAfterVisit) {
+      forgotten.osmarAfterVisit = {
+        version: 1,
+        pending: false,
+        active: false,
+        done: true,
+        returnPending: false,
+        returnedHome: true,
+        sleepRequested: true,
+        sleepCompleted: true,
+        nextDayReady: true,
+        sleepDay: Math.max(0, state.day - 1),
+        followupTalked: true,
+        time: 0,
+        x: 590,
+        y: 770
+      };
+    }
+
     const scene = v0830EnsureOsvaldoScene();
     scene.active = false;
     scene.phase = "done";
     scene.time = 0;
 
-    const flow = state.forgottenAlive.osmarAfterVisit;
+    const flow = forgotten.osmarAfterVisit;
     flow.nextDayReady = true;
     flow.done = true;
     flow.pending = false;
