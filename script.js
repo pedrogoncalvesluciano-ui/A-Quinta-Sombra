@@ -43397,6 +43397,14 @@ v0828GoodEnding = function() {
     prepareSystems();
 
     state.storyFlags = state.storyFlags || {};
+    state.sideQuests = state.sideQuests || {};
+    state.sideQuests.westCase = state.sideQuests.westCase || {};
+    Object.assign(state.sideQuests.westCase, {
+      resolved: false,
+      garciaStatement: false,
+      osvaldoNamed: false
+    });
+
     Object.assign(state.storyFlags, {
       marketParentsConfirmed: false,
       squareVisited: false,
@@ -43791,6 +43799,11 @@ v0828GoodEnding = function() {
       finalArc.claudiaTestimonyDone = true;
       finalArc.garciaCleared = true;
       finalArc.westCaseResolved = true;
+      Object.assign(state.sideQuests.westCase, {
+        resolved: true,
+        garciaStatement: true,
+        osvaldoNamed: true
+      });
       finalArc.raimundoCoupleRumorDone = true;
       finalArc.plazaLinkUnlocked = true;
       finalArc.phase = "coupleSearch";
