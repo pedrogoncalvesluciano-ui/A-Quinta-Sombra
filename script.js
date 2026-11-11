@@ -2,7 +2,7 @@
 "use strict";
 
 /*
-  A QUINTA SOMBRA — 0.8.59
+  A QUINTA SOMBRA — 0.8.61
 
   Base incremental em Canvas.
   Sem bibliotecas ou imagens externas.
@@ -43118,4 +43118,1292 @@ v0828GoodEnding = function() {
 
 // Restaura a interferência visual da cena final: ela acompanha a figura
 // misteriosa quando chega perto da porta, sem alterar o sprite ou o trajeto.
+
+  // =========================================================
+  // 0.8.60 — RECUPERAÇÃO DO AMANHECER E ENCERRAMENTO DA AMEAÇA NOTURNA
+  // Garante o retorno ao jogo após as 07:00 e evita instruções de combate
+  // presas quando a invasão da noite anterior termina com o desmaio.
+  // =========================================================
+
+  function v0860RestoreMorningInterface() {
+    transitionBusy = false;
+    areaLoadingOverlay = false;
+    dialog = null;
+
+    $("dialog").hidden = true;
+    $("choiceScene").hidden = true;
+    $("overlay").hidden = true;
+    $("menu").hidden = true;
+    $("hud").hidden = false;
+    $("prompt").hidden = true;
+    $("eventToast").hidden = true;
+
+    const transition = $("transition");
+    transition.classList.remove("active");
+    transition.style.opacity = "";
+
+    keys.clear();
+    near = null;
+    mode = "game";
+  }
+
+  function v0860EndNightThreats() {
+    if (state?.danger) {
+      const danger = state.danger;
+      danger.phase = "safe";
+      danger.time = 0;
+      danger.countdown = 60;
+      danger.enemy = null;
+      danger.punch = 0;
+      danger.cooldown = Math.max(
+        45,
+        Math.min(180, Number.isFinite(danger.cooldown) ? danger.cooldown : 0)
+      );
+    }
+
+    if (state?.randomEventState) {
+      state.randomEventState.pending = false;
+      state.randomEventState.timer = 0;
+      state.randomEventState.type = null;
+    }
+
+    if (state?.smallEventState) {
+      state.smallEventState.pending = false;
+      state.smallEventState.timer = 0;
+    }
+  }
+
+  function v0860ShowWakeDialogue() {
+    if (state?.dawnWakeDialoguePending) {
+      v0640RecoverInputLock();
+    }
+
+    if (
+      !state ||
+      mode !== "game" ||
+      !state.dawnWakeDialoguePending ||
+      state.dawnCollapse?.active ||
+      state.wakeUp?.active ||
+      dialog ||
+      !$("overlay").hidden ||
+      !$("choiceScene").hidden ||
+      transitionBusy
+    ) {
+      return false;
+    }
+
+    v0860RestoreMorningInterface();
+    updateHud();
+
+    const line =
+      state.dawnCollapseCount === 1
+        ? "Parece que eu desmaiei... e vim parar aqui no meu quarto."
+        : "Aconteceu de novo... o que está acontecendo?";
+
+    say(
+      [["Você", line]],
+      () => {
+        state.dawnWakeDialoguePending = false;
+        updateHud();
+        save();
+      }
+    );
+
+    return true;
+  }
+
+  const v0860UpdateHudBase = updateHud;
+  updateHud = function() {
+    v0860UpdateHudBase();
+
+    if (!state || state.stage === "prologue") return;
+
+    const objective = $("objective");
+    const timeNote = $("timeNote");
+
+    if (state.dawnCollapse?.active) {
+      objective.textContent = "Estevão está perdendo os sentidos...";
+      timeNote.textContent = "DESMAIO · 07:00";
+      return;
+    }
+
+    if (state.wakeUp?.active) {
+      objective.textContent = "Estevão está acordando...";
+      timeNote.textContent = "INÍCIO DE UM NOVO DIA";
+      return;
+    }
+
+    if (
+      state.dawnWakeDialoguePending ||
+      (state.dawnCollapseCount || 0) >
+        (state.brotherDawnTalkCount || 0)
+    ) {
+      objective.textContent =
+        "Converse com seu irmão sobre o que aconteceu durante a noite.";
+      return;
+    }
+
+    // Remove a instrução antiga de soco quando ela já não corresponde
+    // ao objetivo do novo dia. Objetivos específicos de capítulos são mantidos.
+    if (
+      (state.dawnCollapseCount || 0) > 0 &&
+      /soco|invasor/i.test(objective.textContent)
+    ) {
+      objective.textContent =
+        "Seu irmão está seguro. Explore Forgotten e acompanhe os sinais.";
+    }
+  };
+
+  const v0860DawnUpdateBase = update;
+  update = function(dt) {
+    prepareSystems();
+
+    if (!state || mode !== "game") {
+      v0860DawnUpdateBase(dt);
+      return;
+    }
+
+    // Este passe externo assume o controle do desmaio e do despertar.
+    // Assim nenhum wrapper antigo pode deixar o ciclo preso entre fases.
+    if (state.dawnCollapse?.active) {
+      const collapse = state.dawnCollapse;
+      const phases = ["dizzy", "black", "dayCard"];
+
+      if (!phases.includes(collapse.phase)) {
+        collapse.phase = "dizzy";
+        collapse.time = 0;
+      }
+
+      keys.clear();
+      near = null;
+      $("prompt").hidden = true;
+      updateHud();
+
+      elapsed += dt;
+      collapse.time = Math.max(0, Number(collapse.time) || 0) + dt;
+
+      if (collapse.phase === "dizzy" && collapse.time >= 2.2) {
+        collapse.phase = "black";
+        collapse.time = 0;
+      } else if (collapse.phase === "black" && collapse.time >= 1.35) {
+        collapse.phase = "dayCard";
+        collapse.time = 0;
+      } else if (collapse.phase === "dayCard" && collapse.time >= 3.4) {
+        v0632WakeNextDay();
+        v0860EndNightThreats();
+        state.dawnWakeDialoguePending = false;
+        v0860RestoreMorningInterface();
+        updateHud();
+        save();
+      }
+
+      return;
+    }
+
+    if (state.wakeUp?.active) {
+      keys.clear();
+      near = null;
+      $("prompt").hidden = true;
+
+      elapsed += dt;
+      state.wakeUp.time =
+        Math.max(0, Number(state.wakeUp.time) || 0) + dt;
+
+      if (state.wakeUp.time >= 2.3) {
+        state.wakeUp.active = false;
+        state.wakeUp.time = 0;
+
+        v0860EndNightThreats();
+        state.dawnWakeDialoguePending = true;
+
+        v0860RestoreMorningInterface();
+        updateHud();
+        save();
+        v0860ShowWakeDialogue();
+      }
+
+      return;
+    }
+
+    // Se o navegador recarregou durante a fala da manhã, reapresenta-a
+    // antes de devolver o controle normal ao jogador.
+    if (v0860ShowWakeDialogue()) return;
+
+    v0860DawnUpdateBase(dt);
+
+    // Se a lógica antiga acabou de iniciar o desmaio neste frame,
+    // bloqueia imediatamente o restante da entrada do jogador.
+    if (state?.dawnCollapse?.active) {
+      keys.clear();
+      near = null;
+      $("prompt").hidden = true;
+    }
+  };
+
+  // =========================================================
+  // FIM DA CORREÇÃO 0.8.60 — AMANHECER
+  // =========================================================
+
+
+  // =========================================================
+  // 0.8.61 — PAINEL DE TESTE COM SENHA + CENAS GUIADAS
+  // Atalhos constroem os pré-requisitos da campanha antes de teleportar.
+  // Osvaldo só encontra Estevão depois da saída da Rua do Mercado.
+  // =========================================================
+
+  function v0861SetCommonDebugProgress(day, minutes) {
+    if (!state) state = initial();
+
+    state.stage = "free";
+    state.day = day;
+    state.minutes = minutes;
+    state.finished = true;
+    state.familyFarewell = true;
+    state.key = true;
+    state.firstExit = true;
+    state.dawnCollapseArmed = false;
+    state.forcedSleepDue = false;
+    state.gameOver = false;
+    state.walk = 0;
+    state.food = 0;
+    state.brotherFood = Math.max(75, Number(state.brotherFood) || 0);
+
+    state.storyFlags = state.storyFlags || {};
+    state.storyFlags.progressionByDiscovery = true;
+
+    state.day1Progress = state.day1Progress || {};
+    state.day1Progress.neighborVisited = true;
+    state.day1Progress.policeVisited = true;
+    state.day1Progress.completed = true;
+
+    state.day1Extra = state.day1Extra || {};
+    Object.assign(state.day1Extra, {
+      firstNotePrompted: true,
+      firstNoteSaved: true,
+      brotherBedtime: true,
+      tvChecked: true,
+      doorChecked: false,
+      doorLocked: false,
+      doorLockedDay: -1,
+      vanWitnessed: false
+    });
+
+    const q = chapter();
+    if (q) {
+      q.phase = "complete";
+      q.clues = ["list", "photo", "note"];
+    }
+
+    prepareSystems();
+
+    state.storyFlags = state.storyFlags || {};
+    state.sideQuests = state.sideQuests || {};
+    state.sideQuests.westCase = state.sideQuests.westCase || {};
+    Object.assign(state.sideQuests.westCase, {
+      resolved: false,
+      garciaStatement: false,
+      osvaldoNamed: false
+    });
+
+    Object.assign(state.storyFlags, {
+      marketParentsConfirmed: false,
+      squareVisited: false,
+      squareVendorTalked: false,
+      squareEarlyResidentTalked: false,
+      squareCardsTalked: false,
+      squareObserverSeen: false,
+      squareObserverReported: false,
+      squareObserverArmed: false,
+      raimundoMet: false,
+      mineExteriorSeen: false,
+      observerFirstSeen: false,
+      osmarWestUnlocked: false,
+      chapter4Complete: false,
+      florindaChapter4Concern: false,
+      florindaChapter4ConcernSeen: false
+    });
+
+    state.squareManFirstSpeechDone = false;
+    state.forgottenAlive = state.forgottenAlive || {};
+    state.forgottenAlive.completed =
+      state.forgottenAlive.completed || {};
+    state.forgottenAlive.completed.osmar = false;
+    state.forgottenAlive.osmarStage = 0;
+    state.forgottenAlive.started = false;
+    state.forgottenAlive.westPresenceSeen = false;
+    state.forgottenAlive.westPresenceArmed = false;
+    state.forgottenAlive.westHintShown = false;
+    delete state.forgottenAlive.osmarAfterVisit;
+
+    state.flashlight = state.flashlight || {};
+    state.flashlight.owned = false;
+    state.flashlight.source = null;
+    state.flashlight.on = false;
+    state.flashlight.battery = 100;
+    state.flashlight.emptyWarned = false;
+
+    state.chapter4 = state.chapter4 || {};
+    state.chapter4.bloodSeen = [];
+    state.chapter4.bodySeen = false;
+    state.chapter4.bodyReported = false;
+
+    state.garciaEvent = state.garciaEvent || {};
+    Object.assign(state.garciaEvent, {
+      phase: "waiting",
+      caught: false,
+      x: 330,
+      y: 350,
+      grace: 0
+    });
+
+    state.oldManEvent = state.oldManEvent || {};
+    state.oldManEvent.phase = "waiting";
+    state.oldManEvent.x = 625;
+    state.oldManEvent.y = 785;
+    state.oldManEvent.runUnlocked = false;
+    state.oldManEvent.caught = false;
+
+    state.randomEventState = state.randomEventState || {};
+    state.randomEventState.pending = false;
+    state.smallEventState = state.smallEventState || {};
+    state.smallEventState.pending = false;
+
+    if (state.dawnCollapse) {
+      state.dawnCollapse.active = false;
+      state.dawnCollapse.phase = "idle";
+      state.dawnCollapse.time = 0;
+    }
+    if (state.wakeUp) {
+      state.wakeUp.active = false;
+      state.wakeUp.time = 0;
+    }
+
+    v0645ResetTransientState();
+    state.dawnCollapseArmed = false;
+    state.forcedSleepDue = false;
+
+    const finalArc = v0828EnsureFinalArc();
+    finalArc.useCanonicalLateArc = true;
+    Object.assign(finalArc, {
+      phase: "locked",
+      culdesacUnlocked: false,
+      claudiaTestimonyDone: false,
+      garciaCleared: false,
+      osvaldoKnown: false,
+      osvaldoWestSeen: false,
+      westCaseResolved: false,
+      raimundoCoupleRumorDone: false,
+      plazaLinkUnlocked: false,
+      coupleEntry: "village",
+      residentA: false,
+      residentB: false,
+      falseParentsFound: false,
+      falseParentsHome: false,
+      cameraRevealDone: false,
+      kitchenHideDone: false,
+      platesObtained: false,
+      plateSceneDone: false,
+      cellarKeyObtained: false,
+      brotherWithPlayer: false,
+      houseEscaped: false,
+      florindaFinalTalkDone: false,
+      secondChaseActive: false,
+      secondChaseTimer: 0,
+      cellarEntered: false,
+      cellarToolsSeen: false,
+      cellarSplitSeen: false,
+      cellarMiningSeen: false,
+      secretPassageOpened: false,
+      motherFound: false,
+      worldDay: false,
+      observerFinalStarted: false,
+      realScore: 0,
+      lieScore: 0,
+      round: 0,
+      badEndingUnlocked: false,
+      goodEndingUnlocked: false,
+      epilogueActive: false,
+      epilogueTalkedNPCs: [],
+      raimundoEpilogueDone: false,
+      finalHomeUnlocked: false,
+      homeBrotherDone: false,
+      homeMotherDone: false,
+      epilogueTvOn: false,
+      finalFigureStarted: false,
+      completed: false,
+      pursuersActive: false,
+      pursuers: []
+    });
+
+    // Desarma estados legados da rota antiga para que um atalho inicial
+    // não herde perseguições ou finais de um save já avançado.
+    for (const key of ["chapter6", "chapter7", "chapter8", "chapter9"]) {
+      if (state[key] && typeof state[key] === "object") {
+        if ("basementUnlocked" in state[key]) state[key].basementUnlocked = false;
+        if ("started" in state[key]) state[key].started = false;
+        if ("complete" in state[key]) state[key].complete = false;
+        if ("entered" in state[key]) state[key].entered = false;
+      }
+    }
+
+    state.ending = state.ending || {};
+    state.ending.complete = false;
+    state.ending.id = null;
+
+    if (state.copyFather && typeof state.copyFather === "object") {
+      state.copyFather.phase = "waiting";
+      state.copyFather.caught = false;
+      state.copyFather.followDelay = 0;
+    }
+
+    v0828CameraScene.active = false;
+    v0828CameraScene.text = "";
+    v0828CameraScene.phase = 0;
+
+    v0828TruthGame.active = false;
+    v0828TruthGame.round = 0;
+    v0828TruthGame.realScore = 0;
+    v0828TruthGame.lieScore = 0;
+    const debugOsvaldoScene = v0830EnsureOsvaldoScene();
+    debugOsvaldoScene.active = false;
+    debugOsvaldoScene.phase = "waiting";
+    debugOsvaldoScene.time = 0;
+
+    if (state.sideQuests?.westCase) {
+      state.sideQuests.westCase.resolved = false;
+      state.sideQuests.westCase.garciaStatement = false;
+      state.sideQuests.westCase.osvaldoNamed = false;
+    }
+
+    return finalArc;
+  }
+
+  function v0861FinishDebugTeleport(room, x, y, day, minutes, message) {
+    state.room = room;
+    state.x = x;
+    state.y = y;
+    state.facing = "down";
+    state.walk = 0;
+
+    keys.clear();
+    near = null;
+    enterGame();
+    updateHud();
+    save();
+
+    if (message) v06Toast(message, 2.6);
+  }
+
+  function v0861SetWestCasePrerequisites(finalArc) {
+    state.storyFlags.raimundoMet = true;
+    state.storyFlags.mineExteriorSeen = true;
+    state.storyFlags.observerFirstSeen = true;
+    state.storyFlags.osmarWestUnlocked = true;
+    state.storyFlags.chapter4Complete = true;
+    state.storyFlags.florindaChapter4Concern = true;
+    state.storyFlags.florindaChapter4ConcernSeen = true;
+
+    state.chapter4.bodySeen = true;
+    state.chapter4.bodyReported = true;
+    state.garciaEvent.phase = "escaped";
+    state.garciaEvent.caught = false;
+
+    finalArc.useCanonicalLateArc = true;
+    // O encontro anterior com Osvaldo ocorreu após Osmar; o caso do corpo
+    // continua aberto até a testemunha Cláudia e a conclusão na delegacia.
+    finalArc.osvaldoKnown = true;
+    finalArc.osvaldoWestSeen = true;
+    finalArc.garciaCleared = false;
+    finalArc.claudiaTestimonyDone = false;
+    finalArc.westCaseResolved = false;
+
+    state.sideQuests = state.sideQuests || {};
+    state.sideQuests.westCase = state.sideQuests.westCase || {};
+    Object.assign(state.sideQuests.westCase, {
+      resolved: false,
+      garciaStatement: false,
+      osvaldoNamed: false
+    });
+
+    const forgotten = state.forgottenAlive;
+    forgotten.completed = forgotten.completed || {};
+    forgotten.completed.osmar = true;
+    forgotten.osmarStage = Math.max(3, forgotten.osmarStage || 0);
+
+    if (!forgotten.osmarAfterVisit) {
+      forgotten.osmarAfterVisit = {
+        version: 1,
+        pending: false,
+        active: false,
+        done: true,
+        returnPending: false,
+        returnedHome: true,
+        sleepRequested: true,
+        sleepCompleted: true,
+        nextDayReady: true,
+        sleepDay: Math.max(0, state.day - 1),
+        followupTalked: true,
+        time: 0,
+        x: 590,
+        y: 770
+      };
+    }
+
+    const scene = v0830EnsureOsvaldoScene();
+    scene.active = false;
+    scene.phase = "done";
+    scene.time = 0;
+
+    const flow = forgotten.osmarAfterVisit;
+    flow.nextDayReady = true;
+    flow.done = true;
+    flow.pending = false;
+    flow.returnedHome = true;
+    flow.sleepRequested = true;
+    flow.sleepCompleted = true;
+    v0849ApplyWestReadiness(flow);
+  }
+
+  function v0861RunStoryTestCommand(raw) {
+    const command = String(raw || "")
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/\s+/g, " ");
+
+    if (!command) return false;
+
+    if (command === "porta") {
+      v0861SetCommonDebugProgress(1, 0);
+      state.firstExit = false;
+      state.room = "foyer";
+      state.x = 570;
+      state.y = 305;
+      state.facing = "right";
+      enterGame();
+      updateHud();
+      save();
+      v06Toast("TESTE: primeira porta · chave e pistas já concluídas", 3);
+      return true;
+    }
+
+    if (command === "mercado") {
+      v0861SetCommonDebugProgress(1, 20 * 60);
+      state.storyFlags.marketParentsConfirmed = false;
+      state.storyFlags.squareVisited = false;
+      state.squareManFirstSpeechDone = false;
+      v0861FinishDebugTeleport(
+        "market", 310, 330, 1, 20 * 60,
+        "TESTE: mercado · primeira investigação"
+      );
+      return true;
+    }
+
+    if (command === "praca" || command === "praça") {
+      v0861SetCommonDebugProgress(2, 15 * 60);
+      state.storyFlags.marketParentsConfirmed = true;
+      state.storyFlags.squareVisited = true;
+      state.storyFlags.squareVendorTalked = false;
+      state.storyFlags.squareEarlyResidentTalked = false;
+      state.storyFlags.squareCardsTalked = false;
+      state.storyFlags.squareObserverSeen = false;
+      state.storyFlags.squareObserverReported = false;
+      state.squareManFirstSpeechDone = false;
+      v0861FinishDebugTeleport(
+        "square", 760, 430, 2, 15 * 60,
+        "TESTE: praça central · investigação após o mercado"
+      );
+      return true;
+    }
+
+    if (command === "raimundo") {
+      const finalArc = v0861SetCommonDebugProgress(4, 21 * 60);
+      state.storyFlags.marketParentsConfirmed = true;
+      state.storyFlags.squareVisited = true;
+      state.storyFlags.squareVendorTalked = true;
+      state.storyFlags.squareEarlyResidentTalked = true;
+      state.storyFlags.squareCardsTalked = true;
+      state.storyFlags.squareObserverSeen = true;
+      state.storyFlags.squareObserverReported = true;
+      state.storyFlags.raimundoMet = false;
+      state.storyFlags.mineExteriorSeen = false;
+      state.storyFlags.observerFirstSeen = false;
+      state.squareManFirstSpeechDone = true;
+      state.room = "oldRoad";
+      state.x = 610;
+      state.y = 740;
+      state.facing = "down";
+      state.walk = 0;
+      state.oldManEvent.phase = "waiting";
+      state.oldManEvent.x = 625;
+      state.oldManEvent.y = 785;
+      state.oldManEvent.runUnlocked = false;
+      finalArc.phase = "locked";
+      enterGame();
+      updateHud();
+      save();
+      v06Toast("TESTE: estrada de Raimundo · Capítulo 3 liberado", 3);
+      return true;
+    }
+
+    if (command === "oeste") {
+      const finalArc = v0861SetCommonDebugProgress(6, 22 * 60);
+      v0861SetWestCasePrerequisites(finalArc);
+      state.chapter4.bodySeen = false;
+      state.chapter4.bodyReported = false;
+      state.chapter4.bloodSeen = [];
+      state.garciaEvent.phase = "waiting";
+      state.garciaEvent.caught = false;
+      state.garciaEvent.x = 330;
+      state.garciaEvent.y = 350;
+      state.storyFlags.florindaChapter4Concern = false;
+      state.storyFlags.florindaChapter4ConcernSeen = false;
+      state.storyFlags.chapter4Complete = false;
+      finalArc.phase = "postWest";
+      finalArc.garciaCleared = false;
+      finalArc.claudiaTestimonyDone = false;
+      finalArc.westCaseResolved = false;
+      state.sideQuests.westCase.resolved = false;
+      state.sideQuests.westCase.garciaStatement = false;
+      state.sideQuests.westCase.osvaldoNamed = false;
+      v0861FinishDebugTeleport(
+        "westRoad", 1335, 390, 6, 22 * 60,
+        "TESTE: Rua Oeste · corpo e perseguição de Garcia"
+      );
+      state.flashlight.on = true;
+      save();
+      return true;
+    }
+
+    if (command === "rua esquerda" || command === "rua esquerda oeste") {
+      const finalArc = v0861SetCommonDebugProgress(7, 22 * 60);
+      v0861SetWestCasePrerequisites(finalArc);
+      state.chapter4.bodySeen = true;
+      state.chapter4.bodyReported = true;
+      finalArc.phase = "postWest";
+      finalArc.culdesacUnlocked = true;
+      finalArc.claudiaTestimonyDone = false;
+      finalArc.garciaCleared = false;
+      finalArc.westCaseResolved = false;
+      v0861FinishDebugTeleport(
+        "culdesacWest", 350, 390, 7, 22 * 60,
+        "TESTE: rua sem saída · casa de Cláudia"
+      );
+      return true;
+    }
+
+    if (command === "rua direita" || command === "rua direita praca") {
+      const finalArc = v0861SetCommonDebugProgress(8, 15 * 60);
+      v0861SetWestCasePrerequisites(finalArc);
+      finalArc.claudiaTestimonyDone = true;
+      finalArc.garciaCleared = true;
+      finalArc.westCaseResolved = true;
+      Object.assign(state.sideQuests.westCase, {
+        resolved: true,
+        garciaStatement: true,
+        osvaldoNamed: true
+      });
+      finalArc.raimundoCoupleRumorDone = true;
+      finalArc.plazaLinkUnlocked = true;
+      finalArc.phase = "coupleSearch";
+      finalArc.residentA = false;
+      finalArc.residentB = false;
+      finalArc.falseParentsFound = false;
+      finalArc.falseParentsHome = false;
+      v0861FinishDebugTeleport(
+        "coupleRoad", 640, 365, 8, 15 * 60,
+        "TESTE: rua de ligação à Praça · testemunhas do casal"
+      );
+      return true;
+    }
+
+    if (command === "corrida" || command === "corrida garcia") {
+      const finalArc = v0861SetCommonDebugProgress(6, 22 * 60);
+      v0861SetWestCasePrerequisites(finalArc);
+      finalArc.phase = "postWest";
+      state.chapter4.bodySeen = true;
+      state.chapter4.bodyReported = false;
+      state.chapter4.bloodSeen = [];
+      state.garciaEvent.phase = "chase";
+      state.garciaEvent.caught = false;
+      state.garciaEvent.x = 350;
+      state.garciaEvent.y = 360;
+      state.garciaEvent.grace = 1.5;
+      state.room = "westRoad";
+      state.x = 245;
+      state.y = 390;
+      state.facing = "right";
+      state.flashlight.on = true;
+      enterGame();
+      updateHud();
+      save();
+      v06Toast("TESTE: perseguição de Garcia · corra para a saída leste", 3);
+      return true;
+    }
+
+    if (command === "corrida pais" || command === "corrida2" || command === "perseguicao") {
+      const finalArc = v0861SetCommonDebugProgress(10, 23 * 60);
+      v0861SetWestCasePrerequisites(finalArc);
+      finalArc.claudiaTestimonyDone = true;
+      finalArc.garciaCleared = true;
+      finalArc.westCaseResolved = true;
+      Object.assign(state.sideQuests.westCase, {
+        resolved: true,
+        garciaStatement: true,
+        osvaldoNamed: true
+      });
+      finalArc.phase = "secondChase";
+      finalArc.houseEscaped = true;
+      finalArc.florindaFinalTalkDone = true;
+      finalArc.brotherWithPlayer = true;
+      finalArc.secondChaseActive = true;
+      finalArc.secondChaseTimer = 20;
+      finalArc.cellarKeyObtained = false;
+      finalArc.pursuersActive = true;
+      finalArc.pursuers = [
+        { id: "norberto", kind: "father", room: "village", x: 450, y: 700, facing: "down", cooldown: 0 },
+        { id: "claudia", kind: "mother", room: "village", x: 480, y: 700, facing: "down", cooldown: 0 }
+      ];
+      state.storyFlags.sys07hBlackout = false;
+      state.storyFlags.sysHunger = false;
+      state.storyFlags.sysDanger = false;
+      v0861FinishDebugTeleport(
+        "village", 610, 520, 10, 23 * 60,
+        "TESTE: segunda perseguição · falsos pais"
+      );
+      return true;
+    }
+
+    if (command === "pais" || command === "confronto pais") {
+      const finalArc = v0861SetCommonDebugProgress(9, 19 * 60);
+      v0861SetWestCasePrerequisites(finalArc);
+      finalArc.claudiaTestimonyDone = true;
+      finalArc.garciaCleared = true;
+      finalArc.westCaseResolved = true;
+      Object.assign(state.sideQuests.westCase, {
+        resolved: true,
+        garciaStatement: true,
+        osvaldoNamed: true
+      });
+      finalArc.garciaCleared = true;
+      finalArc.westCaseResolved = true;
+      finalArc.raimundoCoupleRumorDone = true;
+      finalArc.plazaLinkUnlocked = true;
+      finalArc.phase = "falseParentsRoad";
+      finalArc.residentA = true;
+      finalArc.residentB = true;
+      finalArc.falseParentsFound = true;
+      finalArc.falseParentsHome = false;
+      v0861FinishDebugTeleport(
+        "coupleRoad", 585, 365, 9, 19 * 60,
+        "TESTE: primeira confrontação com os falsos pais"
+      );
+      return true;
+    }
+
+    if (command === "porao" || command === "porão") {
+      const finalArc = v0861SetCommonDebugProgress(11, 0);
+      v0861SetWestCasePrerequisites(finalArc);
+      Object.assign(finalArc, {
+        phase: "cellarExplore",
+        culdesacUnlocked: true,
+        claudiaTestimonyDone: true,
+        garciaCleared: true,
+        westCaseResolved: true,
+        raimundoCoupleRumorDone: true,
+        plazaLinkUnlocked: true,
+        falseParentsFound: true,
+        falseParentsHome: true,
+        cameraRevealDone: true,
+        kitchenHideDone: true,
+        platesObtained: true,
+        plateSceneDone: true,
+        cellarKeyObtained: true,
+        brotherWithPlayer: true,
+        houseEscaped: true,
+        florindaFinalTalkDone: true,
+        secondChaseActive: false,
+        cellarEntered: true,
+        cellarToolsSeen: true,
+        cellarSplitSeen: true,
+        cellarMiningSeen: true,
+        secretPassageOpened: true,
+        pursuersActive: false,
+        pursuers: []
+      });
+      state.storyFlags.sys07hBlackout = false;
+      state.storyFlags.sysHunger = false;
+      state.storyFlags.sysDanger = false;
+      state.firstExit = false;
+      v0861FinishDebugTeleport(
+        "basement", 310, 330, 11, 0,
+        "TESTE: porão · Dia 11 · passagem já aberta"
+      );
+      return true;
+    }
+
+    return false;
+  }
+
+  const v0861RunDevCommandBase = v0645RunDevCommand;
+  v0645RunDevCommand = function(raw) {
+    if (v0861RunStoryTestCommand(raw)) return;
+    v0861RunDevCommandBase(raw);
+  };
+
+  function v0861BuildCommandPanel() {
+    modal(
+      "Painel de código / teste",
+      "",
+      [["Fechar", closeModal]]
+    );
+
+    const root = $("modalText");
+    root.replaceChildren();
+
+    const info = document.createElement("pre");
+    info.textContent =
+      "COMANDOS DE PROGRESSÃO\n" +
+      "porta         → primeira saída, na porta da casa\n" +
+      "mercado       → mercado, após as três pistas\n" +
+      "praça         → praça, após confirmar o mercado\n" +
+      "raimundo      → estrada de terra, Capítulo 3\n" +
+      "oeste         → começo da Rua Oeste, Capítulo 4\n" +
+      "corrida       → perseguição de Garcia, no Oeste\n" +
+      "rua esquerda → rua sem saída, casa de Cláudia\n" +
+      "rua direita  → rua de ligação à Praça, busca do casal\n" +
+      "pais          → primeira conversa com os falsos pais\n" +
+      "corrida pais  → perseguição dos falsos pais\n" +
+      "porão         → porão, Dia 11, passagem aberta\n\n" +
+      "COMANDOS ANTIGOS\n" +
+      "noite1 | amanhecer | pistas | casa | vila | fome 55";
+    info.style.whiteSpace = "pre-wrap";
+    info.style.fontSize = "12px";
+    info.style.lineHeight = "1.55";
+    root.append(info);
+
+    const input = document.createElement("input");
+    input.type = "text";
+    input.placeholder = "Digite um comando...";
+    input.autocomplete = "off";
+    input.style.width = "100%";
+    input.style.boxSizing = "border-box";
+    input.style.marginTop = "12px";
+    input.style.padding = "10px";
+    input.style.background = "#0b1116";
+    input.style.color = "#e1d5b8";
+    input.style.border = "1px solid #7f7358";
+
+    const run = document.createElement("button");
+    run.textContent = "Executar";
+    run.style.marginTop = "10px";
+
+    const execute = () => {
+      const value = input.value;
+      closeModal();
+      v0645RunDevCommand(value);
+    };
+
+    run.onclick = execute;
+    input.addEventListener("keydown", event => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        event.stopPropagation();
+        execute();
+      }
+    });
+
+    root.append(input, run);
+    setTimeout(() => input.focus(), 0);
+  }
+
+  function v0861OpenSecureDevPanel() {
+    modal(
+      "Acesso restrito",
+      "Digite a senha para abrir o painel de testes.",
+      [["Cancelar", closeModal]]
+    );
+
+    const root = $("modalText");
+    root.replaceChildren();
+
+    const input = document.createElement("input");
+    input.type = "password";
+    input.inputMode = "numeric";
+    input.maxLength = 4;
+    input.autocomplete = "off";
+    input.placeholder = "Senha de 4 dígitos";
+    input.style.width = "100%";
+    input.style.boxSizing = "border-box";
+    input.style.marginTop = "8px";
+    input.style.padding = "10px";
+    input.style.background = "#0b1116";
+    input.style.color = "#e1d5b8";
+    input.style.border = "1px solid #7f7358";
+
+    const feedback = document.createElement("p");
+    feedback.style.color = "#d7a28c";
+    feedback.style.minHeight = "18px";
+    feedback.style.margin = "8px 0 0";
+
+    const unlock = document.createElement("button");
+    unlock.textContent = "Acessar painel";
+    unlock.style.marginTop = "10px";
+
+    const verify = () => {
+      if (input.value !== "2612") {
+        feedback.textContent = "Senha incorreta.";
+        input.value = "";
+        input.focus();
+        return;
+      }
+
+      closeModal();
+      v0861BuildCommandPanel();
+    };
+
+    unlock.onclick = verify;
+    input.addEventListener("keydown", event => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        event.stopPropagation();
+        verify();
+      }
+    });
+
+    root.append(input, feedback, unlock);
+    setTimeout(() => input.focus(), 0);
+  }
+
+  v0645OpenDevPanel = v0861OpenSecureDevPanel;
+
+  // ---------------------------------------------------------
+  // OSVALDO: a cena sai da Rua do Mercado e passa para a rua central.
+  // Só começa depois da conversa de Osmar e da saída para Forgotten.
+  // O desbloqueio do Oeste continua dependendo do sono já existente.
+  // ---------------------------------------------------------
+
+  function v0861StartOsvaldoVillageScene() {
+    const flow = state?.forgottenAlive?.osmarAfterVisit;
+    const finalArc = v0828EnsureFinalArc();
+    const scene = v0830EnsureOsvaldoScene();
+
+    if (
+      !state ||
+      state.room !== "village" ||
+      !flow?.done ||
+      !flow.returnPending ||
+      finalArc.osvaldoWestSeen ||
+      scene.active ||
+      !["waiting", "transition"].includes(scene.phase)
+    ) {
+      return false;
+    }
+
+    scene.active = false;
+    scene.phase = "transition";
+    scene.time = 0;
+    transitionBusy = true;
+    keys.clear();
+    near = null;
+    save();
+
+    // Tela preta: reposiciona o protagonista no meio da rua central.
+    fade("", "", () => {
+      state.room = "village";
+      state.x = 649;
+      state.y = 510;
+      state.facing = "down";
+      state.walk = 0;
+
+      scene.active = true;
+      scene.phase = "approach";
+      scene.time = 0;
+      scene.x = 649;
+      scene.startY = 700;
+      scene.targetY = 565;
+      scene.y = scene.startY;
+      scene.startX = 649;
+      scene.targetX = 34;
+      scene.exitY = 424;
+
+      keys.clear();
+      near = null;
+      transitionBusy = true;
+      updateHud();
+      save();
+    });
+
+    return true;
+  }
+
+  // A rotina antiga só tentava disparar no norte. Agora ela não interrompe
+  // mais a conversa: o novo gatilho fica exclusivamente no bairro principal.
+  v0830StartOsvaldoStreetScene = function() {
+    return false;
+  };
+
+  v0830UpdateOsvaldoScene = function(dt) {
+    const scene = v0830EnsureOsvaldoScene();
+    const finalArc = v0828EnsureFinalArc();
+
+    if (!scene.active) return false;
+
+    if (scene.phase === "dialog") {
+      return true;
+    }
+
+    scene.time += dt;
+
+    if (scene.phase === "approach") {
+      const p = Math.min(1, scene.time / 1.45);
+      const eased = p * p * (3 - 2 * p);
+
+      scene.y =
+        scene.startY +
+        (scene.targetY - scene.startY) * eased;
+
+      if (p >= 1) {
+        scene.phase = "dialog";
+        scene.time = 0;
+        scene.y = scene.targetY;
+        transitionBusy = false;
+
+        say(
+          [
+            [
+              "Osvaldo",
+              "Ei, garoto. Você está voltando para casa?"
+            ],
+            [
+              "Estevão",
+              "Estou. Acabei de sair da rua do mercado."
+            ],
+            [
+              "Osvaldo",
+              "Então faça isso. Não é bom ficar andando sozinho por aqui."
+            ],
+            [
+              "Estevão",
+              "O senhor vai para onde?"
+            ],
+            [
+              "Osvaldo",
+              "Tenho um assunto para resolver do lado oeste. Vai para casa, garoto."
+            ]
+          ],
+          () => {
+            scene.phase = "leave";
+            scene.time = 0;
+            scene.startX = scene.x;
+            scene.startY = scene.y;
+            transitionBusy = true;
+            keys.clear();
+            save();
+          }
+        );
+      }
+
+      return true;
+    }
+
+    if (scene.phase === "leave") {
+      // Primeiro alcança a transversal; depois segue pela via oeste.
+      const p = Math.min(1, scene.time / 1.25);
+      const eased = p * p * (3 - 2 * p);
+      scene.y =
+        scene.startY +
+        (scene.exitY - scene.startY) * eased;
+
+      if (p >= 1) {
+        scene.phase = "leaveWest";
+        scene.time = 0;
+        scene.startX = scene.x;
+        scene.startY = scene.exitY;
+      }
+
+      return true;
+    }
+
+    if (scene.phase === "leaveWest") {
+      const p = Math.min(1, scene.time / 2.4);
+      const eased = p * p * (3 - 2 * p);
+
+      scene.x =
+        scene.startX +
+        (scene.targetX - scene.startX) * eased;
+      scene.y = scene.exitY;
+
+      if (p >= 1) {
+        scene.active = false;
+        scene.phase = "done";
+        scene.time = 0;
+        scene.x = scene.targetX;
+
+        finalArc.osvaldoKnown = true;
+        finalArc.osvaldoWestSeen = true;
+
+        if (state.forgottenAlive?.osmarAfterVisit) {
+          state.forgottenAlive.osmarAfterVisit.followupTalked = true;
+          state.forgottenAlive.osmarAfterVisit.returnPending = true;
+        }
+
+        transitionBusy = false;
+        keys.clear();
+        state.facing = "left";
+        updateHud();
+        save();
+
+        v06Toast(
+          "Osvaldo seguiu em direção à Rua Oeste.",
+          3
+        );
+      }
+
+      return true;
+    }
+
+    return true;
+  };
+
+  v0830DrawOsvaldoScene = function() {
+    const scene = state?.finalArc?.osvaldoStreetScene;
+
+    if (
+      !scene?.active ||
+      state.room !== "village"
+    ) {
+      return;
+    }
+
+    c.save();
+    c.translate(
+      -Math.floor(camera.x),
+      -Math.floor(camera.y)
+    );
+
+    const running = scene.phase === "approach";
+    const facing = running || scene.phase === "leave"
+      ? "up"
+      : scene.phase === "leaveWest"
+        ? "left"
+        : "down";
+
+    // Pequenas marcas de movimento durante a entrada correndo.
+    if (running) {
+      for (let i = 0; i < 3; i++) {
+        rect(
+          scene.x + 12 + i * 6,
+          scene.y + 9 + i * 3,
+          7,
+          2,
+          "rgba(190,184,165," + (0.42 - i * 0.10) + ")"
+        );
+      }
+    }
+
+    person(
+      scene.x,
+      scene.y,
+      "npcMale",
+      running ? scene.time * 15 : scene.time * 7,
+      facing,
+      0.96
+    );
+
+    txt(
+      "OSVALDO",
+      scene.x - 24,
+      scene.y - 37,
+      "#c4b99d",
+      7
+    );
+
+    c.restore();
+  };
+
+  const v0861PrepareBase = prepareSystems;
+  prepareSystems = function() {
+    v0861PrepareBase();
+
+    const scene = state
+      ? v0830EnsureOsvaldoScene()
+      : null;
+
+    if (!scene) return;
+
+    // Recupera um reload no fade ou durante a caixa de diálogo.
+    if (
+      !scene.active &&
+      scene.phase === "transition" &&
+      state.room === "village"
+    ) {
+      scene.phase = "waiting";
+      scene.time = 0;
+    }
+
+    if (
+      scene.active &&
+      scene.phase === "dialog" &&
+      !dialog
+    ) {
+      scene.active = false;
+      scene.phase = "waiting";
+      scene.time = 0;
+    }
+  };
+
+  const v0861UpdateBase = update;
+  update = function(dt) {
+    v0861UpdateBase(dt);
+
+    if (
+      !state ||
+      mode !== "game" ||
+      dialog ||
+      transitionBusy ||
+      !$("overlay").hidden ||
+      state.gameOver ||
+      state.dawnCollapse?.active ||
+      state.wakeUp?.active
+    ) {
+      return;
+    }
+
+    const flow = state.forgottenAlive?.osmarAfterVisit;
+    const finalArc = v0828EnsureFinalArc();
+    const scene = v0830EnsureOsvaldoScene();
+
+    // A cena é cinematográfica: nenhuma entrada pode mover/interagir
+    // com Estevão entre a chegada de Osvaldo e a saída dele para o Oeste.
+    if (scene.active && !dialog) {
+      transitionBusy = true;
+      keys.clear();
+      near = null;
+      return;
+    }
+
+    if (
+      state.room === "village" &&
+      flow?.done &&
+      flow.returnPending &&
+      !finalArc.osvaldoWestSeen &&
+      !scene.active &&
+      scene.phase === "waiting" &&
+      state.x >= 585 &&
+      state.x <= 713 &&
+      state.y >= 560
+    ) {
+      v0861StartOsvaldoVillageScene();
+    }
+  };
+
+  // Identificação visual única da build carregada.
+  $("version").textContent = "PROTÓTIPO · 0.8.61";
+
+  // =========================================================
+  // FIM DA CORREÇÃO 0.8.61
+  // =========================================================
+
 })();
