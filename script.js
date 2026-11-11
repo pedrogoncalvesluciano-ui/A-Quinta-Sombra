@@ -43506,11 +43506,56 @@ v0828GoodEnding = function() {
       cellarSplitSeen: false,
       cellarMiningSeen: false,
       secretPassageOpened: false,
+      motherFound: false,
+      worldDay: false,
+      observerFinalStarted: false,
+      realScore: 0,
+      lieScore: 0,
+      round: 0,
+      badEndingUnlocked: false,
+      goodEndingUnlocked: false,
       epilogueActive: false,
+      epilogueTalkedNPCs: [],
+      raimundoEpilogueDone: false,
+      finalHomeUnlocked: false,
+      homeBrotherDone: false,
+      homeMotherDone: false,
+      epilogueTvOn: false,
+      finalFigureStarted: false,
       completed: false,
       pursuersActive: false,
       pursuers: []
     });
+
+    // Desarma estados legados da rota antiga para que um atalho inicial
+    // não herde perseguições ou finais de um save já avançado.
+    for (const key of ["chapter6", "chapter7", "chapter8", "chapter9"]) {
+      if (state[key] && typeof state[key] === "object") {
+        if ("basementUnlocked" in state[key]) state[key].basementUnlocked = false;
+        if ("started" in state[key]) state[key].started = false;
+        if ("complete" in state[key]) state[key].complete = false;
+        if ("entered" in state[key]) state[key].entered = false;
+      }
+    }
+
+    state.ending = state.ending || {};
+    state.ending.complete = false;
+    state.ending.id = null;
+
+    if (state.copyFather && typeof state.copyFather === "object") {
+      state.copyFather.phase = "waiting";
+      state.copyFather.caught = false;
+      state.copyFather.followDelay = 0;
+    }
+
+    v0828CameraScene.active = false;
+    v0828CameraScene.text = "";
+    v0828CameraScene.phase = 0;
+
+    v0828TruthGame.active = false;
+    v0828TruthGame.round = 0;
+    v0828TruthGame.realScore = 0;
+    v0828TruthGame.lieScore = 0;
     const debugOsvaldoScene = v0830EnsureOsvaldoScene();
     debugOsvaldoScene.active = false;
     debugOsvaldoScene.phase = "waiting";
@@ -43708,6 +43753,12 @@ v0828GoodEnding = function() {
       state.storyFlags.florindaChapter4ConcernSeen = false;
       state.storyFlags.chapter4Complete = false;
       finalArc.phase = "postWest";
+      finalArc.garciaCleared = false;
+      finalArc.claudiaTestimonyDone = false;
+      finalArc.westCaseResolved = false;
+      state.sideQuests.westCase.resolved = false;
+      state.sideQuests.westCase.garciaStatement = false;
+      state.sideQuests.westCase.osvaldoNamed = false;
       v0861FinishDebugTeleport(
         "westRoad", 1335, 390, 6, 22 * 60,
         "TESTE: Rua Oeste · corpo e perseguição de Garcia"
