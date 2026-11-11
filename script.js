@@ -43655,8 +43655,8 @@ v0828GoodEnding = function() {
       state.storyFlags.observerFirstSeen = false;
       state.squareManFirstSpeechDone = true;
       state.room = "oldRoad";
-      state.x = 468;
-      state.y = 180;
+      state.x = 610;
+      state.y = 740;
       state.facing = "down";
       state.walk = 0;
       state.oldManEvent.phase = "waiting";
@@ -44272,6 +44272,15 @@ v0828GoodEnding = function() {
     const flow = state.forgottenAlive?.osmarAfterVisit;
     const finalArc = v0828EnsureFinalArc();
     const scene = v0830EnsureOsvaldoScene();
+
+    // A cena é cinematográfica: nenhuma entrada pode mover/interagir
+    // com Estevão entre a chegada de Osvaldo e a saída dele para o Oeste.
+    if (scene.active && !dialog) {
+      transitionBusy = true;
+      keys.clear();
+      near = null;
+      return;
+    }
 
     if (
       state.room === "village" &&
