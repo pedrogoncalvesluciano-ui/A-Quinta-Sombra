@@ -43440,8 +43440,6 @@ v0828GoodEnding = function() {
 
     const finalArc = v0828EnsureFinalArc();
     finalArc.useCanonicalLateArc = true;
-
-    v0849ApplyWestReadiness(flow);
     return finalArc;
   }
 
