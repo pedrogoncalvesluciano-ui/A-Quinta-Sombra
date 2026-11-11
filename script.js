@@ -953,7 +953,7 @@
       room: "foyer",
       x: housePoint(220),
       y: housePoint(315),
-      houseLayout: 1,
+      houseLayout: 2,
       familyFarewell: false,
       stage: "prologue",
       minutes: 14 * 60,
@@ -975,27 +975,50 @@
 
   const maps = {};
   // Coordenadas legadas continuam sendo usadas nas ligações entre cômodos.
-  // O mapa interno ocupa 80% da largura e altura, sem encolher personagens.
-  const HOUSE_SCALE = 0.8;
+  // A casa fica ligeiramente mais compacta, preservando a escala dos personagens.
+  const HOUSE_SCALE = 0.77;
   const housePoint = value => value * HOUSE_SCALE;
   const children = { x: housePoint(330), y: housePoint(195) };
   let openingStaticUntil = 0;
 
   function migrateHouseSave(saved) {
-    if (!saved || saved.houseLayout === 1) return;
+    if (!saved || saved.houseLayout >= 2) return;
+
+    // Saves antigos usavam coordenadas sem escala ou a escala 0.8.
+    // A versão 0.8.62 aplica a escala compacta uma única vez.
+    const layoutScale = saved.houseLayout === 1
+      ? HOUSE_SCALE / 0.8
+      : HOUSE_SCALE;
+
     if (saved.room !== "village") {
-      saved.x = housePoint(saved.x);
-      saved.y = housePoint(saved.y);
+      saved.x = Number(saved.x || 0) * layoutScale;
+      saved.y = Number(saved.y || 0) * layoutScale;
+
+      if (saved.room === "basement") {
+        saved.x = saved.x * V0862_BASEMENT_SCALE + V0862_BASEMENT_OFFSET.x;
+        saved.y = saved.y * V0862_BASEMENT_SCALE + V0862_BASEMENT_OFFSET.y;
+      }
     }
+
     const enemy = saved.danger?.enemy;
     if (enemy && enemy.room !== "village") {
-      enemy.x = housePoint(enemy.x);
-      enemy.y = housePoint(enemy.y);
-      enemy.path = enemy.path.map(point => point.map(housePoint));
+      const enemyScale = layoutScale;
+      enemy.x = Number(enemy.x || 0) * enemyScale;
+      enemy.y = Number(enemy.y || 0) * enemyScale;
+
+      if (enemy.room === "basement") {
+        enemy.x = enemy.x * V0862_BASEMENT_SCALE + V0862_BASEMENT_OFFSET.x;
+        enemy.y = enemy.y * V0862_BASEMENT_SCALE + V0862_BASEMENT_OFFSET.y;
+      }
+
+      if (Array.isArray(enemy.path)) {
+        enemy.path = enemy.path.map(point => point.map(value => value * enemyScale));
+      }
     }
+
     if (saved.stage === "prologue") saved.familyFarewell = true;
     delete saved.mother;
-    saved.houseLayout = 1;
+    saved.houseLayout = 2;
     migrateHouseSave(saved.rescueCheckpoint);
   }
 
@@ -14169,6 +14192,53 @@ if (!maps.basement) {
 }
 roomNames.basement = "Porão dos Lancaster";
 
+// 0.8.62: compacta o porão sem encolher os personagens.
+// A pequena margem horizontal mantém a sala inteira dentro do canvas.
+const V0862_BASEMENT_SCALE = 0.9;
+const V0862_BASEMENT_OFFSET = { x: 0, y: 0 };
+const v0862BasementMap = maps.basement;
+
+if (v0862BasementMap) {
+  const scaledWidth = v0862BasementMap.w * V0862_BASEMENT_SCALE;
+  const scaledHeight = v0862BasementMap.h * V0862_BASEMENT_SCALE;
+
+  V0862_BASEMENT_OFFSET.x = Math.max(0, (W - scaledWidth) / 2);
+  V0862_BASEMENT_OFFSET.y = Math.max(0, (H - scaledHeight) / 2);
+
+  for (const object of v0862BasementMap.objects) {
+    object.x = object.x * V0862_BASEMENT_SCALE + V0862_BASEMENT_OFFSET.x;
+    object.y = object.y * V0862_BASEMENT_SCALE + V0862_BASEMENT_OFFSET.y;
+    object.w *= V0862_BASEMENT_SCALE;
+    object.h *= V0862_BASEMENT_SCALE;
+  }
+
+  for (const exit of v0862BasementMap.doors) {
+    exit.x = exit.x * V0862_BASEMENT_SCALE + V0862_BASEMENT_OFFSET.x;
+    exit.y = exit.y * V0862_BASEMENT_SCALE + V0862_BASEMENT_OFFSET.y;
+  }
+
+  v0862BasementMap.w = Math.max(W, scaledWidth);
+  v0862BasementMap.h = Math.max(H, scaledHeight);
+}
+
+function v0862BasementPoint(value, axis = "x") {
+  const offset = axis === "y"
+    ? V0862_BASEMENT_OFFSET.y
+    : V0862_BASEMENT_OFFSET.x;
+  return housePoint(value) * V0862_BASEMENT_SCALE + offset;
+}
+
+function v0862BasementMapCoordinate(value, axis = "x") {
+  const offset = axis === "y"
+    ? V0862_BASEMENT_OFFSET.y
+    : V0862_BASEMENT_OFFSET.x;
+  return Number(value) * V0862_BASEMENT_SCALE + offset;
+}
+
+function v0862BasementSize(value) {
+  return housePoint(value) * V0862_BASEMENT_SCALE;
+}
+
 function v0650Chapter6Unlocked() {
   return Boolean(
     state &&
@@ -14241,7 +14311,7 @@ function v0650OpenBasement() {
     "O porão",
     "A fechadura antiga cede depois de alguns minutos.",
     () => {
-      go("basement", 310, 330);
+      go("basement", v0862BasementMapCoordinate(310, "x"), v0862BasementMapCoordinate(330, "y"));
       save();
     }
   );
@@ -14395,7 +14465,7 @@ update = function(dt) {
     state.room === "basement" &&
     state.chapter6.notebookRead &&
     !state.chapter6.staticSeen &&
-    state.x > housePoint(405)
+    state.x > v0862BasementPoint(405, "x")
   ) {
     state.chapter6.staticSeen = true;
     v0650BasementStaticUntil = elapsed + 0.75;
@@ -15211,8 +15281,8 @@ const V0650_ATTIC_AXIS_POS = {
 };
 
 const V0650_BASEMENT_HOLE_POS = {
-  x: housePoint(525),
-  y: housePoint(165)
+  x: v0862BasementPoint(525, "x"),
+  y: v0862BasementPoint(165, "y")
 };
 
 let v0650BasementObserverUntil = 0;
@@ -15272,8 +15342,8 @@ prepareSystems = function() {
 
   if (cabinet) {
     cabinet.x = state.chapter8.cabinetMoved
-      ? housePoint(350)
-      : housePoint(455);
+        ? v0862BasementPoint(350, "x")
+        : v0862BasementPoint(455, "x");
   }
 };
 
@@ -15446,7 +15516,7 @@ function v0650PushBasementCabinet() {
       );
 
       if (cabinet) {
-        cabinet.x = housePoint(350);
+        cabinet.x = v0862BasementPoint(350, "x");
       }
 
       v0650BasementObserverUntil = elapsed + 0.65;
@@ -15617,10 +15687,10 @@ drawWorld = function() {
       -Math.floor(camera.y)
     );
 
-    const hx = housePoint(475);
-    const hy = housePoint(94);
-    const hw = housePoint(82);
-    const hh = housePoint(145);
+    const hx = v0862BasementPoint(475, "x");
+    const hy = v0862BasementPoint(94, "y");
+    const hw = v0862BasementSize(82);
+    const hh = v0862BasementSize(145);
 
     rect(hx, hy, hw, hh, "#07090a");
     rect(hx + 6, hy + 7, hw - 12, hh - 14, "#111517");
@@ -17141,8 +17211,8 @@ function v070ReturnFromTunnel() {
     "",
     () => {
       state.room = "basement";
-      state.x = housePoint(475);
-      state.y = housePoint(175);
+      state.x = v0862BasementPoint(475, "x");
+      state.y = v0862BasementPoint(175, "y");
       state.facing = "left";
       state.walk = 0;
 
@@ -31424,8 +31494,8 @@ function v0828EnterCellar() {
     () => {
       go(
         "basement",
-        310,
-        330
+        v0862BasementMapCoordinate(310, "x"),
+        v0862BasementMapCoordinate(330, "y")
       );
 
       setTimeout(
@@ -31857,24 +31927,24 @@ getNear = function() {
   ) {
     const points = [
       {
-        x: housePoint(130),
-        y: housePoint(135),
+        x: v0862BasementPoint(130, "x"),
+        y: v0862BasementPoint(135, "y"),
         label:
           "Examinar ferramentas",
         action:
           "v0828CellarTools"
       },
       {
-        x: housePoint(325),
-        y: housePoint(130),
+        x: v0862BasementPoint(325, "x"),
+        y: v0862BasementPoint(130, "y"),
         label:
           "Examinar documento",
         action:
           "v0828CellarSplit"
       },
       {
-        x: housePoint(500),
-        y: housePoint(210),
+        x: v0862BasementPoint(500, "x"),
+        y: v0862BasementPoint(210, "y"),
         label:
           "Examinar equipamento",
         action:
@@ -31896,8 +31966,8 @@ getNear = function() {
     if (
       v0828CellarReadyForCabinet()
     ) {
-      const x = housePoint(505);
-      const y = housePoint(135);
+      const x = v0862BasementPoint(505, "x");
+      const y = v0862BasementPoint(135, "y");
 
       if (
         Math.hypot(
@@ -33095,26 +33165,14 @@ function v0828DrawMineCompanions() {
       -Math.floor(camera.y)
     );
 
-    const behind =
-      state.facing === "left"
-        ? 34
-        : state.facing === "right"
-          ? -34
-          : 0;
-
-    const behindY =
-      state.facing === "up"
-        ? 34
-        : state.facing === "down"
-          ? -34
-          : 22;
+    const companion = v0862EnsureBrotherFollower();
 
     person(
-      state.x + behind,
-      state.y + behindY,
+      companion.x,
+      companion.y,
       "brother",
-      state.walk * 0.8,
-      state.facing,
+      companion.walk,
+      companion.facing,
       0.82
     );
 
@@ -43935,9 +43993,14 @@ v0828GoodEnding = function() {
       state.storyFlags.sys07hBlackout = false;
       state.storyFlags.sysHunger = false;
       state.storyFlags.sysDanger = false;
-      state.firstExit = false;
+      // O checkpoint do porão é uma partida ativa, não a introdução.
+      state.firstExit = true;
+      finalArc.brotherFollower = null;
       v0861FinishDebugTeleport(
-        "basement", 310, 330, 11, 0,
+        "basement",
+        v0862BasementMapCoordinate(310, "x"),
+        v0862BasementMapCoordinate(330, "y"),
+        11, 0,
         "TESTE: porão · Dia 11 · passagem já aberta"
       );
       return true;
@@ -44400,10 +44463,163 @@ v0828GoodEnding = function() {
   };
 
   // Identificação visual única da build carregada.
-  $("version").textContent = "PROTÓTIPO · 0.8.61";
+  $("version").textContent = "PROTÓTIPO · 0.8.62";
 
   // =========================================================
-  // FIM DA CORREÇÃO 0.8.61
+  // 0.8.62 — PORÃO ATIVO, CÔMODOS COMPACTOS E IRMÃO AUTÔNOMO
+  // =========================================================
+
+  function v0862EnsureBrotherFollower() {
+    if (!state) {
+      return { x: 0, y: 0, walk: 0, facing: "right" };
+    }
+
+    const finalArc = v0828EnsureFinalArc();
+    let companion = finalArc.brotherFollower;
+
+    if (
+      !companion ||
+      typeof companion !== "object" ||
+      !Number.isFinite(companion.x) ||
+      !Number.isFinite(companion.y)
+    ) {
+      const heading = {
+        left: { x: -1, y: 0 },
+        right: { x: 1, y: 0 },
+        up: { x: 0, y: -1 },
+        down: { x: 0, y: 1 }
+      }[state.facing] || { x: 1, y: 0 };
+
+      const map = maps[state.room];
+      const pad = housePoint(47);
+      companion = {
+        x: Math.max(pad + 8, Math.min(map.w - pad, state.x - heading.x * 58 + heading.y * 14)),
+        y: Math.max(pad + 8, Math.min(map.h - pad, state.y - heading.y * 58 - heading.x * 14)),
+        walk: 0,
+        facing: state.facing || "right",
+        headingX: heading.x,
+        headingY: heading.y,
+        lastPlayerX: state.x,
+        lastPlayerY: state.y,
+        side: 1
+      };
+      finalArc.brotherFollower = companion;
+    }
+
+    if (!Number.isFinite(companion.walk)) companion.walk = 0;
+    if (!Number.isFinite(companion.headingX)) companion.headingX = 1;
+    if (!Number.isFinite(companion.headingY)) companion.headingY = 0;
+    if (!Number.isFinite(companion.lastPlayerX)) companion.lastPlayerX = state.x;
+    if (!Number.isFinite(companion.lastPlayerY)) companion.lastPlayerY = state.y;
+    if (!Number.isFinite(companion.side)) companion.side = 1;
+
+    return companion;
+  }
+
+  function v0862UpdateBrotherFollower(dt) {
+    if (
+      !state ||
+      mode !== "game" ||
+      state.room !== "undergroundPassage"
+    ) {
+      return;
+    }
+
+    const finalArc = v0828EnsureFinalArc();
+    if (
+      !finalArc.useCanonicalLateArc ||
+      finalArc.phase !== "tunnel" ||
+      !finalArc.brotherWithPlayer ||
+      dialog ||
+      transitionBusy ||
+      !$("overlay").hidden
+    ) {
+      return;
+    }
+
+    const companion = v0862EnsureBrotherFollower();
+    const moveX = state.x - companion.lastPlayerX;
+    const moveY = state.y - companion.lastPlayerY;
+    const playerMoved = Math.hypot(moveX, moveY);
+
+    if (playerMoved > 0.25) {
+      const length = playerMoved || 1;
+      companion.headingX = moveX / length;
+      companion.headingY = moveY / length;
+    }
+
+    companion.lastPlayerX = state.x;
+    companion.lastPlayerY = state.y;
+
+    const targetX =
+      state.x - companion.headingX * 62 +
+      companion.headingY * 15 * companion.side;
+    const targetY =
+      state.y - companion.headingY * 62 -
+      companion.headingX * 15 * companion.side;
+
+    const dx = targetX - companion.x;
+    const dy = targetY - companion.y;
+    const distance = Math.hypot(dx, dy);
+
+    if (distance < 7) {
+      companion.walk = 0;
+      return;
+    }
+
+    const distanceFromPlayer = Math.hypot(
+      state.x - companion.x,
+      state.y - companion.y
+    );
+    const speed = distanceFromPlayer > 150
+      ? 118
+      : distanceFromPlayer > 92
+        ? 88
+        : 60;
+    const step = Math.min(distance, speed * dt);
+    const nextX = companion.x + dx / distance * step;
+    const nextY = companion.y + dy / distance * step;
+
+    let movedX = 0;
+    let movedY = 0;
+
+    if (!solid(nextX, companion.y)) {
+      movedX = nextX - companion.x;
+      companion.x = nextX;
+    }
+    if (!solid(companion.x, nextY)) {
+      movedY = nextY - companion.y;
+      companion.y = nextY;
+    }
+
+    if (movedX || movedY) {
+      companion.facing = Math.abs(movedX) > Math.abs(movedY)
+        ? (movedX > 0 ? "right" : "left")
+        : (movedY > 0 ? "down" : "up");
+      companion.walk += dt * 12;
+    } else {
+      companion.walk = 0;
+    }
+  }
+
+  const v0862EnterTunnelBase = v0828EnterTunnel;
+  v0828EnterTunnel = function() {
+    const finalArc = v0828EnsureFinalArc();
+    finalArc.brotherWithPlayer = true;
+    finalArc.brotherFollower = null;
+    return v0862EnterTunnelBase();
+  };
+
+  const v0862UpdateBase = update;
+  update = function(dt) {
+    v0862UpdateBase(dt);
+    v0862UpdateBrotherFollower(dt);
+  };
+
+  $("version").textContent = "PROTÓTIPO · 0.8.62";
+
+  // =========================================================
+  // FIM DA CORREÇÃO 0.8.62
   // =========================================================
 
 })();
